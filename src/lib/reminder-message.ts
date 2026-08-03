@@ -83,7 +83,7 @@ function formatDuration(minutes: number): string {
 }
 
 function cleanField(value: string, max: number): string {
-	return truncate(escapeMarkdown(normalizeLine(value)), max);
+	return truncate(escapeMarkdown(neutralizeLinks(escapeHtml(normalizeLine(value)))), max);
 }
 
 function normalizeLine(value: string): string {
@@ -91,7 +91,18 @@ function normalizeLine(value: string): string {
 }
 
 function escapeMarkdown(value: string): string {
-	return value.replace(/([\\`*_\[\]()])/g, '\\$1');
+	return value.replace(/([\\`*_{}\[\]()#+.!|~])/g, '\\$1');
+}
+
+function escapeHtml(value: string): string {
+	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function neutralizeLinks(value: string): string {
+	return value
+		.replace(/([a-z][a-z\d+.-]*):(?=\/\/)/gi, '$1:\u200b')
+		.replace(/\.(?=[a-z\d])/gi, '.\u200b')
+		.replace(/@/g, '@\u200b');
 }
 
 function truncate(value: string, max: number): string {
