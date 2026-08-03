@@ -113,12 +113,24 @@ test('falls back to deterministic copy and delivers when Gemini fails', async ()
 	assert.doesNotMatch(result.logs.join('\n'), /PRIVATE-42/);
 });
 
-test('times out a stalled Gemini intro and still delivers', async () => {
+test('cancels a stalled Gemini intro, releases its handle, and still delivers', async () => {
 	const posts: string[] = [];
+	let cancelled = false;
+	let active = false;
 	const startedAt = Date.now();
 	const result = await run({
 		config: config({ useLlmIntro: true, timeoutMs: 10 }),
-		generateIntro: () => new Promise(() => {}),
+		generateIntro: (_input, signal) => new Promise((_resolve, reject) => {
+			assert.ok(signal);
+			active = true;
+			const handle = setInterval(() => {}, 1_000);
+			signal.addEventListener('abort', () => {
+				cancelled = true;
+				active = false;
+				clearInterval(handle);
+				reject(signal.reason);
+			}, { once: true });
+		}),
 		post: async (message) => {
 			posts.push(message);
 		},
@@ -126,13 +138,15 @@ test('times out a stalled Gemini intro and still delivers', async () => {
 
 	assert.equal(posts.length, 1);
 	assert.ok(Date.now() - startedAt < 500);
+	assert.equal(cancelled, true);
+	assert.equal(active, false);
 	assert.match(result.logs.join('\n'), /using deterministic copy: TimeoutError/);
 });
 
 interface RunOptions {
 	tickets?: JiraTicket[];
 	config?: AppConfig;
-	generateIntro?: (input: string) => Promise<string>;
+	generateIntro?: (input: string, signal: AbortSignal) => Promise<string>;
 	buildMessages?: () => string[];
 	post?: (message: string) => Promise<void>;
 }

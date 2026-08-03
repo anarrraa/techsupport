@@ -26,14 +26,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.19.0
+          node-version-file: .node-version
           cache: npm
-      - name: Verify Node and npm versions
-        run: |
-          node --version
-          npm --version
-          test "$(node --version)" = "v22.19.0"
-          test "$(npm --version)" = "10.9.3"
+      - name: Verify repository toolchain
+        run: node scripts/verify-toolchain.mjs
       - run: npm ci
       - run: npm test
       - run: npm run typecheck

@@ -30,7 +30,7 @@ interface RunJiraTeamsReminderOptions {
 	config: AppConfig;
 	log: WorkflowLog;
 	now?: Date;
-	generateIntro?: (input: string) => Promise<string>;
+	generateIntro?: (input: string, signal: AbortSignal) => Promise<string>;
 	dependencies?: Partial<WorkflowDependencies>;
 }
 
@@ -54,8 +54,8 @@ export default defineWorkflow({
 		return runJiraTeamsReminder({
 			config: loadConfig(),
 			log,
-			generateIntro: async (input) => {
-				const response = await (await harness.session()).prompt(input);
+			generateIntro: async (input, signal) => {
+				const response = await (await harness.session()).prompt(input, { signal });
 				return response.text;
 			},
 		});
@@ -108,9 +108,10 @@ export async function runJiraTeamsReminder(
 				developerCount,
 				priorities,
 			});
-			intro = cleanIntro(
-				await withTimeout(generateIntro(input), config.http.timeoutMs),
-			);
+			intro = cleanIntro(await withTimeout(
+				(signal) => generateIntro(input, signal),
+				config.http.timeoutMs,
+			));
 		} catch (error) {
 			log.warn(`Reminder intro generation failed; using deterministic copy: ${errorName(error)}`);
 		}
@@ -150,18 +151,19 @@ function errorName(error: unknown): string {
 	return error instanceof Error ? error.name : 'UnknownError';
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-	let timeout: ReturnType<typeof setTimeout>;
-	const timeoutPromise = new Promise<never>((_resolve, reject) => {
-		timeout = setTimeout(() => {
-			const error = new Error(`Reminder intro generation timed out after ${timeoutMs}ms`);
-			error.name = 'TimeoutError';
-			reject(error);
-		}, timeoutMs);
-	});
+async function withTimeout<T>(
+	operation: (signal: AbortSignal) => Promise<T>,
+	timeoutMs: number,
+): Promise<T> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => {
+		const error = new Error(`Reminder intro generation timed out after ${timeoutMs}ms`);
+		error.name = 'TimeoutError';
+		controller.abort(error);
+	}, timeoutMs);
 	try {
-		return await Promise.race([promise, timeoutPromise]);
+		return await operation(controller.signal);
 	} finally {
-		clearTimeout(timeout!);
+		clearTimeout(timeout);
 	}
 }
