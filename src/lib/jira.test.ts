@@ -66,7 +66,7 @@ test('caps empty Jira search pages even when tokens remain unique', async () => 
 	assert.equal(page, 2);
 });
 
-test('marks an exact maxResults response as truncated', async () => {
+test('does not mark an exact maxResults final page as truncated', async () => {
 	let requestedMaxResults: number | undefined;
 	const fetchImpl: typeof fetch = async (input, init) => {
 		const url = String(input);
@@ -80,6 +80,27 @@ test('marks an exact maxResults response as truncated', async () => {
 
 	const result = await fetchTickets({ ...config(), pageSize: 2, maxResults: 2 }, fetchImpl);
 	assert.equal(requestedMaxResults, 2);
+	assert.equal(result.scanned, 2);
+	assert.equal(result.truncated, false);
+});
+
+test('marks an exact maxResults response with more pages as truncated', async () => {
+	let searchCalls = 0;
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			searchCalls += 1;
+			return Response.json({
+				issues: [issue('SUP-1'), issue('SUP-2')],
+				isLast: false,
+				nextPageToken: 'page-2',
+			});
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets({ ...config(), pageSize: 2, maxResults: 2 }, fetchImpl);
+	assert.equal(searchCalls, 1);
 	assert.equal(result.scanned, 2);
 	assert.equal(result.truncated, true);
 });

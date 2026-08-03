@@ -73,8 +73,9 @@ strict paging/on-call system must be implemented separately.
 5. Copy `.env.example` to `.env` and fill in the local values. Never commit `.env`
    or a service-account JSON key.
 
-Use a project-specific `JIRA_JQL`; the default query scans every assigned,
-non-Done issue visible to the integration account.
+Non-dry runs require an explicit, project-specific `JIRA_JQL`. The fallback query
+is dry-run-only and scans every assigned, non-Done issue visible to the integration
+account.
 
 ## Commands
 
@@ -105,8 +106,9 @@ Google Workload Identity Federation. Configure these repository secrets:
 - `JIRA_API_TOKEN`
 - `TEAMS_WEBHOOK_URL`
 
-Optional repository variables are documented in `.env.example`. In particular,
-set `JIRA_JQL` and verify `JIRA_FIRST_RESPONSE_SLA_NAME` against production Jira.
+Configure `JIRA_JQL` as a required repository variable for non-dry runs. Other
+optional repository variables are documented in `.env.example`; verify
+`JIRA_FIRST_RESPONSE_SLA_NAME` against production Jira.
 
 ## Operational limits
 

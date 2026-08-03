@@ -110,7 +110,7 @@ async function fetchIssuePages(
 		nextPageToken = data.nextPageToken;
 	}
 
-	return { values, truncated: pageWasTruncated || values.length >= config.maxResults };
+	return { values, truncated: pageWasTruncated || (hasMore && values.length >= config.maxResults) };
 }
 
 async function fetchFirstResponseSla(
