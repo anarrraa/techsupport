@@ -1,0 +1,25 @@
+{
+	"name": "techsupport-jira-teams-reminder",
+	"version": "0.1.0",
+	"private": true,
+	"engines": {
+		"node": ">=22.19.0"
+	},
+  "dependencies": {
+    "@flue/runtime": "^1.0.0-beta.9",
+    "valibot": "^1.4.2"
+  },
+  "devDependencies": {
+    "@flue/cli": "^1.0.0-beta.9",
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "dev": "flue dev --target node",
+    "build": "flue build --target node",
+    "remind": "flue run jira-teams-reminder --target node",
+    "typecheck": "tsc --noEmit",
+		"test": "node --test src/lib/*.test.ts"
+  },
+  "type": "module"
+}

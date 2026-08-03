@@ -1,0 +1,65 @@
+name: Jira to Teams reminder
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Fetch and select tickets without posting to Teams
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: jira-teams-reminder
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+
+      - name: Authenticate to Google Cloud
+        if: vars.REMINDER_USE_LLM_INTRO == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Run reminder
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_LOCATION: ${{ secrets.GOOGLE_CLOUD_LOCATION }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_JQL: ${{ vars.JIRA_JQL }}
+          JIRA_FIRST_RESPONSE_SLA_NAME: ${{ vars.JIRA_FIRST_RESPONSE_SLA_NAME }}
+          JIRA_PAGE_SIZE: ${{ vars.JIRA_PAGE_SIZE }}
+          JIRA_MAX_RESULTS: ${{ vars.JIRA_MAX_RESULTS }}
+          JIRA_MAX_SEARCH_PAGES: ${{ vars.JIRA_MAX_SEARCH_PAGES }}
+          JIRA_SLA_PAGE_SIZE: ${{ vars.JIRA_SLA_PAGE_SIZE }}
+          JIRA_MAX_SLA_PAGES: ${{ vars.JIRA_MAX_SLA_PAGES }}
+          JIRA_SLA_CONCURRENCY: ${{ vars.JIRA_SLA_CONCURRENCY }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          REMINDER_REPEAT_MINUTES: ${{ vars.REMINDER_REPEAT_MINUTES }}
+          REMINDER_DELIVERY_WINDOW_MINUTES: ${{ vars.REMINDER_DELIVERY_WINDOW_MINUTES }}
+          REMINDER_USE_LLM_INTRO: ${{ vars.REMINDER_USE_LLM_INTRO }}
+          REMINDER_DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          TEAMS_MAX_MESSAGE_CHARS: ${{ vars.TEAMS_MAX_MESSAGE_CHARS }}
+          HTTP_TIMEOUT_MS: ${{ vars.HTTP_TIMEOUT_MS }}
+          HTTP_MAX_RETRIES: ${{ vars.HTTP_MAX_RETRIES }}
+        run: npm run remind
