@@ -181,6 +181,46 @@ test('does not exceed the configured SLA lookup concurrency', async () => {
 	assert.equal(maxActive, 2);
 });
 
+test('canonicalizes generated Jira ticket URLs across accepted base URL edges', async () => {
+	const cases = [
+		{
+			baseUrl: 'https://EXAMPLE.atlassian.net:443/root path)/',
+			key: 'SUP-1',
+			expected: 'https://example.atlassian.net/root%20path%29/browse/SUP-1',
+		},
+		{
+			baseUrl: 'https://example.atlassian.net/nested///?ignored=yes#fragment',
+			key: 'SUP )1',
+			expected: 'https://example.atlassian.net/nested/browse/SUP%20%291',
+		},
+		{
+			baseUrl: 'https://example.atlassian.net/',
+			key: 'SUP-1',
+			expected: 'https://example.atlassian.net/browse/SUP-1',
+		},
+	];
+
+	for (const entry of cases) {
+		const result = await fetchSingleTicket(entry.baseUrl, entry.key);
+		assert.equal(result.tickets[0]?.url, entry.expected);
+		assert.doesNotMatch(result.tickets[0]?.url ?? '', /[\s()]/);
+	}
+});
+
+test('requires HTTPS before constructing generated Jira ticket URLs', async () => {
+	let requestCount = 0;
+	const fetchImpl: typeof fetch = async () => {
+		requestCount += 1;
+		throw new Error('Unexpected request');
+	};
+
+	await assert.rejects(
+		fetchTickets({ ...config(), baseUrl: 'http://example.atlassian.net' }, fetchImpl),
+		/Jira base URL must use HTTPS/,
+	);
+	assert.equal(requestCount, 0);
+});
+
 function config(): JiraConfig {
 	return {
 		baseUrl: 'https://example.atlassian.net',
@@ -224,4 +264,15 @@ function metric(name: string) {
 
 function slaPage(value: ReturnType<typeof metric>) {
 	return { start: 0, limit: 1, isLastPage: true, values: [value] };
+}
+
+async function fetchSingleTicket(baseUrl: string, key: string) {
+	let requestCount = 0;
+	const fetchImpl: typeof fetch = async () => {
+		requestCount += 1;
+		return requestCount === 1
+			? Response.json({ issues: [issue(key)], isLast: true })
+			: Response.json({ start: 0, limit: 1, isLastPage: true, values: [metric('First response')] });
+	};
+	return fetchTickets({ ...config(), baseUrl }, fetchImpl, async () => {});
 }

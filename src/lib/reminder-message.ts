@@ -6,6 +6,8 @@ const DOMAIN_PATTERN = String.raw`(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{
 const URL_PATTERN = /[a-z][a-z\d+.-]*:\/\/[^\s<>{}\[\]()]+/giu;
 const EMAIL_PATTERN = new RegExp(String.raw`[\p{L}\p{N}._%+-]+@${DOMAIN_PATTERN}`, 'gu');
 const DOMAIN_CANDIDATE_PATTERN = new RegExp(DOMAIN_PATTERN, 'gu');
+const DANGEROUS_FORMAT_CONTROLS = /[\u00ad\u061c\u180e\u200b\u200e\u200f\u202a-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb]|\u{e0001}|[\u{e0020}-\u{e007f}]/gu;
+const C0_C1_CONTROLS = /[\u0000-\u001f\u007f-\u009f]/g;
 
 export function buildReminderMessages(
 	tickets: JiraTicket[],
@@ -94,7 +96,12 @@ function cleanField(value: string, max: number): string {
 }
 
 function normalizeLine(value: string): string {
-	return value.replace(/\p{Cf}/gu, '').replace(/[\r\n\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
+	return value
+		.replace(DANGEROUS_FORMAT_CONTROLS, '')
+		.replace(/[\r\n\u2028\u2029]+/g, ' ')
+		.replace(/\s+/g, ' ')
+		.replace(C0_C1_CONTROLS, '')
+		.trim();
 }
 
 function sanitizeText(value: string): string {

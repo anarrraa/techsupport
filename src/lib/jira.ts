@@ -32,6 +32,7 @@ export async function fetchTickets(
 	fetchImpl: Fetch = fetch,
 	sleep?: Sleep,
 ): Promise<JiraFetchResult> {
+	const ticketBaseUrl = canonicalTicketBaseUrl(config.baseUrl);
 	const issues = await fetchIssuePages(config, fetchImpl, sleep);
 	const slas = await mapConcurrent(issues.values, config.slaConcurrency, (issue) =>
 		fetchFirstResponseSla(issue.key, config, fetchImpl, sleep),
@@ -43,7 +44,7 @@ export async function fetchTickets(
 		status: issue.fields.status?.name ?? 'Unknown',
 		priority: issue.fields.priority?.name ?? 'None',
 		assignee: issue.fields.assignee?.displayName ?? 'Unassigned',
-		url: `${config.baseUrl}/browse/${encodeURIComponent(issue.key)}`,
+		url: buildTicketUrl(ticketBaseUrl, issue.key),
 		firstResponseSla: slas[index] ?? null,
 	}));
 	const withoutSla = tickets.filter((ticket) => ticket.firstResponseSla === null).length;
@@ -59,6 +60,24 @@ export async function fetchTickets(
 		withoutSla,
 		truncated: issues.truncated,
 	};
+}
+
+function canonicalTicketBaseUrl(value: string): URL {
+	const url = new URL(value);
+	if (url.protocol !== 'https:') throw new Error('Jira base URL must use HTTPS');
+	url.pathname = url.pathname.replace(/\/+$/, '');
+	url.search = '';
+	url.hash = '';
+	return url;
+}
+
+function buildTicketUrl(baseUrl: URL, issueKey: string): string {
+	const url = new URL(baseUrl);
+	const basePath = baseUrl.pathname === '/' ? '' : baseUrl.pathname;
+	url.pathname = `${basePath}/browse/${encodeURIComponent(issueKey)}`;
+	const destination = url.toString().replace(/\(/g, '%28').replace(/\)/g, '%29');
+	if (/[\s()]/u.test(destination)) throw new Error('Generated Jira ticket URL is not Markdown-safe');
+	return destination;
 }
 
 async function fetchIssuePages(

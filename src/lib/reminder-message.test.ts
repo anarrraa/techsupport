@@ -16,7 +16,7 @@ test('builds factual Jira links and escapes untrusted markdown', () => {
 		1_000,
 		'Please respond',
 	);
-	assert.match(message ?? '', /\[SUP-1\]\(https:\/\/example\.atlassian\.net\/browse\/SUP-1\)/);
+	assert.deepEqual(markdownTargets(message ?? ''), ['https://example.atlassian.net/browse/SUP-1']);
 	assert.match(message ?? '', /Login \\\*broken\\\*/);
 	assert.doesNotMatch(message ?? '', /\nignore/);
 	assert.doesNotMatch(message ?? '', /Developer\nInjected/);
@@ -110,7 +110,20 @@ test('keeps one trusted Jira link in a compact continuation at the max boundary'
 	assert.equal(messages.length, 2);
 	assert.ok(messages.every((message) => message.length <= 1_000));
 	assert.equal(output.match(new RegExp(escapeRegExp(trustedUrl), 'g'))?.length, 1);
-	assert.ok(output.includes(`[SUP-2](${trustedUrl})`));
+	assert.deepEqual(markdownTargets(output), [
+		'https://example.atlassian.net/browse/SUP-1',
+		trustedUrl,
+	]);
+	assert.ok(messages[1]?.includes(`- [SUP-2](${trustedUrl}) · High · 1ц 30м хэтэрсэн`));
+});
+
+test('uses the exact trusted Jira target in the link-only representation', () => {
+	const trustedUrl = 'https://example.atlassian.net/browse/SUP-1';
+	const [message] = buildReminderMessages([ticket({ url: trustedUrl })], NOW, 180);
+
+	assert.ok((message?.length ?? Infinity) <= 180);
+	assert.deepEqual(markdownTargets(message ?? ''), [trustedUrl]);
+	assert.match(message ?? '', new RegExp(`^- \\[SUP-1\\]\\(${escapeRegExp(trustedUrl)}\\)$`, 'm'));
 });
 
 test('fails when maxChars cannot contain the required trusted Jira link', () => {
@@ -148,6 +161,15 @@ test('neutralizes only Unicode-aware link candidates with visible delimiters', (
 	);
 });
 
+test('preserves valid join controls while removing dangerous and C0/C1 controls', () => {
+	assert.equal(cleanIntro('👩‍💻 می‌روم'), '👩‍💻 می‌روم');
+	assert.equal(cleanIntro('Hello\t\u0000world\u001b'), 'Hello world');
+	assert.equal(
+		cleanIntro('\u0000\u001b\u0085\u202e\u200b'),
+		'Багийнхаан, дараах тикетүүдийн анхны хариу өгөх SLA хэтэрсэн байна.',
+	);
+});
+
 function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 	return {
 		key: 'SUP-1',
@@ -170,4 +192,8 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 
 function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function markdownTargets(message: string): string[] {
+	return Array.from(message.matchAll(/\[[^\]\n]+\]\(([^)\s]+)\)/g), (match) => match[1] as string);
 }
