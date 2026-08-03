@@ -1,0 +1,81 @@
+# Agent instructions
+
+These instructions apply to the entire repository.
+
+## Required context
+
+Before planning or changing code, read these files in order:
+
+1. `docs/prd-priority-sla-reminders.md` for the current MVP requirements.
+2. `docs/mvp-roadmap.md` for current status, blockers, execution order, and the
+   definition of done.
+3. `docs/sla-matrix.md` for contractual SLA goals and explicit assumptions.
+4. `README.md` for architecture, setup, commands, and operational limits.
+
+The PRD defines behavior. The SLA matrix defines contract values. The roadmap
+defines release status and work priority. If they conflict, stop and surface the
+conflict instead of guessing.
+
+## Current priority
+
+Finish the existing Jira JSM to Teams First Response SLA reminder MVP before
+building the dashboard or other V2 features. Start with the first unchecked task
+in the earliest incomplete roadmap milestone unless the user explicitly changes
+the priority.
+
+## Non-negotiable invariants
+
+- Jira Service Management owns SLA goals, working calendars, pauses, holidays,
+  and breach state. Do not recreate SLA age or calendar math from issue timestamps.
+- Only an ongoing, breached, unpaused cycle inside calendar hours is eligible.
+- Jira-controlled content must not be sent to an LLM. Optional model input is
+  aggregate counts only.
+- Dry-run mode must not post to Teams or expose ticket content or identities in
+  logs or workflow output.
+- External requests, pagination, concurrency, retries, and retry waits must be
+  explicitly bounded.
+- A missing configured SLA metric across all scanned tickets must fail visibly.
+- Keep `.env`, `.env.*`, service-account files, tokens, and webhook URLs out of
+  source, patches, test fixtures, logs, and documentation.
+
+## Working protocol
+
+- Make the smallest change that completes one roadmap acceptance criterion.
+- Preserve the existing module seams unless a testability requirement justifies a
+  change.
+- Add or update tests for changed behavior, especially workflow side effects and
+  privacy guarantees.
+- Do not claim an integration works without an executed external check.
+- Do not inspect or print `.env` or `gcp-sa.json`; use `.env.example` for variable
+  names and documentation.
+- Do not commit or push unless the user explicitly asks.
+
+## Required verification
+
+For implementation changes, run:
+
+```sh
+npm test
+npm run typecheck
+npm run build
+```
+
+Run `npm ci` when dependency metadata changes or when validating clean-install
+behavior. For deployment changes, inspect the resulting GitHub Actions run and do
+not treat local success as production evidence.
+
+## Documentation updates
+
+When roadmap work is completed:
+
+- Update `docs/mvp-roadmap.md` in the same change.
+- Check a task only when its acceptance condition has evidence.
+- Refresh the evidence snapshot when a newer local or GitHub result supersedes it.
+- Keep the PRD focused on requirements; keep progress and run evidence in the
+  roadmap.
+
+## Scope guard
+
+The dashboard, analytics database, Microsoft Entra group login, personal Teams
+bot, durable delivery ledger, read receipts, and acknowledgements are post-MVP V2
+work. They require an explicit PRD and roadmap update before implementation.

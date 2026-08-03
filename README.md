@@ -4,6 +4,13 @@ A scheduled Flue workflow that reads Jira Service Management's authoritative
 **First Response SLA**, selects currently breached requests, and posts a concise
 developer-grouped reminder to a Microsoft Teams channel.
 
+## Project status
+
+The implementation baseline exists, but the production MVP is not complete. See
+`docs/mvp-roadmap.md` for current evidence, release blockers, rollout steps, and
+the definition of done. Repository agents must follow `AGENTS.md` before making
+changes.
+
 The complete output is deterministic by default. Gemini on Vertex AI is optional and receives
 aggregate counts only to write a one-line introduction; Jira titles, names, email
 addresses, and links are never sent to the model.
