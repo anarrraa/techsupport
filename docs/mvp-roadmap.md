@@ -14,23 +14,25 @@ requirements.
 
 **Baseline implemented; production MVP not complete.**
 
-The Jira adapter, SLA selection policy, deterministic message builder, Teams
-webhook adapter, scheduled workflow, and unit tests exist. Local acceptance
-commands pass, but the current GitHub CI run is red and the scheduled production
-workflow has not completed a run. Dry-run output also exposes assignee names,
-which conflicts with the aggregate-only logging requirement.
+The implementation and local release-hardening work are complete. Local
+acceptance commands pass, dry-run output is aggregate-only, and release-critical
+workflow branches are covered. The current GitHub CI evidence is still red because
+the integrated commits have not been pushed. A local production Jira dry-run
+reached the JSM SLA endpoint but failed with `403 Forbidden`, so the integration
+account's SLA access is the current external blocker.
 
 ## Evidence snapshot
 
 | Check | Status | Evidence |
 | --- | --- | --- |
 | Clean local install | Pass | `npm ci` passed on 2026-08-03 |
-| Unit tests | Pass | `npm test`: 19 passed, 0 failed on 2026-08-03 |
+| Unit tests | Pass | `npm test`: 44 passed, 0 failed on 2026-08-03 |
 | Type checking | Pass | `npm run typecheck` passed on 2026-08-03 |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-08-03 |
 | GitHub CI | Fail | Run `30794553488` failed at `npm ci` with lockfile sync errors |
 | Scheduled reminder workflow | Unverified | Workflow is active but has 0 completed runs as of 2026-08-03 |
-| Live Jira-to-Teams delivery | Unverified | No controlled production delivery evidence recorded |
+| Local production dry-run | Blocked | Jira search reached SLA lookup; JSM SLA API returned `403 Forbidden` on 2026-08-03 |
+| Live Jira-to-Teams delivery | Not attempted | User authorized dry-run only; no Teams post was made |
 
 Update this table when newer evidence supersedes it. Do not mark an external
 integration complete from code inspection or a local mock alone.
@@ -59,13 +61,13 @@ Complete these tasks before any feature expansion.
   - Regenerate or correct `package-lock.json` with the chosen npm version.
   - Pin and print the package-manager version in CI so local and hosted checks agree.
   - Acceptance: a new `ci.yml` run reaches and passes test, typecheck, and build.
-- [ ] Make dry-run output aggregate-only.
+- [x] Make dry-run output aggregate-only.
   - Replace the returned `developers: string[]` with `developerCount: number`.
   - Ensure logs and workflow output contain no assignee, ticket key, summary, URL,
     status, or other Jira-controlled text.
   - Acceptance: a workflow-level test proves that dry-run skips Teams and exposes
     counts only.
-- [ ] Add orchestration tests for the release-critical branches.
+- [x] Add orchestration tests for the release-critical branches.
   - No due tickets produces no Teams request.
   - Dry-run produces no Teams request.
   - Multiple message chunks are posted in order.
@@ -74,19 +76,19 @@ Complete these tasks before any feature expansion.
 
 ## Milestone 2: harden external-call and input safety
 
-- [ ] Bound every wait in the external-call path.
+- [x] Bound every wait in the external-call path.
   - Cap `Retry-After` delays instead of sleeping for an arbitrary server value.
   - Add a timeout around optional Gemini generation, or remove Gemini from the MVP.
   - Acceptance: tests cover an excessive `Retry-After` and a stalled intro writer.
-- [ ] Fail closed on production ticket scope.
+- [x] Fail closed on production ticket scope.
   - Require an explicit project-scoped `JIRA_JQL` outside local dry-run use.
   - Acceptance: production configuration without `JIRA_JQL` is rejected.
-- [ ] Complete Jira adapter edge-case coverage.
+- [x] Complete Jira adapter edge-case coverage.
   - Exact `JIRA_MAX_RESULTS` truncation and `truncated=true`.
   - Configured SLA metric absent from every scanned ticket.
   - SLA page cap exhaustion and mixed present/absent metrics.
   - Actual SLA lookup concurrency ceiling.
-- [ ] Complete message-safety coverage.
+- [x] Complete message-safety coverage.
   - Neutralize renderer-sensitive angle brackets and link-like Jira text.
   - Verify every ticket appears exactly once across chunks.
   - Verify all produced messages stay within `TEAMS_MAX_MESSAGE_CHARS`.
@@ -102,6 +104,9 @@ document or CI logs.
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
 - [ ] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.
 - [ ] Confirm the integration account can search the scoped project and read SLAs.
+  - Current evidence: Jira search succeeds, but JSM SLA lookup returns `403 Forbidden`.
+  - Required action: grant the integration account permission to view the selected
+    requests and their SLA information, then repeat the local dry-run.
 - [ ] Confirm the Teams webhook accepts the payload and renders escaped text.
 - [ ] Confirm required GitHub secrets and variables are configured.
 - [ ] If Gemini is enabled, confirm WIF, Vertex IAM, region, and model access.
