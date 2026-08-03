@@ -2,6 +2,10 @@ import type { JiraTicket } from './jira.ts';
 import { overdueMinutes } from './sla.ts';
 
 const DEFAULT_INTRO = 'Багийнхаан, дараах тикетүүдийн анхны хариу өгөх SLA хэтэрсэн байна.';
+const DOMAIN_PATTERN = String.raw`(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+[\p{L}]{2,63}`;
+const URL_PATTERN = /[a-z][a-z\d+.-]*:\/\/[^\s<>{}\[\]()]+/giu;
+const EMAIL_PATTERN = new RegExp(String.raw`[\p{L}\p{N}._%+-]+@${DOMAIN_PATTERN}`, 'gu');
+const DOMAIN_CANDIDATE_PATTERN = new RegExp(DOMAIN_PATTERN, 'gu');
 
 export function buildReminderMessages(
 	tickets: JiraTicket[],
@@ -43,7 +47,7 @@ export function buildReminderMessages(
 
 export function cleanIntro(value: string): string {
 	const line = normalizeLine(value);
-	return line.slice(0, 160) || DEFAULT_INTRO;
+	return line ? truncate(sanitizeText(line), 160) : DEFAULT_INTRO;
 }
 
 function groupByAssignee(tickets: JiraTicket[]): Map<string, JiraTicket[]> {
@@ -70,9 +74,12 @@ function renderTicket(ticket: JiraTicket, now: Date): string {
 
 function fitTicketLine(line: string, ticket: JiraTicket, now: Date, available: number): string {
 	if (line.length <= available) return line;
-	const compact = `- ${cleanField(ticket.key, 50)} · ${cleanField(ticket.priority, 30)} · ${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
+	const linkedKey = `[${cleanField(ticket.key, 50)}](${ticket.url})`;
+	const compact = `- ${linkedKey} · ${cleanField(ticket.priority, 30)} · ${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
 	if (compact.length <= available) return compact;
-	return truncate(compact, Math.max(1, available));
+	const linkOnly = `- ${linkedKey}`;
+	if (linkOnly.length <= available) return linkOnly;
+	throw new RangeError('Message character limit cannot contain the required Jira ticket link');
 }
 
 function formatDuration(minutes: number): string {
@@ -83,15 +90,19 @@ function formatDuration(minutes: number): string {
 }
 
 function cleanField(value: string, max: number): string {
-	return truncate(escapeMarkdown(neutralizeLinks(escapeHtml(normalizeLine(value)))), max);
+	return truncate(sanitizeText(normalizeLine(value)), max);
 }
 
 function normalizeLine(value: string): string {
-	return value.replace(/[\r\n\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
+	return value.replace(/\p{Cf}/gu, '').replace(/[\r\n\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function sanitizeText(value: string): string {
+	return escapeMarkdown(escapeHtml(neutralizeLinks(value)));
 }
 
 function escapeMarkdown(value: string): string {
-	return value.replace(/([\\`*_{}\[\]()#+.!|~])/g, '\\$1');
+	return value.replace(/([\\`*_{}\[\]()#+!|~])/g, '\\$1');
 }
 
 function escapeHtml(value: string): string {
@@ -100,9 +111,13 @@ function escapeHtml(value: string): string {
 
 function neutralizeLinks(value: string): string {
 	return value
-		.replace(/([a-z][a-z\d+.-]*):(?=\/\/)/gi, '$1:\u200b')
-		.replace(/\.(?=[a-z\d])/gi, '.\u200b')
-		.replace(/@/g, '@\u200b');
+		.replace(URL_PATTERN, neutralizeLinkCandidate)
+		.replace(EMAIL_PATTERN, neutralizeLinkCandidate)
+		.replace(DOMAIN_CANDIDATE_PATTERN, neutralizeLinkCandidate);
+}
+
+function neutralizeLinkCandidate(value: string): string {
+	return value.replace(/:/g, '[:]').replace(/@/g, '[@]').replace(/\./g, '[.]');
 }
 
 function truncate(value: string, max: number): string {

@@ -95,9 +95,57 @@ test('keeps group and continuation chunks within maxChars', () => {
 	assert.ok(messages.slice(1).every((message) => message.includes('SLA сануулгын үргэлжлэл:')));
 });
 
-test('normalizes model intro to one bounded line', () => {
-	assert.equal(cleanIntro('  Hello\nteam  '), 'Hello team');
+test('keeps one trusted Jira link in a compact continuation at the max boundary', () => {
+	const trustedUrl = `https://example.atlassian.net/${'segment/'.repeat(90)}browse/SUP-2`;
+	const messages = buildReminderMessages(
+		[
+			ticket({ summary: 'x'.repeat(180) }),
+			ticket({ key: 'SUP-2', url: trustedUrl, summary: 'y'.repeat(180) }),
+		],
+		NOW,
+		1_000,
+	);
+	const output = messages.join('\n');
+
+	assert.equal(messages.length, 2);
+	assert.ok(messages.every((message) => message.length <= 1_000));
+	assert.equal(output.match(new RegExp(escapeRegExp(trustedUrl), 'g'))?.length, 1);
+	assert.ok(output.includes(`[SUP-2](${trustedUrl})`));
+});
+
+test('fails when maxChars cannot contain the required trusted Jira link', () => {
+	const trustedUrl = `https://example.atlassian.net/${'segment/'.repeat(110)}browse/SUP-1`;
+
+	assert.throws(
+		() => buildReminderMessages([ticket({ url: trustedUrl })], NOW, 1_000),
+		{
+			name: 'RangeError',
+			message: 'Message character limit cannot contain the required Jira ticket link',
+		},
+	);
+});
+
+test('sanitizes renderer-active model intros and preserves the deterministic fallback', () => {
+	const intro = cleanIntro(
+		'<b>Alert</b> [click](https://evil.example/two) <https://evil.example/three>',
+	);
+
+	assert.doesNotMatch(intro, /[<>]/);
+	assert.doesNotMatch(intro, /https:\/\/evil\.example/);
+	assert.match(intro, /&lt;b&gt;Alert&lt;\/b&gt;/);
+	assert.match(intro, /\\\[click\\\]\\\(https\\\[:\\\]\/\/evil\\\[\.\\\]example\/two\\\)/);
+	assert.equal(
+		cleanIntro('\u202e\u200b\n'),
+		'Багийнхаан, дараах тикетүүдийн анхны хариу өгөх SLA хэтэрсэн байна.',
+	);
 	assert.equal(cleanIntro('x'.repeat(200)).length, 160);
+});
+
+test('neutralizes only Unicode-aware link candidates with visible delimiters', () => {
+	assert.equal(
+		cleanIntro('Release v1.2 A.B portal.\u202eрф user@\u200bexample.com https://evil.example/path'),
+		'Release v1.2 A.B portal\\[.\\]рф user\\[@\\]example\\[.\\]com https\\[:\\]//evil\\[.\\]example/path',
+	);
 });
 
 function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
