@@ -52,6 +52,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	if (!dryRun && !teamsWebhookUrl) {
 		throw new Error('Missing required env var: TEAMS_WEBHOOK_URL');
 	}
+	const jql = env.JIRA_JQL?.trim();
+	if (!dryRun && !jql) {
+		throw new Error('Missing required env var: JIRA_JQL');
+	}
 
 	return {
 		http,
@@ -59,7 +63,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			baseUrl: httpsUrl(env, 'JIRA_BASE_URL').replace(/\/$/, ''),
 			email: required(env, 'JIRA_EMAIL'),
 			apiToken: required(env, 'JIRA_API_TOKEN'),
-			jql: env.JIRA_JQL?.trim() || DEFAULT_JQL,
+			jql: jql || DEFAULT_JQL,
 			pageSize: integer(env, 'JIRA_PAGE_SIZE', 50, 1, 100),
 			maxResults: integer(env, 'JIRA_MAX_RESULTS', 500, 1, 5_000),
 			maxSearchPages: integer(env, 'JIRA_MAX_SEARCH_PAGES', 100, 1, 1_000),

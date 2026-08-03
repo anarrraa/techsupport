@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fetchOk } from './http.ts';
+import { fetchOk, MAX_RETRY_DELAY_MS } from './http.ts';
 
 test('retries rate limits using Retry-After', async () => {
 	let calls = 0;
@@ -25,6 +25,33 @@ test('retries rate limits using Retry-After', async () => {
 	assert.equal(calls, 2);
 	assert.deepEqual(sleeps, [2_000]);
 });
+
+for (const [kind, retryAfter] of [
+	['numeric', '999999'],
+	['date', 'Wed, 31 Dec 9999 23:59:59 GMT'],
+] as const) {
+	test(`caps excessive ${kind} Retry-After values`, async () => {
+		let calls = 0;
+		const sleeps: number[] = [];
+		const fetchImpl: typeof fetch = async () => {
+			calls += 1;
+			return calls === 1
+				? new Response('', { status: 429, headers: { 'retry-after': retryAfter } })
+				: Response.json({ ok: true });
+		};
+
+		await fetchOk(
+			'https://example.com',
+			{},
+			{ timeoutMs: 1_000, maxRetries: 1 },
+			fetchImpl,
+			async (milliseconds) => {
+				sleeps.push(milliseconds);
+			},
+		);
+		assert.deepEqual(sleeps, [MAX_RETRY_DELAY_MS]);
+	});
+}
 
 test('does not retry permanent failures', async () => {
 	let calls = 0;

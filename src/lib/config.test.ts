@@ -16,8 +16,18 @@ test('loads validated defaults', () => {
 test('allows dry-run mode without a Teams webhook', () => {
 	const env = baseEnv();
 	delete env.TEAMS_WEBHOOK_URL;
+	delete env.JIRA_JQL;
 	env.REMINDER_DRY_RUN = 'true';
-	assert.equal(loadConfig(env).teamsWebhookUrl, null);
+	const config = loadConfig(env);
+	assert.equal(config.teamsWebhookUrl, null);
+	assert.match(config.jira.jql, /statusCategory != Done/);
+});
+
+test('requires an explicit Jira scope for non-dry runs', () => {
+	const env = baseEnv();
+	delete env.JIRA_JQL;
+	assert.throws(() => loadConfig(env), /Missing required env var: JIRA_JQL/);
+	assert.throws(() => loadConfig({ ...env, JIRA_JQL: '   ' }), /Missing required env var: JIRA_JQL/);
 });
 
 test('rejects unsafe URLs and malformed values', () => {
@@ -39,6 +49,7 @@ function baseEnv(): NodeJS.ProcessEnv {
 		JIRA_BASE_URL: 'https://example.atlassian.net',
 		JIRA_EMAIL: 'support@example.com',
 		JIRA_API_TOKEN: 'test-token',
+		JIRA_JQL: 'project = SUPPORT',
 		TEAMS_WEBHOOK_URL: 'https://example.webhook.office.com/test',
 	};
 }

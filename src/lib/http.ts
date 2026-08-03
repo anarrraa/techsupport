@@ -2,6 +2,7 @@ import type { HttpConfig } from './config.ts';
 
 export type Fetch = typeof fetch;
 export type Sleep = (milliseconds: number) => Promise<void>;
+export const MAX_RETRY_DELAY_MS = 60_000;
 
 export async function fetchOk(
 	url: string,
@@ -51,10 +52,12 @@ function retryDelayMs(response: Response, attempt: number): number {
 	const retryAfter = response.headers.get('retry-after');
 	if (retryAfter) {
 		const seconds = Number(retryAfter);
-		if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+		if (Number.isFinite(seconds) && seconds >= 0) {
+			return Math.min(seconds * 1_000, MAX_RETRY_DELAY_MS);
+		}
 
 		const date = Date.parse(retryAfter);
-		if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+		if (!Number.isNaN(date)) return Math.min(Math.max(0, date - Date.now()), MAX_RETRY_DELAY_MS);
 	}
 	return 250 * 2 ** attempt;
 }
