@@ -1,6 +1,6 @@
 # MVP completion roadmap
 
-Last reviewed: 2026-08-03
+Last reviewed: 2026-08-04
 
 ## Goal
 
@@ -15,11 +15,10 @@ requirements.
 **Baseline implemented; production MVP not complete.**
 
 The implementation and local release-hardening work are complete. Local
-acceptance commands pass, dry-run output is aggregate-only, and release-critical
-workflow branches are covered. The current GitHub CI evidence is still red because
-the integrated commits have not been pushed. A local production Jira dry-run
-reached the JSM SLA endpoint but failed with `403 Forbidden`, so the integration
-account's SLA access is the current external blocker.
+acceptance commands pass, dry-run output is aggregate-only, release-critical
+workflow branches are covered, and GitHub CI is green. A local production Jira
+dry-run reached the JSM SLA endpoint but failed with `403 Forbidden`, so the
+integration account's SLA access is the current external blocker.
 
 ## Evidence snapshot
 
@@ -29,7 +28,7 @@ account's SLA access is the current external blocker.
 | Unit tests | Pass | `npm test`: 44 passed, 0 failed on 2026-08-03 |
 | Type checking | Pass | `npm run typecheck` passed on 2026-08-03 |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-08-03 |
-| GitHub CI | Fail | Run `30794553488` failed at `npm ci` with lockfile sync errors |
+| GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
 | Scheduled reminder workflow | Unverified | Workflow is active but has 0 completed runs as of 2026-08-03 |
 | Local production dry-run | Blocked | Jira search reached SLA lookup; JSM SLA API returned `403 Forbidden` on 2026-08-03 |
 | Live Jira-to-Teams delivery | Not attempted | User authorized dry-run only; no Teams post was made |
@@ -56,7 +55,7 @@ integration complete from code inspection or a local mock alone.
 
 Complete these tasks before any feature expansion.
 
-- [ ] Make clean installation pass on GitHub Actions.
+- [x] Make clean installation pass on GitHub Actions.
   - Reproduce with the exact Linux Node and npm versions used by the workflow.
   - Regenerate or correct `package-lock.json` with the chosen npm version.
   - Pin and print the package-manager version in CI so local and hosted checks agree.
