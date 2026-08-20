@@ -1,6 +1,7 @@
 # BRD: Personal Teams bot for direct reminders and contract escalation
 
-Status: proposed (pre-implementation, V2)
+Status: proposed (V2). Delivery mechanism resolved and verified 2026-08-20;
+remaining decisions still block implementation.
 
 ## Business context
 
@@ -12,9 +13,11 @@ versus off-hours.
 
 ## Business problem
 
-The shipped MVP (`docs/prd-priority-sla-reminders.md`) posts one aggregated
-message to a Teams channel every 15 minutes when tickets breach the first
-response SLA. It does not:
+The MVP (`docs/prd-priority-sla-reminders.md`) posts one aggregated message to a
+Teams channel when tickets breach the first response SLA. The workflow is
+scheduled every 15 minutes, but each breach has one delivery window per repeat
+interval, 60 minutes by default. The MVP is an implemented baseline, not yet
+production verified; see `docs/mvp-roadmap.md`. It does not:
 
 - address the individually responsible person directly,
 - escalate to the next contractual level when a ticket stays unresolved,
@@ -68,13 +71,21 @@ responsible person being asked directly.
 
 Implementation must not start until these are answered.
 
-1. **Bot delivery mechanism.** Sending a Teams message to a person directly
-   requires either (a) a registered Bot Framework / Azure Bot Service app
-   that the person has already installed or messaged, so it holds a
-   conversation reference, or (b) a Microsoft Graph app-only integration with
-   `Chat.Create` / `ChatMessage.Send` application permissions and tenant
-   admin consent. Both are an Azure AD registration and admin-approval
-   decision, not an engineering one.
+1. ~~**Bot delivery mechanism.**~~ **Resolved 2026-08-20 by executed test.**
+   There was no choice to make. Microsoft Graph app-only chat messaging does
+   not exist: `POST /chats/{id}/messages` lists `ChatMessage.Send` as
+   delegated-only, and its single application permission,
+   `Teamwork.Migrate.All`, applies only to chats in migration mode. A
+   registered Bot Framework bot is the only mechanism that can direct-message
+   a person from an unattended job. A working direct message was delivered on
+   2026-08-20; see the V2 milestone in `docs/mvp-roadmap.md`.
+
+   The prerequisite chain is longer than this document originally stated. It
+   is an **Azure subscription**, then an Entra app registration, then an
+   Azure Bot resource with the Teams channel enabled, then a Teams app
+   package, then per-recipient installation. Cost is not the obstacle: the
+   bot resource runs on the free tier and Teams is a standard channel with
+   unmetered messages. Approval is the obstacle.
 2. **Escalation contact directory.** The contract names roles (L2 developer,
    L3 team lead, L4 CTO, L5 executive), not people or Teams identities. A
    mapping from Jira project/team to a named Teams user per level does not
@@ -90,6 +101,23 @@ Implementation must not start until these are answered.
    contract's definition of "unresolved," which only JSM's SLA/ticket state
    can express. A person answering in chat is not a resolution signal.
    Confirm the bot is notify-only and never a source of SLA truth.
+5. **Assignee and escalation identity resolution.** Teams rejects email and
+   user principal name for proactive direct messages; only a Microsoft Entra
+   object id works. Jira supplies an Atlassian account and, subject to
+   privacy settings, an email address, and `src/lib/jira.ts` currently keeps
+   only the display name. Decide where the Jira-account-to-Entra-object-id
+   mapping lives, for the **assignee as well as** the L2-L5 contacts. Note
+   that channel @mentions accept email or UPN, so this constraint applies to
+   direct messages only.
+6. **Escalation state storage.** `AGENTS.md` requires that a level already
+   notified for a ticket is never notified again. A stateless delivery window
+   cannot guarantee that, because a delayed or bunched scheduler run can fall
+   twice inside one window. Decide where "highest level notified per ticket"
+   is persisted, given that the workflow has no storage today. Options
+   include a Jira issue entity property, a bot-authored Jira comment, or a
+   GitHub Actions cache. This is a permissions decision as much as a design
+   one, since the durable options need write access the integration account
+   may not have.
 
 ## Out of scope (unless a decision above revises this)
 
