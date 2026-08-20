@@ -11,6 +11,9 @@ Before planning or changing code, read these files in order:
    definition of done.
 3. `docs/sla-matrix.md` for contractual SLA goals and explicit assumptions.
 4. `README.md` for architecture, setup, commands, and operational limits.
+5. `docs/brd-teams-bot-escalation.md` and `docs/prd-teams-bot-escalation.md` for
+   the proposed V2 personal-bot/escalation work, if touching that scope.
+6. `TODO.md` for the current actionable task list across the MVP and V2.
 
 The PRD defines behavior. The SLA matrix defines contract values. The roadmap
 defines release status and work priority. If they conflict, stop and surface the
@@ -79,3 +82,27 @@ When roadmap work is completed:
 The dashboard, analytics database, Microsoft Entra group login, personal Teams
 bot, durable delivery ledger, read receipts, and acknowledgements are post-MVP V2
 work. They require an explicit PRD and roadmap update before implementation.
+
+The personal Teams bot / escalation feature now has a BRD and PRD
+(`docs/brd-teams-bot-escalation.md`, `docs/prd-teams-bot-escalation.md`), but
+that only satisfies the "explicit PRD" gate — it does not clear it for
+implementation. Do not write bot code until:
+
+- every open decision listed in `docs/brd-teams-bot-escalation.md` has an
+  answer from the user (bot delivery mechanism, escalation contact directory,
+  off-hours phone-call handling, response-detection scope), and
+- `docs/mvp-roadmap.md` has a V2 milestone reflecting those answers.
+
+Once implementation starts, these invariants apply in addition to the ones
+above:
+
+- Never hardcode or guess an escalation contact (L2-L5). Resolve every
+  recipient through the directory the user supplies; fail visibly if a level's
+  contact is missing rather than silently skipping or misdirecting it.
+- Never attempt to place a phone call or drive a paging system that hasn't
+  been explicitly approved in the BRD. Surface the on-call contact; a human
+  places the call.
+- Never treat a chat reply as evidence that a ticket's SLA is satisfied. Jira
+  remains the only source of resolution state.
+- Escalating to a level must not re-send the notification for a level already
+  notified for that ticket.
