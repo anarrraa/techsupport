@@ -1,11 +1,12 @@
 import { defineAgent } from '@flue/runtime';
+import { REMINDER_INTRO_INSTRUCTIONS, REMINDER_INTRO_MODEL } from '../lib/reminder-intro.ts';
 
+/**
+ * Flue binding for the Reminder Intro. The prompt contract itself lives in
+ * src/lib/reminder-intro.ts so that module stays framework-free; this file
+ * only adapts it to the runtime and keeps the agent discoverable.
+ */
 export default defineAgent(() => ({
-	model: 'google-vertex/gemini-2.5-flash',
-	instructions: [
-		'Write one short, polite opening sentence for a Microsoft Teams SLA reminder.',
-		'Input contains aggregate counts only: ticketCount, developerCount, and priorities.',
-		'Do not invent ticket details, names, links, or numbers.',
-		'Default to Mongolian. Output one plain-text line under 160 characters with no sign-off.',
-	].join('\n'),
+	model: REMINDER_INTRO_MODEL,
+	instructions: REMINDER_INTRO_INSTRUCTIONS,
 }));

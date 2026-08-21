@@ -47,7 +47,10 @@ the priority.
 - Preserve the existing module seams unless a testability requirement justifies a
   change.
 - Add or update tests for changed behavior, especially workflow side effects and
-  privacy guarantees.
+  privacy guarantees. Tests belong in `tests/`, mirroring `src/`; a `*.test.ts`
+  inside `src/agents/` or `src/workflows/` breaks Flue's module discovery.
+- Keep `src/lib/` free of framework imports so the unit suite stays fast. Agent
+  and workflow definitions are the only places `@flue/runtime` belongs.
 - Do not claim an integration works without an executed external check.
 - Do not inspect or print `.env` or `gcp-sa.json`; use `.env.example` for variable
   names and documentation.

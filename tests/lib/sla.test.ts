@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { JiraTicket } from './jira.ts';
-import { isReminderWindow, selectReminderTickets } from './sla.ts';
+import type { JiraTicket } from '../../src/lib/jira.ts';
+import { isReminderWindow, selectReminderTickets } from '../../src/lib/sla.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
 
@@ -89,3 +89,22 @@ function sla(overrides: Partial<NonNullable<JiraTicket['firstResponseSla']>> = {
 		...overrides,
 	};
 }
+
+test('partitions every scanned ticket into exactly one bucket', () => {
+	const tickets = [
+		ticket({ firstResponseSla: sla({ breached: false }) }),
+		ticket({ firstResponseSla: sla({ paused: true }) }),
+		ticket({ firstResponseSla: sla({ state: 'completed' }) }),
+		ticket({ firstResponseSla: sla({ withinCalendarHours: false }) }),
+	];
+	const selection = selectReminderTickets(tickets, NOW, 60, 15);
+	const accounted =
+		selection.due.length
+		+ selection.ineligible
+		+ selection.suppressedOutsideCalendar
+		+ selection.waitingForNextWindow;
+
+	assert.equal(selection.ineligible, 3);
+	assert.equal(selection.suppressedOutsideCalendar, 1);
+	assert.equal(accounted, tickets.length);
+});

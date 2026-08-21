@@ -22,6 +22,7 @@ export interface ReminderConfig {
 	repeatMinutes: number;
 	deliveryWindowMinutes: number;
 	useLlmIntro: boolean;
+	introTimeoutMs: number;
 	dryRun: boolean;
 	maxMessageChars: number;
 }
@@ -79,6 +80,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			repeatMinutes,
 			deliveryWindowMinutes,
 			useLlmIntro: boolean(env, 'REMINDER_USE_LLM_INTRO', false),
+			introTimeoutMs: integer(env, 'REMINDER_INTRO_TIMEOUT_MS', 10_000, 1_000, 120_000),
 			dryRun,
 			maxMessageChars: integer(env, 'TEAMS_MAX_MESSAGE_CHARS', 12_000, 1_000, 25_000),
 		},

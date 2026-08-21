@@ -1,9 +1,11 @@
 import { defineWorkflow } from '@flue/runtime';
 import * as v from 'valibot';
 import reminderWriter from '../agents/reminder-writer.ts';
+import { generateReminderIntro } from '../lib/reminder-intro.ts';
 import { loadConfig, type AppConfig } from '../lib/config.ts';
 import { fetchTickets } from '../lib/jira.ts';
-import { buildReminderMessages, cleanIntro } from '../lib/reminder-message.ts';
+import { buildReminderMessages } from '../lib/reminder-message.ts';
+import { createRunJournal, type JournalSink } from '../lib/run-journal.ts';
 import { selectReminderTickets } from '../lib/sla.ts';
 import { postToChannel } from '../lib/teams-webhook.ts';
 
@@ -15,11 +17,6 @@ export interface JiraTeamsReminderOutput {
 	developerCount: number;
 }
 
-interface WorkflowLog {
-	info(message: string): void;
-	warn(message: string): void;
-}
-
 interface WorkflowDependencies {
 	fetchTickets: typeof fetchTickets;
 	buildReminderMessages: typeof buildReminderMessages;
@@ -28,7 +25,7 @@ interface WorkflowDependencies {
 
 interface RunJiraTeamsReminderOptions {
 	config: AppConfig;
-	log: WorkflowLog;
+	log: JournalSink;
 	now?: Date;
 	generateIntro?: (input: string, signal: AbortSignal) => Promise<string>;
 	dependencies?: Partial<WorkflowDependencies>;
@@ -77,16 +74,16 @@ export async function runJiraTeamsReminder(
 	);
 	const developerCount = new Set(selection.due.map((ticket) => ticket.assignee)).size;
 
-	log.info(
-		JSON.stringify({
-			scanned: jira.scanned,
-			withoutSla: jira.withoutSla,
-			truncated: jira.truncated,
-			due: selection.due.length,
-			suppressedOutsideCalendar: selection.suppressedOutsideCalendar,
-			waitingForNextWindow: selection.waitingForNextWindow,
-		}),
-	);
+	const journal = createRunJournal(log);
+	journal.selection({
+		scanned: jira.scanned,
+		withoutSla: jira.withoutSla,
+		truncated: jira.truncated,
+		due: selection.due.length,
+		ineligible: selection.ineligible,
+		suppressedOutsideCalendar: selection.suppressedOutsideCalendar,
+		waitingForNextWindow: selection.waitingForNextWindow,
+	});
 
 	if (selection.due.length === 0) {
 		return {
@@ -98,38 +95,37 @@ export async function runJiraTeamsReminder(
 		};
 	}
 
-	let intro: string | undefined;
-	if (config.reminder.useLlmIntro) {
-		try {
-			if (!generateIntro) throw new Error('Reminder intro generator is unavailable');
-			const priorities = countBy(selection.due.map((ticket) => ticket.priority));
-			const input = JSON.stringify({
-				ticketCount: selection.due.length,
-				developerCount,
-				priorities,
-			});
-			intro = cleanIntro(await withTimeout(
-				(signal) => generateIntro(input, signal),
-				config.http.timeoutMs,
-			));
-		} catch (error) {
-			log.warn(`Reminder intro generation failed; using deterministic copy: ${errorName(error)}`);
-		}
-	}
+	const intro = await generateReminderIntro({
+		ticketCount: selection.due.length,
+		developerCount,
+		priorities: countBy(selection.due.map((ticket) => ticket.priority)),
+	}, {
+		enabled: config.reminder.useLlmIntro,
+		timeoutMs: config.reminder.introTimeoutMs,
+		generate: generateIntro,
+	});
+	journal.intro(intro);
 
 	const messages = dependencies.buildReminderMessages(
 		selection.due,
 		now,
 		config.reminder.maxMessageChars,
-		intro,
+		intro.text,
 	);
 	if (!config.reminder.dryRun) {
 		if (!config.teamsWebhookUrl) throw new Error('TEAMS_WEBHOOK_URL is required outside dry-run mode');
-		for (const message of messages) {
-			await dependencies.postToChannel(message, config.teamsWebhookUrl, config.http);
+		let delivered = 0;
+		try {
+			for (const message of messages) {
+				await dependencies.postToChannel(message, config.teamsWebhookUrl, config.http);
+				delivered += 1;
+			}
+		} finally {
+			// Reported even when a send throws, so a partial delivery is visible.
+			journal.delivery({ messages: messages.length, delivered, dryRun: false });
 		}
 	} else {
-		log.info(`Dry run: skipped ${messages.length} Teams message(s).`);
+		journal.delivery({ messages: messages.length, dryRun: true });
 	}
 
 	return {
@@ -145,25 +141,4 @@ function countBy(values: string[]): Record<string, number> {
 	const counts: Record<string, number> = Object.create(null) as Record<string, number>;
 	for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
 	return counts;
-}
-
-function errorName(error: unknown): string {
-	return error instanceof Error ? error.name : 'UnknownError';
-}
-
-async function withTimeout<T>(
-	operation: (signal: AbortSignal) => Promise<T>,
-	timeoutMs: number,
-): Promise<T> {
-	const controller = new AbortController();
-	const timeout = setTimeout(() => {
-		const error = new Error(`Reminder intro generation timed out after ${timeoutMs}ms`);
-		error.name = 'TimeoutError';
-		controller.abort(error);
-	}, timeoutMs);
-	try {
-		return await operation(controller.signal);
-	} finally {
-		clearTimeout(timeout);
-	}
 }

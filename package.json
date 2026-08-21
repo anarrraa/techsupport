@@ -19,7 +19,7 @@
     "build": "flue build --target node",
     "remind": "flue run jira-teams-reminder --target node",
     "typecheck": "tsc --noEmit",
-		"test": "node --test src/lib/*.test.ts src/workflow-tests/*.test.ts"
+		"test": "node --test tests/lib/*.test.ts tests/workflows/*.test.ts"
   },
   "type": "module"
 }

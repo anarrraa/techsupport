@@ -13,5 +13,5 @@
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src", "flue.config.ts"]
+	"include": ["src", "tests", "flue.config.ts"]
 }
