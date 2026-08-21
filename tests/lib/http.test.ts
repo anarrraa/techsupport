@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fetchOk, MAX_RETRY_DELAY_MS } from './http.ts';
+import { fetchOk, MAX_RETRY_DELAY_MS } from '../../src/lib/http.ts';
 
 test('retries rate limits using Retry-After', async () => {
 	let calls = 0;

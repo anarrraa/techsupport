@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loadConfig } from './config.ts';
+import { loadConfig } from '../../src/lib/config.ts';
 
 test('loads validated defaults', () => {
 	const config = loadConfig(baseEnv());

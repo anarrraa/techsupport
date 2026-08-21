@@ -13,7 +13,9 @@ changes.
 
 The complete output is deterministic by default. Gemini on Vertex AI is optional and receives
 aggregate counts only to write a one-line introduction; Jira titles, names, email
-addresses, and links are never sent to the model.
+addresses, and links are never sent to the model. `src/lib/reminder-intro.ts` owns that
+contract: its input type cannot express Jira-controlled content, and it reports whether the
+model or the deterministic opener was used rather than failing the run.
 
 ## Architecture
 
@@ -35,9 +37,25 @@ src/lib/jira.ts                      Jira search + JSM SLA adapter
 src/lib/sla.ts                       pure reminder selection policy
 src/lib/reminder-message.ts          deterministic Teams message builder
 src/lib/teams-webhook.ts             Teams webhook adapter
-src/agents/reminder-writer.ts        optional aggregate-only intro writer
+src/lib/reminder-intro.ts            optional aggregate-only intro writer
 src/workflows/jira-teams-reminder.ts workflow orchestration
 ```
+
+## Repository layout
+
+```text
+src/agents/        Flue-discovered agent bindings
+src/workflows/     Flue-discovered workflow modules
+src/lib/           plain modules, no framework imports
+tests/lib/         unit tests, mirroring src/lib
+tests/workflows/   workflow orchestration tests
+```
+
+Tests live outside `src/` deliberately. Flue scans `src/agents/`, `src/workflows/`
+and `src/channels/` and requires every file found there to default-export the
+matching definition, so a `*.test.ts` beside a workflow fails the build. Keeping
+`src/lib/` free of framework imports is also deliberate: it keeps the unit suite
+loading in milliseconds instead of paying for the agent runtime.
 
 ## Authoritative SLA
 

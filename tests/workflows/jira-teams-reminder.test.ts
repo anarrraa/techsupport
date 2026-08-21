@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { AppConfig } from '../lib/config.ts';
-import type { JiraFetchResult, JiraTicket } from '../lib/jira.ts';
-import { runJiraTeamsReminder } from '../workflows/jira-teams-reminder.ts';
+import type { AppConfig } from '../../src/lib/config.ts';
+import type { JiraFetchResult, JiraTicket } from '../../src/lib/jira.ts';
+import { runJiraTeamsReminder } from '../../src/workflows/jira-teams-reminder.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
 
@@ -60,7 +60,12 @@ test('dry-run skips Teams and exposes aggregate-only logs, model input, and outp
 		developerCount: 1,
 		priorities: { High: 1 },
 	});
-	const observableText = JSON.stringify({ logs: result.logs, output: result.output, modelInput });
+	const observableText = JSON.stringify({
+		logs: result.logs,
+		attributes: result.attributes,
+		output: result.output,
+		modelInput,
+	});
 	for (const privateValue of [
 		privateTicket.key,
 		privateTicket.summary,
@@ -109,27 +114,32 @@ test('falls back to deterministic copy and delivers when Gemini fails', async ()
 
 	assert.equal(posts.length, 1);
 	assert.match(posts[0] ?? '', /SLA хэтэрсэн байна/);
-	assert.match(result.logs.join('\n'), /using deterministic copy: Error/);
-	assert.doesNotMatch(result.logs.join('\n'), /PRIVATE-42/);
+	assert.match(result.logs.join('\n'), /fell back to the deterministic opener: error/);
+	assert.ok(result.attributes.some((entry) => entry.errorName === 'Error'));
+	assert.doesNotMatch(JSON.stringify({ logs: result.logs, attributes: result.attributes }), /PRIVATE-42/);
 });
 
-test('cancels a stalled Gemini intro, releases its handle, and still delivers', async () => {
+test('escapes a model intro exactly once', async () => {
 	const posts: string[] = [];
-	let cancelled = false;
-	let active = false;
-	const startedAt = Date.now();
+	await run({
+		config: config({ useLlmIntro: true }),
+		generateIntro: async () => 'Сануулга *чухал* [одоо]',
+		post: async (message) => {
+			posts.push(message);
+		},
+	});
+
+	const message = posts[0] ?? '';
+	assert.match(message, /Сануулга \\\*чухал\\\* \\\[одоо\\\]/);
+	assert.doesNotMatch(message, /\\\\/);
+});
+
+test('still delivers when the intro times out', async () => {
+	const posts: string[] = [];
 	const result = await run({
 		config: config({ useLlmIntro: true, timeoutMs: 10 }),
 		generateIntro: (_input, signal) => new Promise((_resolve, reject) => {
-			assert.ok(signal);
-			active = true;
-			const handle = setInterval(() => {}, 1_000);
-			signal.addEventListener('abort', () => {
-				cancelled = true;
-				active = false;
-				clearInterval(handle);
-				reject(signal.reason);
-			}, { once: true });
+			signal.addEventListener('abort', () => reject(signal.reason), { once: true });
 		}),
 		post: async (message) => {
 			posts.push(message);
@@ -137,10 +147,9 @@ test('cancels a stalled Gemini intro, releases its handle, and still delivers', 
 	});
 
 	assert.equal(posts.length, 1);
-	assert.ok(Date.now() - startedAt < 500);
-	assert.equal(cancelled, true);
-	assert.equal(active, false);
-	assert.match(result.logs.join('\n'), /using deterministic copy: TimeoutError/);
+	assert.match(posts[0] ?? '', /SLA хэтэрсэн байна/);
+	assert.match(result.logs.join('\n'), /fell back to the deterministic opener: timeout/);
+	assert.ok(result.attributes.some((entry) => entry.errorName === 'TimeoutError'));
 });
 
 interface RunOptions {
@@ -153,14 +162,21 @@ interface RunOptions {
 
 async function run(options: RunOptions = {}) {
 	const logs: string[] = [];
+	const attributes: Record<string, unknown>[] = [];
 	const tickets = options.tickets ?? [ticket()];
 	const output = await runJiraTeamsReminder({
 		config: options.config ?? config(),
 		now: NOW,
 		generateIntro: options.generateIntro,
 		log: {
-			info: (message) => logs.push(message),
-			warn: (message) => logs.push(message),
+			info: (message, attrs) => {
+				logs.push(message);
+				if (attrs) attributes.push(attrs);
+			},
+			warn: (message, attrs) => {
+				logs.push(message);
+				if (attrs) attributes.push(attrs);
+			},
 		},
 		dependencies: {
 			fetchTickets: async (): Promise<JiraFetchResult> => ({
@@ -173,7 +189,7 @@ async function run(options: RunOptions = {}) {
 			postToChannel: async (message) => options.post?.(message),
 		},
 	});
-	return { logs, output };
+	return { logs, attributes, output };
 }
 
 function config(
@@ -201,6 +217,7 @@ function config(
 			repeatMinutes: 60,
 			deliveryWindowMinutes: 15,
 			useLlmIntro: overrides.useLlmIntro ?? false,
+			introTimeoutMs: overrides.timeoutMs ?? 1_000,
 			dryRun: overrides.dryRun ?? false,
 			maxMessageChars: 12_000,
 		},

@@ -2,6 +2,12 @@ import type { JiraTicket } from './jira.ts';
 
 export interface ReminderSelection {
 	due: JiraTicket[];
+	/**
+	 * Cycles excluded before any window check: no SLA metric on the ticket, a
+	 * completed cycle, an unbreached cycle, or a paused one. Overlaps
+	 * `JiraFetchResult.withoutSla`, which counts the first of those four.
+	 */
+	ineligible: number;
 	suppressedOutsideCalendar: number;
 	waitingForNextWindow: number;
 }
@@ -21,12 +27,16 @@ export function selectReminderTickets(
 	deliveryWindowMinutes: number,
 ): ReminderSelection {
 	const due: JiraTicket[] = [];
+	let ineligible = 0;
 	let suppressedOutsideCalendar = 0;
 	let waitingForNextWindow = 0;
 
 	for (const ticket of tickets) {
 		const sla = ticket.firstResponseSla;
-		if (!sla || sla.state !== 'ongoing' || !sla.breached || sla.paused) continue;
+		if (!sla || sla.state !== 'ongoing' || !sla.breached || sla.paused) {
+			ineligible += 1;
+			continue;
+		}
 		if (!sla.withinCalendarHours) {
 			suppressedOutsideCalendar += 1;
 			continue;
@@ -52,7 +62,7 @@ export function selectReminderTickets(
 		return overdueMinutes(b, now) - overdueMinutes(a, now) || a.key.localeCompare(b.key);
 	});
 
-	return { due, suppressedOutsideCalendar, waitingForNextWindow };
+	return { due, ineligible, suppressedOutsideCalendar, waitingForNextWindow };
 }
 
 export function isReminderWindow(

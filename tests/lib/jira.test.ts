@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { JiraConfig } from './config.ts';
-import { fetchTickets } from './jira.ts';
+import type { JiraConfig } from '../../src/lib/config.ts';
+import { fetchTickets } from '../../src/lib/jira.ts';
 
 test('paginates Jira search and JSM SLA metrics', async () => {
 	const searchTokens: Array<string | undefined> = [];

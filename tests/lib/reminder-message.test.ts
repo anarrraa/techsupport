@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { JiraTicket } from './jira.ts';
-import { buildReminderMessages, cleanIntro } from './reminder-message.ts';
+import type { JiraTicket } from '../../src/lib/jira.ts';
+import { buildReminderMessages, cleanIntro } from '../../src/lib/reminder-message.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { postToChannel } from './teams-webhook.ts';
+import { postToChannel } from '../../src/lib/teams-webhook.ts';
 
 test('posts the expected Teams text payload', async () => {
 	let request: { url: string; init?: RequestInit } | undefined;
