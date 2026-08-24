@@ -119,9 +119,9 @@ test('keeps one trusted Jira link in a compact continuation at the max boundary'
 
 test('uses the exact trusted Jira target in the link-only representation', () => {
 	const trustedUrl = 'https://example.atlassian.net/browse/SUP-1';
-	const [message] = buildReminderMessages([ticket({ url: trustedUrl })], NOW, 180);
+	const [message] = buildReminderMessages([ticket({ url: trustedUrl })], NOW, 216);
 
-	assert.ok((message?.length ?? Infinity) <= 180);
+	assert.ok((message?.length ?? Infinity) <= 216);
 	assert.deepEqual(markdownTargets(message ?? ''), [trustedUrl]);
 	assert.match(message ?? '', new RegExp(`^- \\[SUP-1\\]\\(${escapeRegExp(trustedUrl)}\\)$`, 'm'));
 });
@@ -149,7 +149,7 @@ test('sanitizes renderer-active model intros and preserves the deterministic fal
 	assert.match(intro, /\\\[click\\\]\\\(https\\\[:\\\]\/\/evil\\\[\.\\\]example\/two\\\)/);
 	assert.equal(
 		cleanIntro('\u202e\u200b\n'),
-		'Багийнхаан, дараах тикетүүдийн анхны хариу өгөх SLA хэтэрсэн байна.',
+		'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.',
 	);
 	assert.equal(cleanIntro('x'.repeat(200)).length, 160);
 });
@@ -166,7 +166,7 @@ test('preserves valid join controls while removing dangerous and C0/C1 controls'
 	assert.equal(cleanIntro('Hello\t\u0000world\u001b'), 'Hello world');
 	assert.equal(
 		cleanIntro('\u0000\u001b\u0085\u202e\u200b'),
-		'Багийнхаан, дараах тикетүүдийн анхны хариу өгөх SLA хэтэрсэн байна.',
+		'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.',
 	);
 });
 

@@ -2,14 +2,13 @@ name: Jira to Teams reminder
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 0 * * *'   
   workflow_dispatch:
     inputs:
       dry_run:
         description: Fetch and select tickets without posting to Teams
         type: boolean
         default: true
-
 permissions:
   contents: read
   id-token: write

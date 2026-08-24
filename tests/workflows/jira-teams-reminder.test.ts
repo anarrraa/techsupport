@@ -113,7 +113,7 @@ test('falls back to deterministic copy and delivers when Gemini fails', async ()
 	});
 
 	assert.equal(posts.length, 1);
-	assert.match(posts[0] ?? '', /SLA хэтэрсэн байна/);
+	assert.match(posts[0] ?? '', /SLA хугацаа хэтэрсэн/);
 	assert.match(result.logs.join('\n'), /fell back to the deterministic opener: error/);
 	assert.ok(result.attributes.some((entry) => entry.errorName === 'Error'));
 	assert.doesNotMatch(JSON.stringify({ logs: result.logs, attributes: result.attributes }), /PRIVATE-42/);
@@ -147,7 +147,7 @@ test('still delivers when the intro times out', async () => {
 	});
 
 	assert.equal(posts.length, 1);
-	assert.match(posts[0] ?? '', /SLA хэтэрсэн байна/);
+	assert.match(posts[0] ?? '', /SLA хугацаа хэтэрсэн/);
 	assert.match(result.logs.join('\n'), /fell back to the deterministic opener: timeout/);
 	assert.ok(result.attributes.some((entry) => entry.errorName === 'TimeoutError'));
 });

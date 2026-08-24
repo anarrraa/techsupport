@@ -1,7 +1,7 @@
 import type { JiraTicket } from './jira.ts';
 import { overdueMinutes } from './sla.ts';
 
-const DEFAULT_INTRO = 'Багийнхаан, дараах тикетүүдийн анхны хариу өгөх SLA хэтэрсэн байна.';
+const DEFAULT_INTRO = 'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.';
 const DOMAIN_PATTERN = String.raw`(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+[\p{L}]{2,63}`;
 const URL_PATTERN = /[a-z][a-z\d+.-]*:\/\/[^\s<>{}\[\]()]+/giu;
 const EMAIL_PATTERN = new RegExp(String.raw`[\p{L}\p{N}._%+-]+@${DOMAIN_PATTERN}`, 'gu');
