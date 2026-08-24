@@ -200,18 +200,30 @@ and Teams is a standard channel with unmetered messages.
 
 ### Remaining before bot code enters `src/`
 
-- [ ] Answer every open decision in `docs/brd-teams-bot-escalation.md`, including
-      decisions 5 and 6 added by this milestone.
-- [ ] Choose the recipient installation model. Per-person custom app upload does
-      not scale and depends on a permission most accounts lack. The supported
-      options are a Teams app setup policy that installs the app for a known
-      group, or `TeamsAppInstallation.ReadWriteSelfForUser.All` so the workflow
-      installs the app for any recipient on demand. Both require one
-      organisation catalog publish by an administrator.
-- [ ] Decide whether a GitHub OIDC federated credential replaces the client
-      secret, matching the existing Vertex authentication pattern.
-- [ ] Resolve an Entra object id for every intended recipient. Teams rejects
-      email and user principal name for proactive direct messages.
+- [x] Answer every open decision in `docs/brd-teams-bot-escalation.md`,
+      including decisions 5 and 6 added by this milestone. Resolved
+      2026-08-24: contact directory and identity mapping both live in one
+      repo config file (person directory + per-project escalation-level
+      mapping); off-hours step surfaces the on-call contact only, no paging
+      integration; escalation state persists in a GitHub Actions cache keyed
+      per ticket. See `docs/brd-teams-bot-escalation.md` decisions 2-6.
+- [ ] Design and add the config file itself (schema for the person directory
+      and the per-project/team L2-L5 mapping decided above). No bot code
+      reads it until it exists and is populated with real Entra object ids.
+- [x] Choose the recipient installation model. **Decided 2026-08-24:** a
+      Teams app setup policy assigned to a known group, over
+      `TeamsAppInstallation.ReadWriteSelfForUser.All` (broader standing
+      permission, on-demand install not needed). Still needs an administrator
+      to publish the app package to the organisation catalog and assign the
+      policy to the recipient group; not yet executed.
+- [x] Decide whether a GitHub OIDC federated credential replaces the client
+      secret. **Decided 2026-08-24:** yes, matching the existing Vertex
+      authentication pattern — no secret to store or rotate. Still needs the
+      federated credential configured on the Entra app registration; not yet
+      executed.
+- [ ] Resolve an Entra object id for every intended recipient (every possible
+      assignee plus L2-L5 contacts) to populate the new config file. Teams
+      rejects email and user principal name for proactive direct messages.
 - [ ] Confirm the escalation clock reads the JSM resolution metric rather than
       elapsed time since the first-response breach.
 

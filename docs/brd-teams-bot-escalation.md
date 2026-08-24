@@ -1,7 +1,10 @@
 # BRD: Personal Teams bot for direct reminders and contract escalation
 
-Status: proposed (V2). Delivery mechanism resolved and verified 2026-08-20;
-remaining decisions still block implementation.
+Status: proposed (V2). Delivery mechanism resolved and verified 2026-08-20; all
+six open decisions resolved 2026-08-24. Implementation is still blocked on the
+infrastructure/admin follow-ups tracked in the V2 milestone in
+`docs/mvp-roadmap.md` (recipient installation model, per-recipient Entra
+object ids, and the config file itself) — see `AGENTS.md` scope guard.
 
 ## Business context
 
@@ -86,38 +89,39 @@ Implementation must not start until these are answered.
    package, then per-recipient installation. Cost is not the obstacle: the
    bot resource runs on the free tier and Teams is a standard channel with
    unmetered messages. Approval is the obstacle.
-2. **Escalation contact directory.** The contract names roles (L2 developer,
-   L3 team lead, L4 CTO, L5 executive), not people or Teams identities. A
-   mapping from Jira project/team to a named Teams user per level does not
-   exist yet and must be supplied (e.g. a config file, a Jira field) before
-   any escalation message can be addressed to anyone.
-3. **Off-hours phone call step.** Contract section 3 requires a phone call to
-   the on-call NOC engineer for off-hours Critical/High. A chat bot cannot
-   place a phone call. Decide whether the bot only surfaces the on-call
-   contact for a human to call, or whether this integrates with a separate
-   paging system (PagerDuty, Opsgenie, etc.) — that integration is out of
-   scope unless explicitly added here.
-4. **Response detection.** The escalation clock must advance on the
-   contract's definition of "unresolved," which only JSM's SLA/ticket state
-   can express. A person answering in chat is not a resolution signal.
-   Confirm the bot is notify-only and never a source of SLA truth.
-5. **Assignee and escalation identity resolution.** Teams rejects email and
-   user principal name for proactive direct messages; only a Microsoft Entra
-   object id works. Jira supplies an Atlassian account and, subject to
-   privacy settings, an email address, and `src/lib/jira.ts` currently keeps
-   only the display name. Decide where the Jira-account-to-Entra-object-id
-   mapping lives, for the **assignee as well as** the L2-L5 contacts. Note
-   that channel @mentions accept email or UPN, so this constraint applies to
-   direct messages only.
-6. **Escalation state storage.** `AGENTS.md` requires that a level already
-   notified for a ticket is never notified again. A stateless delivery window
-   cannot guarantee that, because a delayed or bunched scheduler run can fall
-   twice inside one window. Decide where "highest level notified per ticket"
-   is persisted, given that the workflow has no storage today. Options
-   include a Jira issue entity property, a bot-authored Jira comment, or a
-   GitHub Actions cache. This is a permissions decision as much as a design
-   one, since the durable options need write access the integration account
-   may not have.
+2. ~~**Escalation contact directory.**~~ **Resolved 2026-08-24 by user
+   decision.** A config file in this repo maps Jira project/team to a named
+   Teams contact per level (L2-L5). The same file also serves decision 5
+   below, since both are identity lookups against the same directory. It must
+   be a file the workflow reads at run time, not a hardcoded mapping in
+   `src/lib/`; a missing level's entry fails visibly rather than guessing
+   (`AGENTS.md`).
+3. ~~**Off-hours phone call step.**~~ **Resolved 2026-08-24 by user decision.**
+   The bot surfaces the on-call NOC contact in the escalation message; a
+   human places the call. No paging system integration (PagerDuty, Opsgenie,
+   or similar) is in scope. Automated phone dialing stays out of scope per
+   the section below.
+4. ~~**Response detection.**~~ **Resolved by project invariant**, not a
+   choice: `AGENTS.md` already requires the bot be notify-only and never a
+   source of SLA truth, and forbids treating a chat reply as evidence of
+   resolution. This decision existed to flag the constraint, not to select
+   among alternatives.
+5. ~~**Assignee and escalation identity resolution.**~~ **Resolved
+   2026-08-24 by user decision.** The same config file from decision 2 maps
+   every relevant Jira identity — both dynamic assignees and the fixed L2-L5
+   contacts — to a Microsoft Entra object id. The file therefore needs two
+   sections: a person directory (Jira account -> Entra object id, covering
+   every possible assignee) and a per-project/team escalation-level mapping
+   that references entries in that directory. Object ids must be collected
+   and kept current by whoever maintains the file; there is no run-time Graph
+   lookup.
+6. ~~**Escalation state storage.**~~ **Resolved 2026-08-24 by user decision.**
+   "Highest level notified per ticket" is persisted in a GitHub Actions
+   cache, keyed per ticket. This needs no additional Jira write permission,
+   at the accepted cost that a cache eviction or workflow/cache-key rename
+   can lose the record and risk a duplicate notification — acceptable because
+   the alternative (Jira entity property or comment writes) needs permissions
+   the integration account does not have today.
 
 ## Out of scope (unless a decision above revises this)
 

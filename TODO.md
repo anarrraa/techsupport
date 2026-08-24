@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-08-20
+Last updated: 2026-08-24
 
 This tracks actionable next steps across the MVP and the proposed V2
 (personal Teams bot + contract escalation). See `AGENTS.md` for required
@@ -20,30 +20,29 @@ reading order and non-negotiable invariants before touching any of this.
       consumes a licensed seat. V2 reads the same SLA data, so this blocks both.
       Re-run `scratchpad/jira-sla-check.mjs` to confirm.
 - [ ] Get an administrator to publish the Teams app package to the
-      organisation catalog, and pick the recipient installation model:
-      a Teams app setup policy for a known group, or
-      `TeamsAppInstallation.ReadWriteSelfForUser.All` so the workflow installs
-      the app per recipient on demand. Per-person custom app upload is a spike
-      technique, not a deployment model. See the V2 milestone in
-      `docs/mvp-roadmap.md`.
-- [ ] Get the user's answers to the open decisions in
-      `docs/brd-teams-bot-escalation.md`:
+      organisation catalog and assign a Teams app setup policy to the
+      recipient group (model decided 2026-08-24; see the V2 milestone in
+      `docs/mvp-roadmap.md`). Per-person custom app upload is a spike
+      technique, not a deployment model.
+- [ ] Configure a GitHub OIDC federated credential on the Entra app
+      registration (decided 2026-08-24, matching the existing Vertex
+      authentication pattern) instead of a client secret.
+- [x] Get the user's answers to the open decisions in
+      `docs/brd-teams-bot-escalation.md`. All six resolved as of 2026-08-24:
   - [x] Bot delivery mechanism. **Resolved 2026-08-20 by executed test.**
         Graph app-only chat messaging does not exist; a Bot Framework bot is
         the only option, and a direct message was delivered successfully.
-  - [ ] Escalation contact directory: who is L2/L3/L4/L5 as a real Teams
-        identity, and where does that mapping live.
-  - [ ] Off-hours phone-call step: bot surfaces the on-call contact only, or
-        integrates with a paging system (and if so, which one).
-  - [ ] Response detection: confirm the bot is notify-only and never a
-        source of SLA truth. The JSM resolution metric's ongoing cycle is the
-        available "unresolved" signal.
-  - [ ] Identity resolution (decision 5): where the Jira-account-to-Entra
-        -object-id mapping lives, for the assignee as well as L2-L5. Teams
-        rejects email and UPN for proactive direct messages.
-  - [ ] Escalation state storage (decision 6): where "highest level notified
-        per ticket" persists. A stateless window cannot satisfy the
-        no-duplicate invariant in `AGENTS.md`.
+  - [x] Escalation contact directory: a repo config file maps Jira
+        project/team to a named Teams contact per level (L2-L5).
+  - [x] Off-hours phone-call step: bot surfaces the on-call contact only; no
+        paging-system integration.
+  - [x] Response detection: already settled by the `AGENTS.md` invariant —
+        notify-only, chat replies are never a resolution signal.
+  - [x] Identity resolution (decision 5): the same config file as the contact
+        directory maps every assignee and every L2-L5 contact's Jira identity
+        to a Microsoft Entra object id.
+  - [x] Escalation state storage (decision 6): a GitHub Actions cache keyed
+        per ticket holds "highest level notified."
 - [x] Add a V2 milestone to `docs/mvp-roadmap.md` before writing any bot code
       (`AGENTS.md` scope guard). Added 2026-08-20 with the verified delivery
       evidence and the Azure prerequisites already established.
@@ -76,11 +75,14 @@ guard does not apply.
 
 ## Next — once the blockers above are cleared
 
-- [ ] Implement the escalation-state store chosen in decision 6. The design
-      question moved into the blocking list above, because every durable
-      option needs a write permission that is not granted yet.
-- [ ] Build the contact-directory resolver from the source the user picks in
-      open decision 2. Fail visibly on a missing contact; never guess one.
+- [ ] Add the config file (schema decided 2026-08-24: a person directory of
+      Jira account -> Entra object id, plus a per-project/team L2-L5
+      escalation mapping referencing that directory) and populate it with
+      real Entra object ids for every assignee and L2-L5 contact.
+- [ ] Implement the escalation-state store: a GitHub Actions cache keyed per
+      ticket, holding the highest level already notified.
+- [ ] Build the contact-directory resolver reading the config file above.
+      Fail visibly on a missing contact; never guess one.
 - [ ] Implement the direct-message sender against the call sequence recorded in
       the V2 milestone. Parameterise the escape target in
       `src/lib/reminder-message.ts` rather than writing a second renderer; the

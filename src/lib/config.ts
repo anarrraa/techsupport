@@ -35,7 +35,7 @@ export interface AppConfig {
 }
 
 const DEFAULT_JQL =
-	'statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC';
+'project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC';
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	const http = {
