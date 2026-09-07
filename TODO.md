@@ -17,6 +17,10 @@ reading order and non-negotiable invariants before touching any of this.
 - [x] Make an empty scan loud. `scanned: 0` now exits with error in non-dry-run mode.
 - [x] Report overdue time in working hours. `overdueMinutes` now reads `elapsedTime`
       from JSM metric instead of clock time.
+- [ ] Point the manifest's `developer.privacyUrl` and `termsOfUseUrl` at pages
+      that actually resolve, and swap the placeholder icons in
+      `packages/teams-app/` for the real brand marks. Catalog publish validates
+      both.
 - [ ] Get an administrator to publish the Teams app package to the
       organisation catalog and assign a Teams app setup policy to the
       recipient group (model decided 2026-08-24; see the V2 milestone in

@@ -6,3 +6,4 @@ dist/
 gcp-sa.json
 *.log
 .escalation-state/
+packages/*.zip

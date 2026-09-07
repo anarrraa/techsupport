@@ -121,7 +121,23 @@ Prerequisites, in order:
 1. An Azure subscription, and a single-tenant Entra app registration.
 2. An Azure Bot resource (free tier) with the Teams channel enabled and the
    messaging endpoint left empty.
-3. A notification-only Teams app package scoped to personal chats.
+3. A notification-only Teams app package scoped to personal chats. Build it from
+   this repo:
+
+   ```sh
+   TEAMS_BOT_APP_ID=<guid> npm run package:teams
+   ```
+
+   That produces `packages/sla-reminder-teams-app.zip` from
+   `packages/teams-app/`. Teams requires `manifest.json` and both icons at the
+   **root** of the archive, which is why this is a script and not a manual zip.
+   `isNotificationOnly: true` in the manifest is what removes the reply box, so
+   the app cannot become a two-way chat by accident.
+
+   The icons are placeholders. Replace them with the real brand marks, keeping
+   `color.png` at 192x192 and `outline.png` at 32x32 with a transparent
+   background. The `developer` URLs in the manifest must resolve before the
+   organisation catalog will accept the package.
 4. The app installed in each recipient's personal scope. At organisation scale
    that means an administrator publishes the package to the organisation catalog
    and assigns a Teams app setup policy to the recipient group; a per-person
