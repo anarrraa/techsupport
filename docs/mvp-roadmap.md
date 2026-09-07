@@ -39,7 +39,7 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Type checking | Pass | `npm run typecheck` exit 0 on 2026-09-07 |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-09-07 |
 | GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
-| Scheduled reminder workflow | Unverified | Workflow is active but has 0 completed runs as of 2026-08-03 |
+| Scheduled reminder workflow | Failing on `main` | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/lib/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; needs a green scheduled run to confirm |
 | Scoped JQL correctness | Pass | On 2026-08-26 `JIRA_JQL` set to `project = DC AND statusCategory != Done AND assignee is not EMPTY` |
 | Local production dry-run | Pass | On 2026-08-26 dry-run scans real DC issues and reaches SLA endpoint |
 | JSM SLA read access | Pass | On 2026-08-26 `GET /rest/servicedeskapi/request/DC-844/sla` returns 200 OK (agent access granted) |
