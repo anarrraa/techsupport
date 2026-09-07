@@ -65,6 +65,18 @@ test('rejects an identifier that Teams cannot use for a direct message', async (
 	);
 });
 
+test('rejects the placeholder object id the example file ships', async () => {
+	await assert.rejects(
+		write({
+			people: {
+				lead: { name: 'Team Lead', entraObjectId: '00000000-0000-0000-0000-000000000000' },
+			},
+			projects: {},
+		}),
+		/is still the placeholder from the example file/,
+	);
+});
+
 test('reports an unreadable or malformed file by path', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'escalation-'));
 	await assert.rejects(

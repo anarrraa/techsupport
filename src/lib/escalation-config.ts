@@ -14,9 +14,18 @@ import type { ContactLevel } from './escalation.ts';
 
 const LEVEL_KEYS = ['L2', 'L3', 'L4', 'L5'] as const;
 
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
 const PersonSchema = v.object({
 	name: v.pipe(v.string(), v.minLength(1)),
-	entraObjectId: v.pipe(v.string(), v.uuid('must be a Microsoft Entra object id (a UUID)')),
+	entraObjectId: v.pipe(
+		v.string(),
+		v.uuid('must be a Microsoft Entra object id (a UUID)'),
+		// The example file ships this id. It is a well-formed UUID, so without an
+		// explicit check a copied-but-unedited directory would pass validation and
+		// deliver nowhere.
+		v.notValue(NIL_UUID, 'is still the placeholder from the example file'),
+	),
 	jiraAccountId: v.optional(v.pipe(v.string(), v.minLength(1))),
 });
 
