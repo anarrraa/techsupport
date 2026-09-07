@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-08-24
+Last updated: 2026-09-07
 
 This tracks actionable next steps across the MVP and the proposed V2
 (personal Teams bot + contract escalation). See `AGENTS.md` for required
@@ -8,17 +8,15 @@ reading order and non-negotiable invariants before touching any of this.
 
 ## Now — blocking, in order
 
-- [ ] Point `JIRA_JQL` at a service desk project that exists. As of 2026-08-20
-      it matches zero issues, so the dry-run completes having scanned nothing
-      and every other check downstream is untested. The tenant's JSM projects
-      are `APUT`, `DC`, `SHT`, and `AM`; `DC` and `SHT` have open issues.
-- [ ] Give the Jira integration account **agent** access on the service desk
-      projects in scope. `GET /rest/servicedeskapi/request/{key}/sla` returns
-      `403 Forbidden` on `DC` and `SHT` while project search, service desk
-      listing, and issue search all return `200`, so SLA data is the only thing
-      being refused and that is an agent-level permission. A JSM agent role
-      consumes a licensed seat. V2 reads the same SLA data, so this blocks both.
-      Re-run `scratchpad/jira-sla-check.mjs` to confirm.
+- [x] Point `JIRA_JQL` at a service desk project that exists.
+  - Done 2026-08-26: set to `project = DC AND statusCategory != Done AND assignee is not EMPTY`.
+- [x] Give the Jira integration account **agent** access on the service desk
+      projects in scope.
+  - Done 2026-08-26: agent access granted on DC. `GET
+    /rest/servicedeskapi/request/DC-844/sla` returns 200 OK.
+- [x] Make an empty scan loud. `scanned: 0` now exits with error in non-dry-run mode.
+- [x] Report overdue time in working hours. `overdueMinutes` now reads `elapsedTime`
+      from JSM metric instead of clock time.
 - [ ] Get an administrator to publish the Teams app package to the
       organisation catalog and assign a Teams app setup policy to the
       recipient group (model decided 2026-08-24; see the V2 milestone in
@@ -26,7 +24,23 @@ reading order and non-negotiable invariants before touching any of this.
       technique, not a deployment model.
 - [ ] Configure a GitHub OIDC federated credential on the Entra app
       registration (decided 2026-08-24, matching the existing Vertex
-      authentication pattern) instead of a client secret.
+      authentication pattern) instead of a client secret. Audience
+      `api://AzureADTokenExchange`, subject
+      `repo:<owner>/<repo>:ref:refs/heads/main`. The code path exists and is
+      unit tested; only the credential is missing.
+- [ ] Copy `config/escalation.example.json` to `config/escalation.json` and fill
+      in a real Microsoft Entra object id for every possible assignee and every
+      L2-L5 contact, plus the on-call handle. Until this file exists the bot path
+      fails visibly by path, on purpose.
+- [ ] Prove the transport from this codebase:
+      `npm run verify:bot -- <entra-object-id>`. Record the outcome in the
+      evidence snapshot in `docs/mvp-roadmap.md`.
+- [ ] Seed the escalation state before the first live run
+      (`ESCALATION_SEED_ONLY=true`, `REMINDER_DRY_RUN` unset). The 2026-09-07
+      dry-run found 9 DC requests already past a level, two of them past L5.
+      Without this the first live run delivers the whole backlog at once.
+- [ ] Confirm with the client what Low L5 means. The contract gives it no clock
+      mark ("only if SLA breached"), so Low currently never escalates past L4.
 - [x] Get the user's answers to the open decisions in
       `docs/brd-teams-bot-escalation.md`. All six resolved as of 2026-08-24:
   - [x] Bot delivery mechanism. **Resolved 2026-08-20 by executed test.**
@@ -58,47 +72,43 @@ Verified 2026-08-20. Details and evidence in `docs/mvp-roadmap.md`.
 - [x] Notification-only Teams app package, personal scope.
 - [x] One direct message delivered and confirmed by the recipient.
 
-## MVP defects found 2026-08-20
+## MVP defects found 2026-08-20 — Fixed
 
-Neither depends on an external grant. Both are in MVP scope, so the V2 scope
-guard does not apply.
+- [x] Make an empty scan loud. Fixed 2026-08-26: `scanned: 0` in non-dry-run mode
+      now throws `Error('Jira search returned 0 issues — check JIRA_JQL configuration')`.
+- [x] Report overdue time in working hours. Fixed 2026-08-26: `overdueMinutes` now
+      reads `elapsedTime` from JSM metric instead of clock time.
 
-- [ ] Make an empty scan loud. `scanned: 0` currently exits successfully, so a
-      misconfigured query and a genuinely quiet queue are indistinguishable in
-      the logs and in GitHub Actions. This is what hid the `JIRA_JQL` fault.
-- [ ] Report overdue time in working hours. `overdueMinutes` in `src/lib/sla.ts`
-      subtracts the breach timestamp from the current time, so a Friday evening
-      breach reads as tens of hours overdue on Monday when the contractual
-      figure is minutes. It also skews the secondary sort. Read `elapsedTime`
-      from the JSM metric instead, which keeps calendar arithmetic in Jira as
-      `AGENTS.md` requires. Verification needs the agent grant above.
+## Done — V2 implementation, 2026-09-07
 
-## Next — once the blockers above are cleared
+`npm test` 93 passed, `npm run typecheck` exit 0, `npm run build` produced
+`dist/server.mjs`. None of this is production evidence; see the blockers above.
 
-- [ ] Add the config file (schema decided 2026-08-24: a person directory of
-      Jira account -> Entra object id, plus a per-project/team L2-L5
-      escalation mapping referencing that directory) and populate it with
-      real Entra object ids for every assignee and L2-L5 contact.
-- [ ] Implement the escalation-state store: a GitHub Actions cache keyed per
-      ticket, holding the highest level already notified.
-- [ ] Build the contact-directory resolver reading the config file above.
-      Fail visibly on a missing contact; never guess one.
-- [ ] Implement the direct-message sender against the call sequence recorded in
-      the V2 milestone. Parameterise the escape target in
-      `src/lib/reminder-message.ts` rather than writing a second renderer; the
-      bot payload is not escaped like the channel webhook. Handle
-      `403 ForbiddenOperationException` and `403 MessageWritesBlocked`
-      distinctly.
-- [ ] Implement working-hours vs off-hours routing per `docs/sla-matrix.md`
-      section 3 (sequential vs parallel + on-call surfacing).
-- [ ] Add unit tests for every threshold in `docs/sla-matrix.md` section 2,
-      for both working-hours and off-hours. Read elapsed working time from the
-      JSM resolution metric; do not derive it from the first-response breach
-      timestamp.
-- [ ] Add workflow tests: no duplicate escalation within one delivery window,
-      dry-run sends zero direct messages and logs counts only.
-- [ ] Run `npm test`, `npm run typecheck`, `npm run build` before calling any
-      of the above done.
+- [x] Add the config file schema (person directory of Jira account -> Entra
+      object id, plus a per-project L2-L5 mapping referencing it).
+      `config/escalation.example.json` + `src/lib/escalation-config.ts`.
+      Populating it with real ids is still open above.
+- [x] Implement the escalation-state store. `src/lib/escalation-state.ts`, saved
+      and restored by `actions/cache` in the reminder workflow.
+- [x] Build the contact-directory resolver. Fails visibly on a missing contact
+      and checks referential integrity at load time.
+- [x] Implement the direct-message sender. `src/lib/teams-bot.ts`: token by
+      client secret or GitHub OIDC, conversation create, activity post,
+      `403 ForbiddenOperationException` and `403 MessageWritesBlocked` reported
+      as distinct reasons.
+      Escape target **not** parameterised: the sanitize/escape path is identical
+      for both transports, so a parameter would have had one value. Revisit only
+      if a real direct message shows a literal `&lt;` or `&amp;`.
+- [x] Implement working-hours vs off-hours routing per `docs/sla-matrix.md`
+      section 3. `src/lib/escalation.ts`, using JSM's `withinCalendarHours` so
+      no calendar math is duplicated.
+- [x] Add unit tests for every threshold in section 2, both routings. Elapsed
+      working time is read from the JSM **resolution** metric.
+- [x] Add workflow tests: no duplicate escalation across runs, dry-run sends
+      zero direct messages and logs counts only.
+- [x] Make the channel webhook optional so a bot-only deployment works. It was
+      already removed from the workflow env while `src/lib/config.ts` still
+      required it, which would have failed every non-dry run.
 
 ## Reference
 

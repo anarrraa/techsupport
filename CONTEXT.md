@@ -39,6 +39,17 @@ The bounded period, opening once per repeat interval, during which a given breac
 produce one Reminder. Keeps a breach from being reported on every scheduled run.
 _Avoid_: cooldown, throttle, debounce, rate limit
 
+**Direct Reminder**:
+One Teams chat message sent to a single person: either the assignee's own breached
+requests, or the requests that have reached the Escalation Level this person answers
+for. Distinct from a Reminder, which addresses a channel.
+_Avoid_: DM, ping, personal notification, nudge
+
+**Escalation State**:
+The highest Escalation Level already notified for a given request. The only thing this
+project remembers between runs, and it exists solely so a level is never notified twice.
+_Avoid_: ledger, history, delivery log, audit
+
 **Reminder Intro**:
 The opening sentence of a Reminder: either the deterministic opener or one sentence
 written by a model.

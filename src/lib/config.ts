@@ -15,7 +15,29 @@ export interface JiraConfig {
 	maxSlaPages: number;
 	slaConcurrency: number;
 	firstResponseSlaName: string;
+	/** The JSM metric that drives the escalation clock in `docs/sla-matrix.md`. */
+	resolutionSlaName: string;
 	http: HttpConfig;
+}
+
+export interface TeamsBotConfig {
+	appId: string;
+	tenantId: string;
+	/**
+	 * Client secret for local use. Null in GitHub Actions, where the token is
+	 * obtained through the OIDC federated credential instead.
+	 */
+	appPassword: string | null;
+	/** Bot Connector service URL for the tenant's Teams region. */
+	serviceUrl: string;
+	http: HttpConfig;
+}
+
+export interface EscalationConfigPaths {
+	/** Person directory and per-project L2-L5 mapping. */
+	configFile: string;
+	/** Highest level already notified per ticket, restored from the Actions cache. */
+	stateFile: string;
 }
 
 export interface ReminderConfig {
@@ -25,11 +47,20 @@ export interface ReminderConfig {
 	introTimeoutMs: number;
 	dryRun: boolean;
 	maxMessageChars: number;
+	/**
+	 * One-time rollout step: record every escalation level already crossed
+	 * without notifying anyone, so switching the bot on does not deliver the
+	 * whole backlog at once.
+	 */
+	escalationSeedOnly: boolean;
 }
 
 export interface AppConfig {
 	jira: JiraConfig;
 	teamsWebhookUrl: string | null;
+	/** Null when the personal-bot transport is not configured; channel post only. */
+	bot: TeamsBotConfig | null;
+	escalation: EscalationConfigPaths;
 	reminder: ReminderConfig;
 	http: HttpConfig;
 }
@@ -50,8 +81,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
 	const dryRun = boolean(env, 'REMINDER_DRY_RUN', false);
 	const teamsWebhookUrl = optionalHttpsUrl(env, 'TEAMS_WEBHOOK_URL');
-	if (!dryRun && !teamsWebhookUrl) {
-		throw new Error('Missing required env var: TEAMS_WEBHOOK_URL');
+	const bot = loadBotConfig(env, http, dryRun);
+	if (!dryRun && !teamsWebhookUrl && !bot) {
+		throw new Error(
+			'No Teams transport configured: set TEAMS_WEBHOOK_URL for the channel post, '
+				+ 'TEAMS_BOT_APP_ID and TEAMS_BOT_TENANT_ID for direct messages, or both',
+		);
 	}
 	const jql = env.JIRA_JQL?.trim();
 	if (!dryRun && !jql) {
@@ -73,9 +108,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			slaConcurrency: integer(env, 'JIRA_SLA_CONCURRENCY', 5, 1, 20),
 			firstResponseSlaName:
 				env.JIRA_FIRST_RESPONSE_SLA_NAME?.trim() || 'Time To First Response',
+			resolutionSlaName: env.JIRA_RESOLUTION_SLA_NAME?.trim() || 'Time to resolution',
 			http,
 		},
 		teamsWebhookUrl,
+		bot,
+		escalation: {
+			configFile: env.ESCALATION_CONFIG_FILE?.trim() || 'config/escalation.json',
+			stateFile: env.ESCALATION_STATE_FILE?.trim() || '.escalation-state/state.json',
+		},
 		reminder: {
 			repeatMinutes,
 			deliveryWindowMinutes,
@@ -83,8 +124,40 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			introTimeoutMs: integer(env, 'REMINDER_INTRO_TIMEOUT_MS', 10_000, 1_000, 120_000),
 			dryRun,
 			maxMessageChars: integer(env, 'TEAMS_MAX_MESSAGE_CHARS', 12_000, 1_000, 25_000),
+			escalationSeedOnly: boolean(env, 'ESCALATION_SEED_ONLY', false),
 		},
 	};
+}
+
+/**
+ * The bot transport is opt-in: with no app id and tenant id the workflow keeps
+ * posting to the channel only. Once opted in, a missing credential is a visible
+ * failure rather than a silently skipped direct message.
+ */
+function loadBotConfig(
+	env: NodeJS.ProcessEnv,
+	http: HttpConfig,
+	dryRun: boolean,
+): TeamsBotConfig | null {
+	const appId = env.TEAMS_BOT_APP_ID?.trim();
+	const tenantId = env.TEAMS_BOT_TENANT_ID?.trim();
+	if (!appId && !tenantId) return null;
+	if (!appId || !tenantId) {
+		throw new Error('TEAMS_BOT_APP_ID and TEAMS_BOT_TENANT_ID must be set together');
+	}
+
+	const appPassword = env.TEAMS_BOT_APP_PASSWORD?.trim() || null;
+	// A dry run never asks for a token, so it can exercise routing without one.
+	if (!dryRun && !appPassword && !env.ACTIONS_ID_TOKEN_REQUEST_URL?.trim()) {
+		throw new Error(
+			'Teams bot needs a credential: set TEAMS_BOT_APP_PASSWORD, or run where GitHub '
+				+ 'OIDC is available (permissions: id-token: write) for the federated credential',
+		);
+	}
+
+	const serviceUrl = env.TEAMS_BOT_SERVICE_URL?.trim() || 'https://smba.trafficmanager.net/teams/';
+	validateHttpsUrl(serviceUrl, 'TEAMS_BOT_SERVICE_URL');
+	return { appId, tenantId, appPassword, serviceUrl, http };
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {

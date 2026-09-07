@@ -1,0 +1,36 @@
+{
+	"_comment": "Copy to config/escalation.json and fill in real values. Every id is a Microsoft Entra object id (a UUID) — Teams rejects an email or user principal name for a proactive direct message. jiraAccountId is the accountId Jira reports for that person; it is how a breached request finds its assignee here.",
+	"people": {
+		"dev-batbayar": {
+			"name": "Batbayar",
+			"entraObjectId": "00000000-0000-0000-0000-000000000000",
+			"jiraAccountId": "5f8a1b2c3d4e5f6a7b8c9d0e"
+		},
+		"lead-oyunaa": {
+			"name": "Oyunaa",
+			"entraObjectId": "00000000-0000-0000-0000-000000000000",
+			"jiraAccountId": "6a9b2c3d4e5f6a7b8c9d0e1f"
+		},
+		"cto": {
+			"name": "CTO",
+			"entraObjectId": "00000000-0000-0000-0000-000000000000"
+		},
+		"ceo": {
+			"name": "CEO",
+			"entraObjectId": "00000000-0000-0000-0000-000000000000"
+		},
+		"noc-oncall": {
+			"name": "NOC On-call",
+			"entraObjectId": "00000000-0000-0000-0000-000000000000"
+		}
+	},
+	"projects": {
+		"DC": {
+			"L2": "dev-batbayar",
+			"L3": "lead-oyunaa",
+			"L4": "cto",
+			"L5": "ceo"
+		}
+	},
+	"onCall": "noc-oncall"
+}

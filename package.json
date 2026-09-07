@@ -18,6 +18,7 @@
     "dev": "flue dev --target node",
     "build": "flue build --target node",
     "remind": "flue run jira-teams-reminder --target node",
+    "verify:bot": "node scripts/verify-teams-bot.ts",
     "typecheck": "tsc --noEmit",
 		"test": "node --test tests/lib/*.test.ts tests/workflows/*.test.ts"
   },

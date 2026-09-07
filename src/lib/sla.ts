@@ -77,7 +77,12 @@ export function isReminderWindow(
 }
 
 export function overdueMinutes(ticket: JiraTicket, now: Date): number {
-	const breachTime = ticket.firstResponseSla?.breachTimeEpochMillis;
+	const sla = ticket.firstResponseSla;
+	if (!sla) return 0;
+	// Prefer JSM's working-hours elapsed time when available.
+	if (sla.elapsedMinutes != null) return Math.max(0, sla.elapsedMinutes);
+	// Fallback to clock time (less accurate across non-working hours).
+	const breachTime = sla.breachTimeEpochMillis;
 	if (breachTime === null || breachTime === undefined) return 0;
 	return Math.max(0, Math.floor((now.getTime() - breachTime) / 60_000));
 }

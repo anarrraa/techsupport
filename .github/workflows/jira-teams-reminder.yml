@@ -9,6 +9,13 @@ on:
         description: Fetch and select tickets without posting to Teams
         type: boolean
         default: true
+      seed_only:
+        description: >-
+          One-time rollout step. Record every escalation level already crossed
+          and notify nobody. Requires dry_run to be false. An input rather than
+          a variable so it cannot be left switched on.
+        type: boolean
+        default: false
 permissions:
   contents: read
   id-token: write
@@ -33,6 +40,17 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
+      # Carries "highest escalation level notified per ticket" between runs. The
+      # key is unique per run and the prefix restores the newest entry, because a
+      # cache entry cannot be overwritten in place. A miss re-notifies a level
+      # rather than skipping one.
+      - name: Restore escalation state
+        uses: actions/cache@v4
+        with:
+          path: .escalation-state
+          key: escalation-state-${{ github.run_id }}
+          restore-keys: escalation-state-
+
       - name: Authenticate to Google Cloud
         if: vars.REMINDER_USE_LLM_INTRO == 'true'
         uses: google-github-actions/auth@v2
@@ -49,17 +67,24 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           JIRA_JQL: ${{ vars.JIRA_JQL }}
           JIRA_FIRST_RESPONSE_SLA_NAME: ${{ vars.JIRA_FIRST_RESPONSE_SLA_NAME }}
+          JIRA_RESOLUTION_SLA_NAME: ${{ vars.JIRA_RESOLUTION_SLA_NAME }}
           JIRA_PAGE_SIZE: ${{ vars.JIRA_PAGE_SIZE }}
           JIRA_MAX_RESULTS: ${{ vars.JIRA_MAX_RESULTS }}
           JIRA_MAX_SEARCH_PAGES: ${{ vars.JIRA_MAX_SEARCH_PAGES }}
           JIRA_SLA_PAGE_SIZE: ${{ vars.JIRA_SLA_PAGE_SIZE }}
           JIRA_MAX_SLA_PAGES: ${{ vars.JIRA_MAX_SLA_PAGES }}
           JIRA_SLA_CONCURRENCY: ${{ vars.JIRA_SLA_CONCURRENCY }}
-          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
           REMINDER_REPEAT_MINUTES: ${{ vars.REMINDER_REPEAT_MINUTES }}
           REMINDER_DELIVERY_WINDOW_MINUTES: ${{ vars.REMINDER_DELIVERY_WINDOW_MINUTES }}
           REMINDER_USE_LLM_INTRO: ${{ vars.REMINDER_USE_LLM_INTRO }}
           REMINDER_DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          # No client secret: the bot token comes from the OIDC federated
+          # credential on the Entra app registration (id-token: write above).
+          TEAMS_BOT_APP_ID: ${{ vars.TEAMS_BOT_APP_ID }}
+          TEAMS_BOT_TENANT_ID: ${{ vars.TEAMS_BOT_TENANT_ID }}
+          TEAMS_BOT_SERVICE_URL: ${{ vars.TEAMS_BOT_SERVICE_URL }}
+          ESCALATION_SEED_ONLY: ${{ inputs.seed_only || 'false' }}
           TEAMS_MAX_MESSAGE_CHARS: ${{ vars.TEAMS_MAX_MESSAGE_CHARS }}
           HTTP_TIMEOUT_MS: ${{ vars.HTTP_TIMEOUT_MS }}
           HTTP_MAX_RETRIES: ${{ vars.HTTP_MAX_RETRIES }}
