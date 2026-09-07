@@ -39,6 +39,10 @@ reading order and non-negotiable invariants before touching any of this.
 - [ ] Prove the transport from this codebase:
       `npm run verify:bot -- <entra-object-id>`. Record the outcome in the
       evidence snapshot in `docs/mvp-roadmap.md`.
+- [ ] Stage the first live run to `anar@zerotech.mn` and `tergel@zerotech.mn`
+      only: resolve both to Entra object ids and set them as the
+      `TEAMS_BOT_RECIPIENT_ALLOWLIST` repository variable. Widen it once the
+      messages read the way they should.
 - [ ] Seed the escalation state before the first live run
       (`ESCALATION_SEED_ONLY=true`, `REMINDER_DRY_RUN` unset). The 2026-09-07
       dry-run found 9 DC requests already past a level, two of them past L5.

@@ -230,6 +230,7 @@ async function runBotDelivery(
 		config: escalationConfig,
 		now,
 		maxChars: config.reminder.maxMessageChars,
+		allowlist: config.bot.recipientAllowlist,
 	});
 	const totalMessages = plan.messages.reduce((total, planned) => total + planned.messages.length, 0);
 	const observed = {
@@ -237,6 +238,7 @@ async function runBotDelivery(
 		messages: totalMessages,
 		unmappedAssignees: plan.unmappedAssignees,
 		missingOnCall: plan.missingOnCall,
+		suppressedByAllowlist: plan.suppressedByAllowlist,
 	};
 
 	if (config.reminder.dryRun) {

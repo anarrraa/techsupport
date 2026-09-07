@@ -85,6 +85,7 @@ jobs:
           TEAMS_BOT_TENANT_ID: ${{ vars.TEAMS_BOT_TENANT_ID }}
           TEAMS_BOT_SERVICE_URL: ${{ vars.TEAMS_BOT_SERVICE_URL }}
           ESCALATION_SEED_ONLY: ${{ inputs.seed_only || 'false' }}
+          TEAMS_BOT_RECIPIENT_ALLOWLIST: ${{ vars.TEAMS_BOT_RECIPIENT_ALLOWLIST }}
           TEAMS_MAX_MESSAGE_CHARS: ${{ vars.TEAMS_MAX_MESSAGE_CHARS }}
           HTTP_TIMEOUT_MS: ${{ vars.HTTP_TIMEOUT_MS }}
           HTTP_MAX_RETRIES: ${{ vars.HTTP_MAX_RETRIES }}

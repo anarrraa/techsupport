@@ -256,6 +256,18 @@ test('fails visibly when no ticket carries the escalation clock', async () => {
 	);
 });
 
+test('the staged rollout gate keeps escalation out of everyone else\'s chat', async () => {
+	const result = await run({
+		config: config({ bot: true, allowlist: [DEV] }),
+		// High priority: L2 falls due at 8 working hours, and L2 is the lead.
+		tickets: [ticket({ resolutionSla: resolutionCycle({ elapsedMinutes: 8 * 60 }) })],
+	});
+
+	assert.deepEqual(result.sent.map((message) => message.entraObjectId), [DEV]);
+	assert.deepEqual(result.saved, {});
+	assert.match(result.logs.join('\n'), /Staged rollout withheld 1 recipient/);
+});
+
 test('seeds escalation state without notifying anyone', async () => {
 	const result = await run({
 		config: config({ bot: true, seedOnly: true }),
@@ -368,6 +380,7 @@ function config(
 		bot?: boolean;
 		webhook?: boolean;
 		seedOnly?: boolean;
+		allowlist?: string[] | null;
 	} = {},
 ): AppConfig {
 	const http = { timeoutMs: overrides.timeoutMs ?? 1_000, maxRetries: 0 };
@@ -395,6 +408,7 @@ function config(
 				tenantId: '99999999-8888-7777-6666-555555555555',
 				appPassword: 'synthetic-secret',
 				serviceUrl: 'https://smba.invalid/teams/',
+				recipientAllowlist: overrides.allowlist ?? null,
 				http,
 			}
 			: null,

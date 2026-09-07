@@ -30,6 +30,8 @@ const config: TeamsBotConfig = {
 	appPassword: process.env.TEAMS_BOT_APP_PASSWORD?.trim() || null,
 	serviceUrl:
 		process.env.TEAMS_BOT_SERVICE_URL?.trim() || 'https://smba.trafficmanager.net/teams/',
+	// The check addresses exactly the id given on the command line.
+	recipientAllowlist: null,
 	http: { timeoutMs: 15_000, maxRetries: 1 },
 };
 

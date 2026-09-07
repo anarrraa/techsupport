@@ -105,6 +105,50 @@ test('counts an off-hours escalation that cannot name an on-call contact', () =>
 	assert.doesNotMatch(plan.messages[0]?.messages.join('\n') ?? '', /дуудлагын инженер/);
 });
 
+test('withholds everyone outside the staged-rollout allowlist', () => {
+	const plan = planDirectMessages({
+		due: [ticket({ key: 'DC-1' })],
+		escalations: [candidate({ level: 3, withinCalendarHours: true })],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+		allowlist: [DEV],
+	});
+
+	assert.deepEqual(plan.messages.map((message) => message.entraObjectId), [DEV]);
+	assert.equal(plan.suppressedByAllowlist, 1);
+	// Withheld, not recorded: the level is still owed once the gate opens.
+	assert.deepEqual(plan.messages.flatMap((message) => message.records), []);
+});
+
+test('matches allowlist object ids regardless of case', () => {
+	const plan = planDirectMessages({
+		due: [ticket({ key: 'DC-1' })],
+		escalations: [],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+		allowlist: [DEV.toUpperCase()],
+	});
+	assert.equal(plan.messages.length, 1);
+	assert.equal(plan.suppressedByAllowlist, 0);
+});
+
+test('rejects an allowlist id that nobody in the directory has', () => {
+	assert.throws(
+		() =>
+			planDirectMessages({
+				due: [ticket()],
+				escalations: [],
+				config: directory(),
+				now: NOW,
+				maxChars: 12_000,
+				allowlist: ['99999999-9999-4999-8999-999999999999'],
+			}),
+		/1 object id\(s\) that no one in the escalation directory has/,
+	);
+});
+
 test('fails visibly when the crossed level has no contact configured', () => {
 	assert.throws(
 		() =>

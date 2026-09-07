@@ -43,6 +43,8 @@ export interface DirectMessagesObserved {
 	/** A breached request whose assignee is absent from the escalation directory. */
 	unmappedAssignees: number;
 	missingOnCall: number;
+	/** Recipients withheld by the staged-rollout gate. */
+	suppressedByAllowlist: number;
 	/** Delivery failures counted by cause, never by recipient. */
 	failures: Record<string, number>;
 }
@@ -126,6 +128,12 @@ export function createRunJournal(sink: JournalSink): RunJournal {
 				sink.warn(
 					`${event.unmappedAssignees} breached request(s) have no assignee entry in the escalation directory`,
 					{ unmappedAssignees: event.unmappedAssignees },
+				);
+			}
+			if (event.suppressedByAllowlist > 0) {
+				sink.info(
+					`Staged rollout withheld ${event.suppressedByAllowlist} recipient(s) outside the allowlist`,
+					{ suppressedByAllowlist: event.suppressedByAllowlist },
 				);
 			}
 			if (event.missingOnCall > 0) {

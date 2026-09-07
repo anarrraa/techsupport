@@ -286,7 +286,9 @@ escalation path, which is what contract section 3 describes.
       including two to the L5 contact.
 - [ ] Run `workflow_dispatch` with `dry_run=true` and confirm the direct-message
       counts look right and no identity appears in the log.
-- [ ] Run one controlled live delivery to a single recipient.
+- [ ] Run one controlled live delivery with `TEAMS_BOT_RECIPIENT_ALLOWLIST` set
+      to `anar@zerotech.mn` and `tergel@zerotech.mn` (as object ids), so the
+      first live run cannot reach anyone else.
 - [ ] Confirm the escalation state cache survives between scheduled runs and that
       no level is notified twice.
 - [ ] Confirm the Low L5 threshold question with the client.

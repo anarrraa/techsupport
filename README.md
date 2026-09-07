@@ -172,6 +172,14 @@ together and names the on-call engineer for a human to call.
 level is never notified twice. A cache miss re-notifies a level rather than
 skipping one.
 
+**Stage the rollout.** Set `TEAMS_BOT_RECIPIENT_ALLOWLIST` to a few Entra object
+ids and nobody else can be messaged, whatever the escalation directory says. The
+directory cannot serve as the pilot's blast radius, because it has to hold
+everyone for the policy to resolve a level at all. A withheld level is **not**
+recorded as notified, so it is delivered once the gate opens rather than lost.
+An id in the list that nobody in the directory has is an error, not a gate that
+quietly matches nobody.
+
 **Seed the state before the first live run.** Requests that have been open for a
 while have already crossed several levels, and an empty state file treats every
 one of them as new. A dry-run against the DC project on 2026-09-07 found 9 such

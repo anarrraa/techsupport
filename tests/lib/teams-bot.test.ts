@@ -99,6 +99,7 @@ function config(): TeamsBotConfig {
 		tenantId: TENANT_ID,
 		appPassword: 'synthetic-secret',
 		serviceUrl: 'https://smba.invalid/teams/',
+		recipientAllowlist: null,
 		http: { timeoutMs: 1_000, maxRetries: 0 },
 	};
 }

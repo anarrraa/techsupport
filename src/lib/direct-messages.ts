@@ -35,6 +35,8 @@ export interface DirectMessagePlan {
 	unmappedAssignees: number;
 	/** Off-hours Critical/High escalations with no on-call contact configured. */
 	missingOnCall: number;
+	/** Recipients the policy selected but the staged-rollout gate withheld. */
+	suppressedByAllowlist: number;
 }
 
 interface Recipient {
@@ -52,8 +54,11 @@ export function planDirectMessages(input: {
 	config: EscalationConfig;
 	now: Date;
 	maxChars: number;
+	/** Entra object ids allowed to receive a message; null means everyone. */
+	allowlist?: string[] | null;
 }): DirectMessagePlan {
 	const { due, escalations, config, now, maxChars } = input;
+	const allowlist = normalizeAllowlist(input.allowlist, config);
 	const recipients = new Map<string, Recipient>();
 	let unmappedAssignees = 0;
 	let missingOnCall = 0;
@@ -88,7 +93,14 @@ export function planDirectMessages(input: {
 	}
 
 	const messages: PlannedDirectMessage[] = [];
+	let suppressedByAllowlist = 0;
 	for (const recipient of recipients.values()) {
+		if (allowlist && !allowlist.has(recipient.person.entraObjectId.toLowerCase())) {
+			// Withheld, not recorded: the level stays un-notified so it is delivered
+			// once the gate opens rather than being lost.
+			suppressedByAllowlist += 1;
+			continue;
+		}
 		messages.push({
 			entraObjectId: recipient.person.entraObjectId,
 			level: recipient.level,
@@ -103,7 +115,29 @@ export function planDirectMessages(input: {
 			}),
 		});
 	}
-	return { messages, unmappedAssignees, missingOnCall };
+	return { messages, unmappedAssignees, missingOnCall, suppressedByAllowlist };
+}
+
+/**
+ * A typo here would silently deliver nothing, so an id that no one in the
+ * directory has is an error rather than a gate that matches nobody.
+ */
+function normalizeAllowlist(
+	allowlist: string[] | null | undefined,
+	config: EscalationConfig,
+): Set<string> | null {
+	if (!allowlist?.length) return null;
+	const known = new Set(
+		Object.values(config.people).map((person) => person.entraObjectId.toLowerCase()),
+	);
+	const unknown = allowlist.map((id) => id.toLowerCase()).filter((id) => !known.has(id));
+	if (unknown.length > 0) {
+		throw new Error(
+			`Recipient allowlist has ${unknown.length} object id(s) that no one in the escalation `
+				+ 'directory has; check TEAMS_BOT_RECIPIENT_ALLOWLIST against the directory',
+		);
+	}
+	return new Set(allowlist.map((id) => id.toLowerCase()));
 }
 
 function add(
