@@ -1,26 +1,31 @@
 {
-	"_comment": "Copy to config/escalation.json and fill in real values. Every id is a Microsoft Entra object id (a UUID) — Teams rejects an email or user principal name for a proactive direct message. jiraAccountId is the accountId Jira reports for that person; it is how a breached request finds its assignee here.",
+	"_comment": "Copy to config/escalation.json, fill in email and jiraAccountId, then run `npm run resolve:ids` to fill entraObjectId from Microsoft Entra. Teams rejects an email or user principal name when addressing someone, so the object id is what the bot actually needs; email is only recorded so the id can be looked up. jiraAccountId is the accountId Jira reports for that person, and is how a breached request finds its assignee here. Only people who can be assignees need one.",
 	"people": {
 		"dev-batbayar": {
 			"name": "Batbayar",
+			"email": "batbayar@zerotech.mn",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000",
 			"jiraAccountId": "5f8a1b2c3d4e5f6a7b8c9d0e"
 		},
 		"lead-oyunaa": {
 			"name": "Oyunaa",
+			"email": "oyunaa@zerotech.mn",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000",
 			"jiraAccountId": "6a9b2c3d4e5f6a7b8c9d0e1f"
 		},
 		"cto": {
 			"name": "CTO",
+			"email": "cto@zerotech.mn",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000"
 		},
 		"ceo": {
 			"name": "CEO",
+			"email": "ceo@zerotech.mn",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000"
 		},
 		"noc-oncall": {
 			"name": "NOC On-call",
+			"email": "noc@zerotech.mn",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000"
 		}
 	},

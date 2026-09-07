@@ -145,9 +145,23 @@ Prerequisites, in order:
 5. A GitHub OIDC federated credential on the app registration, so no client
    secret is stored. Subject `repo:<owner>/<repo>:ref:refs/heads/main`, audience
    `api://AzureADTokenExchange`.
-6. `config/escalation.json`, copied from the example and filled in with a real
-   Microsoft Entra object id for every possible assignee and every L2-L5 contact.
-   Teams rejects an email or user principal name here.
+6. `config/escalation.json`, copied from the example. Fill in each person's
+   `email` and `jiraAccountId`, then let the object ids be looked up rather than
+   pasted:
+
+   ```sh
+   brew install azure-cli
+   az login --tenant zerotech.mn
+   npm run resolve:ids
+   ```
+
+   Teams rejects an email or user principal name when addressing someone, so the
+   object id is what the bot needs; the email is recorded only so the id can be
+   resolved. A hand-pasted GUID that is off by a character is a recipient who is
+   silently unreachable, which is why this is a script that validates the file
+   afterwards. With no Azure CLI available, read each id from
+   [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer):
+   `GET https://graph.microsoft.com/v1.0/users/<email>?$select=id,displayName`.
 
 Prove the transport before scheduling anything:
 

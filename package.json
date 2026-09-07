@@ -20,6 +20,7 @@
     "remind": "flue run jira-teams-reminder --target node",
     "verify:bot": "node scripts/verify-teams-bot.ts",
     "package:teams": "node scripts/build-teams-package.mjs",
+    "resolve:ids": "node scripts/resolve-entra-ids.mjs",
     "typecheck": "tsc --noEmit",
 		"test": "node --test tests/lib/*.test.ts tests/workflows/*.test.ts"
   },

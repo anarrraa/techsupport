@@ -18,6 +18,12 @@ const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
 const PersonSchema = v.object({
 	name: v.pipe(v.string(), v.minLength(1)),
+	/**
+	 * Never used to address anyone — Teams rejects it. It records who a handle is
+	 * and gives `scripts/resolve-entra-ids.mjs` something to look the object id up
+	 * by, so nobody has to paste GUIDs by hand.
+	 */
+	email: v.optional(v.pipe(v.string(), v.email('must be an email address'))),
 	entraObjectId: v.pipe(
 		v.string(),
 		v.uuid('must be a Microsoft Entra object id (a UUID)'),
