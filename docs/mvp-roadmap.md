@@ -44,7 +44,8 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Local production dry-run | Pass | On 2026-08-26 dry-run scans real DC issues and reaches SLA endpoint |
 | JSM SLA read access | Pass | On 2026-08-26 `GET /rest/servicedeskapi/request/DC-844/sla` returns 200 OK (agent access granted) |
 | First response metric name | Pass | On 2026-08-20 `GET /rest/api/3/field` lists `Time to first response`; `JIRA_FIRST_RESPONSE_SLA_NAME` matches it case-insensitively |
-| Live Jira-to-Teams delivery | Not attempted | User authorized dry-run only; no Teams post was made |
+| Live Jira-to-Teams delivery | **Pass** (bot transport) | On 2026-09-08 a local live run delivered 3 escalation messages covering 7 real DC requests to the two pilot recipients, then re-ran and delivered nothing. The channel-webhook transport remains unattempted and is not configured |
+| Escalation message quotes the right clock | Fixed 2026-09-08 | The first preview printed `0м хэтэрсэн` on escalation rows: it quoted the first-response clock on a message raised by the resolution clock, and a request past its resolution mark can have no first-response cycle at all. Escalation rows now read the resolution cycle and say `шийдэгдээгүй`; DC-811 went from `0м` to `158ц` |
 | Overdue uses working hours | Pass | On 2026-08-26 `elapsedMinutes` from JSM used instead of clock time |
 | Empty scan detection | Pass | On 2026-08-26 `scanned: 0` in non-dry-run mode throws visible error |
 | V2 bot and escalation code | Implemented, unverified | Added 2026-09-07 with unit coverage for every `docs/sla-matrix.md` section 2 threshold; no live send |
@@ -340,9 +341,17 @@ endpoint for this tenant, and the tenant id is
       including two to the L5 contact.
 - [ ] Run `workflow_dispatch` with `dry_run=true` and confirm the direct-message
       counts look right and no identity appears in the log.
-- [ ] Run one controlled live delivery with `TEAMS_BOT_RECIPIENT_ALLOWLIST` set
-      to `anar@zerotech.mn` and `tergel@zerotech.mn` (as object ids), so the
-      first live run cannot reach anyone else.
+- [x] Run one controlled live delivery with the allowlist set to the two pilot
+      recipients. Done 2026-09-08 from a local run: `Delivered 3 direct
+      message(s) to 3 recipient(s)` covering 7 requests at L2, L3 and L5, with
+      `withheld by allowlist: 0` — the directory holds only those two, so no
+      other recipient was even planned.
+- [x] Confirm no level is notified twice. The immediately following run reported
+      `0 request(s) crossed an escalation level` and delivered nothing, against
+      the state file the first run wrote.
+- [ ] Seed the **Actions cache** state before the first scheduled run. The state
+      written above is local; the cache is separate and starts empty, so a
+      scheduled run would re-deliver all 7 without `seed_only=true` first.
 - [ ] Confirm the escalation state cache survives between scheduled runs and that
       no level is notified twice.
 - [ ] Confirm the Low L5 threshold question with the client.

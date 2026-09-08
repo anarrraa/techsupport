@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { JiraTicket } from '../../src/lib/jira.ts';
-import { buildReminderMessages, cleanIntro } from '../../src/lib/reminder-message.ts';
+import { buildDirectMessages, buildReminderMessages, cleanIntro } from '../../src/lib/reminder-message.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
 
@@ -168,6 +168,45 @@ test('preserves valid join controls while removing dangerous and C0/C1 controls'
 		cleanIntro('\u0000\u001b\u0085\u202e\u200b'),
 		'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.',
 	);
+});
+
+test('an escalation message quotes the resolution clock, not the first-response one', () => {
+	// A request can sit far past its resolution mark while its first-response
+	// cycle reports nothing, so quoting the wrong clock prints 0 on a message
+	// that exists precisely because time has run out.
+	const escalating = ticket({
+		key: 'DC-811',
+		firstResponseSla: null,
+		resolutionSla: {
+			name: 'Time to resolution',
+			state: 'ongoing',
+			breached: true,
+			paused: false,
+			withinCalendarHours: true,
+			breachTimeEpochMillis: null,
+			elapsedMinutes: 67 * 60,
+		},
+	});
+
+	const escalation = buildDirectMessages({
+		recipientName: 'Lead',
+		level: 3,
+		tickets: [escalating],
+		now: NOW,
+		maxChars: 12_000,
+	}).join('\n');
+	assert.match(escalation, /67ц шийдэгдээгүй/);
+	assert.doesNotMatch(escalation, /0м/);
+
+	const reminder = buildDirectMessages({
+		recipientName: 'Dev',
+		level: 1,
+		tickets: [escalating],
+		now: NOW,
+		maxChars: 12_000,
+	}).join('\n');
+	assert.match(reminder, /хэтэрсэн/);
+	assert.doesNotMatch(reminder, /шийдэгдээгүй/);
 });
 
 function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {

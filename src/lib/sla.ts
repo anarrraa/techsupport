@@ -1,4 +1,4 @@
-import type { JiraTicket } from './jira.ts';
+import type { JiraTicket, SlaCycle } from './jira.ts';
 
 export interface ReminderSelection {
 	due: JiraTicket[];
@@ -77,7 +77,16 @@ export function isReminderWindow(
 }
 
 export function overdueMinutes(ticket: JiraTicket, now: Date): number {
-	const sla = ticket.firstResponseSla;
+	return elapsedMinutesOf(ticket.firstResponseSla, now);
+}
+
+/**
+ * Working-hours elapsed time on one SLA cycle. Which cycle matters: a message
+ * about the first response must not quote the resolution clock, and an
+ * escalation message must not quote the first-response clock — a request can be
+ * far past its resolution mark while its first-response cycle reports nothing.
+ */
+export function elapsedMinutesOf(sla: SlaCycle | null, now: Date): number {
 	if (!sla) return 0;
 	// Prefer JSM's working-hours elapsed time when available.
 	if (sla.elapsedMinutes != null) return Math.max(0, sla.elapsedMinutes);
