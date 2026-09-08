@@ -260,7 +260,9 @@ level is never notified twice. A cache miss re-notifies a level rather than
 skipping one.
 
 **Stage the rollout.** Set `TEAMS_BOT_RECIPIENT_ALLOWLIST` and nobody else can
-be messaged, whatever the escalation directory says:
+be messaged, whatever the escalation directory says. Set it in **both** places
+— the repository variable and your `.env` — so a local `npm run remind` cannot
+reach people a scheduled run would not:
 
 ```sh
 TEAMS_BOT_RECIPIENT_ALLOWLIST=anar@zerotech.mn,tergel@zerotech.mn

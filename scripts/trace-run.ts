@@ -23,6 +23,17 @@ import { elapsedMinutesOf, selectReminderTickets } from '../src/lib/sla.ts';
 
 const applyAllowlist = process.argv.includes('--allowlist');
 const config = loadConfig({ ...process.env, REMINDER_DRY_RUN: 'true' });
+if (applyAllowlist && !config.bot?.recipientAllowlist) {
+	// Asking for the gate and silently getting none is how a local run reaches
+	// people a deployed run would not. The variable is set on the repository;
+	// mirror it in .env for the local view to match.
+	console.error(
+		'--allowlist was passed but TEAMS_BOT_RECIPIENT_ALLOWLIST is not set in this environment.\n'
+			+ 'The deployed value lives in the repository variables; copy it into .env so a local run '
+			+ 'has the same reach as a scheduled one.',
+	);
+	process.exit(2);
+}
 const now = new Date();
 const stage = (n: number, title: string) => console.log(`\n${'─'.repeat(74)}\n${n}. ${title}\n${'─'.repeat(74)}`);
 
