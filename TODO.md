@@ -44,10 +44,13 @@ reading order and non-negotiable invariants before touching any of this.
       policy is needed** — superseded 2026-09-08 by the goOrange delivery path,
       which installs the app per recipient through Graph. See the revision note
       in `docs/mvp-roadmap.md`.
-- [ ] Grant and consent the Graph application permissions on the app
-      registration: `TeamsAppInstallation.ReadWriteForUser.All`,
-      `AppCatalog.Read.All`, and `User.Read.All` (for `npm run resolve:ids`).
-      goOrange already holds these in this tenant, so the pattern is approved.
+- [ ] Grant and consent the Graph **application** permissions on the app
+      registration: `AppCatalog.Read.All`, and
+      `TeamsAppInstallation.ReadWriteSelfForUser.All` (narrower — limited to this
+      app; fall back to `TeamsAppInstallation.ReadWriteForUser.All` if Graph
+      refuses). `User.Read.All` only if `npm run resolve:ids` is used rather than
+      reading the two object ids from the portal. goOrange already holds this
+      shape of permission in the tenant, so the pattern is approved.
 - [ ] Configure a GitHub OIDC federated credential on the Entra app
       registration (decided 2026-08-24, matching the existing Vertex
       authentication pattern) instead of a client secret. Audience

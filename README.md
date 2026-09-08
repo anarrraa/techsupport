@@ -153,9 +153,14 @@ Prerequisites, in order:
    the app for each recipient on first delivery. The catalog publish is the one
    step that cannot be automated away, because Graph finds the app by its
    catalog entry.
-5. Graph application permissions with admin consent:
-   `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`, and
-   `User.Read.All` for `npm run resolve:ids`.
+5. Graph **application** permissions with admin consent — delegated ones are
+   useless here, because nobody is signed in when the schedule fires:
+
+   | Permission | What it is for |
+   | --- | --- |
+   | `AppCatalog.Read.All` | find the app in the organisation catalog |
+   | `TeamsAppInstallation.ReadWriteSelfForUser.All` | install this app for a recipient. Try this one first: it is limited to this app. Fall back to `TeamsAppInstallation.ReadWriteForUser.All` if Graph refuses |
+   | `User.Read.All` | only for `npm run resolve:ids`. Skip it if the object ids are read from the Azure portal instead |
 6. A GitHub OIDC federated credential on the app registration, so no client
    secret is stored. Subject `repo:<owner>/<repo>:ref:refs/heads/main`, audience
    `api://AzureADTokenExchange`.

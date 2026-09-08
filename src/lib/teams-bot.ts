@@ -347,8 +347,11 @@ async function graphJson<T>(
 		if (error instanceof ExternalRequestError && error.status === 403) {
 			throw new TeamsDeliveryError(
 				'install-forbidden',
-				'Graph refused the app installation: the app registration needs '
-					+ 'TeamsAppInstallation.ReadWriteForUser.All and AppCatalog.Read.All with admin consent',
+				'Graph refused the app installation. The app registration needs '
+					+ 'AppCatalog.Read.All plus permission to install itself for a user, with admin '
+					+ 'consent: try TeamsAppInstallation.ReadWriteSelfForUser.All first, which is '
+					+ 'limited to this app, and fall back to TeamsAppInstallation.ReadWriteForUser.All '
+					+ 'if Graph still refuses',
 				{ cause: error },
 			);
 		}

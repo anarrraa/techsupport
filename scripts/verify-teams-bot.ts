@@ -33,8 +33,9 @@ const REMEDY: Record<string, string> = {
 		'Publish the app package to the organisation catalog, then check that TEAMS_APP_EXTERNAL_ID '
 			+ 'matches the manifest id of the published package.',
 	'install-forbidden':
-		'Grant the app registration TeamsAppInstallation.ReadWriteForUser.All and AppCatalog.Read.All '
-			+ 'as application permissions, with admin consent.',
+		'Grant the app registration AppCatalog.Read.All and one of '
+			+ 'TeamsAppInstallation.ReadWriteSelfForUser.All (limited to this app, try this first) or '
+			+ 'TeamsAppInstallation.ReadWriteForUser.All, as application permissions with admin consent.',
 	'not-installed':
 		'Graph reported no personal installation even after installing. Confirm the recipient is a '
 			+ 'licensed Teams user in this tenant.',
