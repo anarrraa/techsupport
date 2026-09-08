@@ -1,3 +1,4 @@
+import type { DeliveryFailureReason } from './teams-bot.ts';
 import type { IntroReason, IntroResult } from './reminder-intro.ts';
 
 /**
@@ -7,7 +8,10 @@ import type { IntroReason, IntroResult } from './reminder-intro.ts';
  * identity, title, assignee, or link. That is the enforcement of the invariant
  * in AGENTS.md and the definition of done in docs/mvp-roadmap.md: no ticket
  * content or personal data in operational output. Redaction is not a step this
- * module performs, it is a shape its callers cannot escape.
+ * module performs, it is a shape its callers cannot escape. The two map-shaped
+ * events are keyed by closed unions rather than `string` for that reason: a
+ * `Record<string, number>` would have let a caller file a count under a request
+ * key or a person's name and still typecheck.
  */
 
 export interface SelectionObserved {
@@ -32,7 +36,8 @@ export type DeliveryObserved =
 /** Escalation levels that came due this run, counted per level. */
 export interface EscalationObserved {
 	candidates: number;
-	byLevel: Record<string, number>;
+	/** Keyed by contractual level, so it cannot hold a request key. */
+	byLevel: Partial<Record<'2' | '3' | '4' | '5', number>>;
 }
 
 export interface DirectMessagesObserved {
@@ -45,8 +50,8 @@ export interface DirectMessagesObserved {
 	missingOnCall: number;
 	/** Recipients withheld by the staged-rollout gate. */
 	suppressedByAllowlist: number;
-	/** Delivery failures counted by cause, never by recipient. */
-	failures: Record<string, number>;
+	/** Keyed by cause, so it cannot hold a recipient. */
+	failures: Partial<Record<DeliveryFailureReason, number>>;
 }
 
 /** The subset of the runtime logger this module needs. Attributes are structured. */

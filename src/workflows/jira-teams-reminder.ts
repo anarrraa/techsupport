@@ -14,7 +14,13 @@ import {
 } from '../lib/escalation-state.ts';
 import { fetchTickets, type JiraTicket } from '../lib/jira.ts';
 import { buildReminderMessages } from '../lib/reminder-message.ts';
-import { createRunJournal, type JournalSink, type RunJournal } from '../lib/run-journal.ts';
+import {
+	createRunJournal,
+	type DirectMessagesObserved,
+	type EscalationObserved,
+	type JournalSink,
+	type RunJournal,
+} from '../lib/run-journal.ts';
 import { selectReminderTickets } from '../lib/sla.ts';
 import { createBotSender, TeamsDeliveryError } from '../lib/teams-bot.ts';
 import { postToChannel } from '../lib/teams-webhook.ts';
@@ -206,10 +212,14 @@ async function runBotDelivery(
 	const escalationConfig = await dependencies.loadEscalationConfig(config.escalation.configFile);
 	const state = await dependencies.readEscalationState(config.escalation.stateFile);
 	const escalations = selectEscalations(tickets, (key) => highestNotified(state, key));
-	journal.escalation({
-		candidates: escalations.length,
-		byLevel: countBy(escalations.map((candidate) => String(candidate.level))),
-	});
+	// Built key by key rather than through countBy, whose Record<string, number>
+	// would satisfy the journal's narrow type and reopen the hole it closes.
+	const byLevel: EscalationObserved['byLevel'] = {};
+	for (const candidate of escalations) {
+		const key = String(candidate.level) as '2' | '3' | '4' | '5';
+		byLevel[key] = (byLevel[key] ?? 0) + 1;
+	}
+	journal.escalation({ candidates: escalations.length, byLevel });
 
 	if (config.reminder.escalationSeedOnly) {
 		if (config.reminder.dryRun) {
@@ -247,7 +257,7 @@ async function runBotDelivery(
 	}
 
 	const sender = await dependencies.createBotSender(config.bot);
-	const failures: Record<string, number> = {};
+	const failures: DirectMessagesObserved['failures'] = {};
 	let firstFailure: unknown;
 	let delivered = 0;
 	try {

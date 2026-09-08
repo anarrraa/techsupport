@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { DirectMessagesObserved, EscalationObserved } from '../../src/lib/run-journal.ts';
 import { createRunJournal, type JournalSink } from '../../src/lib/run-journal.ts';
 
 interface Emitted {
@@ -29,6 +30,23 @@ const COUNTERS = {
 	suppressedOutsideCalendar: 2,
 	waitingForNextWindow: 1,
 };
+
+test('cannot be handed a request key or a person as a map key', () => {
+	// The module claims its event shapes are unable to express an identity. The
+	// two map-shaped events are the only place that claim could fail, so it is
+	// stated here as a type assertion: a Record<string, number> would accept a
+	// ticket key or a name and still compile.
+	const escalation: EscalationObserved['byLevel'] = { '3': 2 };
+	const failures: DirectMessagesObserved['failures'] = { 'not-installed': 1 };
+	assert.deepEqual(Object.keys(escalation), ['3']);
+	assert.deepEqual(Object.keys(failures), ['not-installed']);
+
+	// @ts-expect-error a request key is not a contractual level
+	const leakedTicket: EscalationObserved['byLevel'] = { 'DC-885': 1 };
+	// @ts-expect-error a person is not a delivery failure reason
+	const leakedPerson: DirectMessagesObserved['failures'] = { 'Anar Tuvshinjargal': 1 };
+	assert.ok(leakedTicket && leakedPerson, 'referenced so the assertions are not dead code');
+});
 
 test('reports the selection counters as structured attributes', () => {
 	const { emitted, sink: target } = sink();
