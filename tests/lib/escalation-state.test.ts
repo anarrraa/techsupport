@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -30,6 +30,25 @@ test('never lowers a recorded level', () => {
 	recordNotified(state, 'DC-1', 4);
 	assert.equal(highestNotified(state, 'DC-1'), 4);
 	assert.equal(highestNotified(state, 'DC-UNSEEN'), 0);
+});
+
+test('reports a truncated state file by path instead of a bare SyntaxError', async () => {
+	// A cancelled job could leave the file half-written; the next run then aborted
+	// before any reminder with "Unexpected end of JSON input" and no context.
+	const directory = await mkdtemp(join(tmpdir(), 'escalation-state-'));
+	const path = join(directory, 'state.json');
+	await writeFile(path, '{"DC-1": 3', 'utf8');
+	await assert.rejects(readEscalationState(path), /is not valid JSON; delete the cache entry/);
+});
+
+test('a write leaves no half-written file behind', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'escalation-state-'));
+	const path = join(directory, 'state.json');
+	await writeEscalationState(path, { 'DC-1': 2 });
+	await writeEscalationState(path, { 'DC-1': 3 });
+	// Written to a sibling and renamed, so the target is only ever complete.
+	assert.deepEqual(await readEscalationState(path), { 'DC-1': 3 });
+	assert.deepEqual((await readdir(directory)).sort(), ['state.json']);
 });
 
 test('refuses a state file that is not a ticket-to-level map', async () => {

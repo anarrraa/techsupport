@@ -189,6 +189,7 @@ async function resolveCatalogAppId(
 		graphToken,
 		fetchImpl,
 		sleep,
+		diagnoseCatalog,
 	);
 
 	// One person sideloading the package during a pilot creates a second catalog
@@ -236,6 +237,7 @@ async function resolvePersonalChatId(
 			graphToken,
 			fetchImpl,
 			sleep,
+			diagnoseInstallation,
 		)
 	).value?.[0]?.id;
 
@@ -254,6 +256,7 @@ async function resolvePersonalChatId(
 					graphToken,
 					fetchImpl,
 					sleep,
+					diagnoseInstallation,
 				)
 			).id;
 		} catch (error) {
@@ -268,6 +271,7 @@ async function resolvePersonalChatId(
 				graphToken,
 				fetchImpl,
 				sleep,
+				diagnoseInstallation,
 			)
 		).value?.[0]?.id;
 	}
@@ -287,6 +291,7 @@ async function resolvePersonalChatId(
 			graphToken,
 			fetchImpl,
 			sleep,
+			diagnoseChat,
 		)
 	).id;
 	if (!chatId) {
@@ -325,13 +330,19 @@ async function postActivity(
 	}
 }
 
+/**
+ * `diagnose` belongs to the caller, not here: a 404 from the catalog lookup and
+ * a 404 from the chat lookup mean different things, and one shared mapping told
+ * an operator to go looking for a correct object id that was never wrong.
+ */
 async function graphJson<T>(
 	path: string,
 	init: RequestInit,
 	config: TeamsBotConfig,
 	graphToken: string,
 	fetchImpl: Fetch,
-	sleep?: Sleep,
+	sleep: Sleep | undefined,
+	diagnose: (error: ExternalRequestError) => TeamsDeliveryError | null,
 ): Promise<T> {
 	try {
 		const response = await fetchOk(
@@ -351,31 +362,57 @@ async function graphJson<T>(
 		const body = await response.text();
 		return (body ? JSON.parse(body) : {}) as T;
 	} catch (error) {
-		// Graph answers 404 on /users/{id} for anything that is not a user in this
-		// tenant, and the commonest cause is an object id copied from the wrong
-		// page: an app registration's own object id looks exactly like a user's.
-		if (error instanceof ExternalRequestError && error.status === 404) {
-			throw new TeamsDeliveryError(
-				'unknown-recipient',
-				'Microsoft Entra has no user with that object id. Check it came from '
-					+ 'Entra ID > Users > the person, not from the app registration\'s overview — '
-					+ 'the app has an object id of its own and it is not interchangeable',
-				{ cause: error },
-			);
-		}
-		if (error instanceof ExternalRequestError && error.status === 403) {
-			throw new TeamsDeliveryError(
-				'install-forbidden',
-				'Graph refused the app installation. The app registration needs '
-					+ 'AppCatalog.Read.All plus permission to install itself for a user, with admin '
-					+ 'consent: try TeamsAppInstallation.ReadWriteSelfForUser.All first, which is '
-					+ 'limited to this app, and fall back to TeamsAppInstallation.ReadWriteForUser.All '
-					+ 'if Graph still refuses',
-				{ cause: error },
-			);
-		}
+		if (error instanceof ExternalRequestError) throw diagnose(error) ?? error;
 		throw error;
 	}
+}
+
+/** Reading the catalog needs `AppCatalog.Read.All`. */
+function diagnoseCatalog(error: ExternalRequestError): TeamsDeliveryError | null {
+	if (error.status !== 403) return null;
+	return new TeamsDeliveryError(
+		'not-in-catalog',
+		'Graph refused to read the organisation catalog: the app registration needs '
+			+ 'AppCatalog.Read.All as an application permission, with admin consent',
+		{ cause: error },
+	);
+}
+
+/** Listing or creating an installation is where the recipient id is used. */
+function diagnoseInstallation(error: ExternalRequestError): TeamsDeliveryError | null {
+	if (error.status === 404) {
+		return new TeamsDeliveryError(
+			'unknown-recipient',
+			'Microsoft Entra has no user with that object id. Check it came from '
+				+ 'Entra ID > Users > the person, not from the app registration\'s overview — '
+				+ 'the app has an object id of its own and it is not interchangeable',
+			{ cause: error },
+		);
+	}
+	if (error.status === 403) {
+		return new TeamsDeliveryError(
+			'install-forbidden',
+			'Graph refused the app installation. The app registration needs permission to '
+				+ 'install itself for a user, with admin consent: try '
+				+ 'TeamsAppInstallation.ReadWriteSelfForUser.All first, which is limited to this '
+				+ 'app, and fall back to TeamsAppInstallation.ReadWriteForUser.All if Graph still '
+				+ 'refuses',
+			{ cause: error },
+		);
+	}
+	return null;
+}
+
+/** The installation exists; a 404 here is a chat Teams has not provisioned. */
+function diagnoseChat(error: ExternalRequestError): TeamsDeliveryError | null {
+	if (error.status !== 404) return null;
+	return new TeamsDeliveryError(
+		'not-installed',
+		'Teams has no personal chat for this recipient\'s installation of the app. The object '
+			+ 'id resolved and the app is installed, so confirm the recipient is a licensed Teams '
+			+ 'user in this tenant',
+		{ cause: error },
+	);
 }
 
 /**

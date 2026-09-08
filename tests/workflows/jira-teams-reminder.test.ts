@@ -276,6 +276,16 @@ test('fails the run visibly when a recipient cannot be reached, without naming t
 	);
 });
 
+test('fails visibly when no ticket carries a vendor participant', async () => {
+	// First-response reminders route through participants alone, so a renamed
+	// custom field would otherwise report "Delivered 0 direct message(s)" and
+	// exit 0 — the same silence the SLA-metric guard exists to prevent.
+	await assert.rejects(
+		run({ config: config({ bot: true }), tickets: [ticket({ participants: [] })] }),
+		/No Jira ticket carries a vendor participant in field "customfield_10065"/,
+	);
+});
+
 test('fails visibly when no ticket carries the escalation clock', async () => {
 	await assert.rejects(
 		run({ config: config({ bot: true }), tickets: [ticket({ resolutionSla: null })] }),
@@ -357,6 +367,7 @@ async function run(options: RunOptions = {}) {
 				scanned: tickets.length,
 				withoutSla: 0,
 				withoutResolutionSla: tickets.filter((value) => value.resolutionSla === null).length,
+				withoutParticipants: tickets.filter((value) => value.participants.length === 0).length,
 				truncated: false,
 			}),
 			...(options.buildMessages ? { buildReminderMessages: options.buildMessages } : {}),

@@ -116,7 +116,21 @@ export function loadTeamsBotConfig(env: NodeJS.ProcessEnv = process.env): TeamsB
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	const http = loadHttpConfig(env);
 	const repeatMinutes = integer(env, 'REMINDER_REPEAT_MINUTES', 60, 15, 1_440);
-	const deliveryWindowMinutes = integer(env, 'REMINDER_DELIVERY_WINDOW_MINUTES', 15, 1, 60);
+	/**
+	 * Defaults to the repeat interval, which disables suppression and makes the
+	 * schedule the cadence. The old default of 15 was sized for a workflow that
+	 * ran every 15 minutes; against the current twice-a-day schedule it reaches
+	 * a quarter of breaches and always the same quarter, because the gaps
+	 * between runs are whole multiples of 60. Clearing the variable used to
+	 * restore that silently.
+	 */
+	const deliveryWindowMinutes = integer(
+		env,
+		'REMINDER_DELIVERY_WINDOW_MINUTES',
+		repeatMinutes,
+		1,
+		1_440,
+	);
 	if (deliveryWindowMinutes > repeatMinutes) {
 		throw new Error('REMINDER_DELIVERY_WINDOW_MINUTES must not exceed REMINDER_REPEAT_MINUTES');
 	}

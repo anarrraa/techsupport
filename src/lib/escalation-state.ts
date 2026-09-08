@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import * as v from 'valibot';
 
@@ -32,7 +32,19 @@ export async function readEscalationState(path: string): Promise<EscalationState
 		throw error;
 	}
 
-	const result = v.safeParse(StateSchema, JSON.parse(raw) as unknown);
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch (error) {
+		// A cancelled job could leave the file truncated. Say which file, and how
+		// to recover, rather than a bare SyntaxError with no context.
+		throw new Error(
+			`Escalation state file at ${path} is not valid JSON; delete the cache entry to reset it`,
+			{ cause: error },
+		);
+	}
+
+	const result = v.safeParse(StateSchema, parsed);
 	if (!result.success) {
 		throw new Error(
 			`Escalation state file at ${path} is not a ticket-to-level map; delete the cache entry to reset it`,
@@ -43,7 +55,12 @@ export async function readEscalationState(path: string): Promise<EscalationState
 
 export async function writeEscalationState(path: string, state: EscalationState): Promise<void> {
 	await mkdir(dirname(path), { recursive: true });
-	await writeFile(path, `${JSON.stringify(state, null, '\t')}\n`, 'utf8');
+	// Written to a sibling and renamed: rename is atomic, so a job cancelled
+	// mid-write leaves the previous state intact instead of a truncated file the
+	// next run cannot parse.
+	const temporary = `${path}.writing`;
+	await writeFile(temporary, `${JSON.stringify(state, null, '\t')}\n`, 'utf8');
+	await rename(temporary, path);
 }
 
 export function highestNotified(state: EscalationState, ticketKey: string): number {

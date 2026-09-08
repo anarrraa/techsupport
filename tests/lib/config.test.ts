@@ -9,7 +9,10 @@ test('loads validated defaults', () => {
 	assert.equal(config.jira.maxSlaPages, 10);
 	assert.equal(config.jira.firstResponseSlaName, 'Time To First Response');
 	assert.equal(config.reminder.repeatMinutes, 60);
-	assert.equal(config.reminder.deliveryWindowMinutes, 15);
+	// Defaults to the repeat interval, so the schedule is the cadence. The old
+	// default of 15 was sized for a 15-minute schedule and silently reached a
+	// quarter of breaches on the current one.
+	assert.equal(config.reminder.deliveryWindowMinutes, 60);
 	assert.equal(config.reminder.useLlmIntro, false);
 });
 

@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SOURCE = new URL('../packages/teams-app/', import.meta.url);
 const OUTPUT = new URL('../packages/sla-reminder-teams-app.zip', import.meta.url);
@@ -43,7 +44,10 @@ try {
 	writeFileSync(join(staging, 'manifest.json'), remaining, 'utf8');
 	for (const icon of ICONS) copyFileSync(new URL(icon, SOURCE), join(staging, icon));
 
-	const zipPath = OUTPUT.pathname;
+	// fileURLToPath, not .pathname: a checkout under a directory with a space
+	// yields `My%20Projects` from pathname, so rmSync silently misses and zip
+	// fails on a directory that does not exist.
+	const zipPath = fileURLToPath(OUTPUT);
 	rmSync(zipPath, { force: true });
 	execFileSync('zip', ['-q', '-j', zipPath, join(staging, 'manifest.json'), ...ICONS.map((icon) => join(staging, icon))]);
 	console.log(`Built ${zipPath}`);

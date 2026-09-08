@@ -19,7 +19,8 @@ interface Recorded {
 interface Overrides {
 	installed?: boolean;
 	catalog?: Array<{ id: string; distributionMethod?: string }>;
-	graphStatus?: number;
+	/** Status to answer on one Graph path, so each test exercises one call site. */
+	graphFailure?: { path: 'catalog' | 'installedApps' | 'chat'; status: number };
 	activity?: { status: number; body: string };
 }
 
@@ -165,7 +166,11 @@ test('says so when the app is not in the organisation catalog', async () => {
 });
 
 test('names the wrong-object-id mistake when Graph has no such user', async () => {
-	const sender = await createBotSender(config(), {}, fakeFetch([], { graphStatus: 404 }));
+	const sender = await createBotSender(
+		config(),
+		{},
+		fakeFetch([], { graphFailure: { path: 'installedApps', status: 404 } }),
+	);
 	const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
 	assert.ok(error instanceof TeamsDeliveryError);
 	assert.equal(error.reason, 'unknown-recipient');
@@ -173,11 +178,36 @@ test('names the wrong-object-id mistake when Graph has no such user', async () =
 });
 
 test('names the missing Graph consent when installation is refused', async () => {
-	const sender = await createBotSender(config(), {}, fakeFetch([], { graphStatus: 403 }));
+	const sender = await createBotSender(
+		config(),
+		{},
+		fakeFetch([], { graphFailure: { path: 'installedApps', status: 403 } }),
+	);
 	const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
 	assert.ok(error instanceof TeamsDeliveryError);
 	assert.equal(error.reason, 'install-forbidden');
 	assert.match(error.message, /TeamsAppInstallation\.ReadWriteForUser\.All/);
+});
+
+test('diagnoses each Graph call by what that call means', async () => {
+	// One shared mapping told an operator to go hunting for a correct object id
+	// when the catalog read had failed, and blamed the installation permission
+	// for a missing AppCatalog.Read.All.
+	const cases = [
+		{ path: 'catalog' as const, status: 403, reason: 'not-in-catalog', hint: /AppCatalog\.Read\.All/ },
+		{ path: 'chat' as const, status: 404, reason: 'not-installed', hint: /licensed Teams user/ },
+	];
+	for (const { path, status, reason, hint } of cases) {
+		const sender = await createBotSender(
+			config(),
+			{},
+			fakeFetch([], { installed: true, graphFailure: { path, status } }),
+		);
+		const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
+		assert.ok(error instanceof TeamsDeliveryError, `${path} ${status} should be a delivery error`);
+		assert.equal(error.reason, reason, `${path} ${status}`);
+		assert.match(error.message, hint);
+	}
 });
 
 test('tells a missing app installation apart from blocked writes', async () => {
@@ -230,10 +260,16 @@ function fakeFetch(calls: Recorded[], overrides: Overrides = {}): typeof fetch {
 		if (url.includes('/oauth2/v2.0/token')) return json({ access_token: 'synthetic-token' });
 
 		if (url.includes('graph.microsoft.com')) {
-			if (overrides.graphStatus) {
+			const failure = overrides.graphFailure;
+			const path = url.includes('/appCatalogs/teamsApps?')
+				? 'catalog'
+				: url.endsWith('/chat')
+					? 'chat'
+					: 'installedApps';
+			if (failure && failure.path === path) {
 				return new Response('{"error":{"code":"Authorization_RequestDenied"}}', {
-					status: overrides.graphStatus,
-					statusText: 'Forbidden',
+					status: failure.status,
+					statusText: 'Failed',
 				});
 			}
 			if (url.includes('/appCatalogs/teamsApps?')) return json({ value: catalog });

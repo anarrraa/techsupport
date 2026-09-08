@@ -165,6 +165,7 @@ export async function runJiraTeamsReminder(
 		journal,
 		tickets: jira.tickets,
 		withoutResolutionSla: jira.withoutResolutionSla,
+		withoutParticipants: jira.withoutParticipants,
 		due: selection.due,
 		now,
 	});
@@ -187,6 +188,7 @@ interface BotDeliveryInput {
 	journal: RunJournal;
 	tickets: JiraTicket[];
 	withoutResolutionSla: number;
+	withoutParticipants: number;
 	due: JiraTicket[];
 	now: Date;
 }
@@ -206,6 +208,16 @@ async function runBotDelivery(
 		throw new Error(
 			`JSM SLA metric "${config.jira.resolutionSlaName}" drives the escalation clock but `
 				+ `was not found on any of ${tickets.length} Jira tickets`,
+		);
+	}
+	// First-response reminders route through participants alone, so this field
+	// now carries the same weight for delivery as the SLA metric does, and gets
+	// the same fail-visibly treatment (`AGENTS.md`). A renamed custom field
+	// would otherwise report "Delivered 0 direct message(s)" and exit 0.
+	if (tickets.length > 0 && input.withoutParticipants === tickets.length) {
+		throw new Error(
+			`No Jira ticket carries a vendor participant in field "${config.jira.participantsField}" `
+				+ `across all ${tickets.length} scanned tickets — check JIRA_PARTICIPANTS_FIELD`,
 		);
 	}
 

@@ -1,5 +1,5 @@
 import type { JiraConfig } from './config.ts';
-import { fetchOk, type Fetch, type Sleep } from './http.ts';
+import { ExternalRequestError, fetchOk, type Fetch, type Sleep } from './http.ts';
 
 export interface SlaCycle {
 	name: string;
@@ -59,6 +59,8 @@ export interface JiraFetchResult {
 	withoutSla: number;
 	/** Tickets carrying no resolution metric, so no escalation clock. */
 	withoutResolutionSla: number;
+	/** Tickets with no vendor participant, so nobody to remind. */
+	withoutParticipants: number;
 	truncated: boolean;
 }
 
@@ -97,6 +99,7 @@ export async function fetchTickets(
 		scanned: tickets.length,
 		withoutSla,
 		withoutResolutionSla: tickets.filter((ticket) => ticket.resolutionSla === null).length,
+		withoutParticipants: tickets.filter((ticket) => ticket.participants.length === 0).length,
 		truncated: issues.truncated,
 	};
 }
@@ -216,7 +219,10 @@ async function fetchSlaCycles(
 				sleep,
 			);
 		} catch (error) {
-			if (error instanceof Error && error.message.includes('404')) return found;
+			// The typed status, not the message text: a 404 in a statusText or a
+			// change to the error template would otherwise decide whether a
+			// ticket's metrics are treated as absent or the run aborts.
+			if (error instanceof ExternalRequestError && error.status === 404) return found;
 			throw error;
 		}
 
