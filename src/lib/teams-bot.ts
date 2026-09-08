@@ -180,23 +180,33 @@ async function resolveCatalogAppId(
 	sleep?: Sleep,
 ): Promise<string> {
 	const filter = `externalId eq '${config.appExternalId.replaceAll("'", "''")}'`;
-	const body = await graphJson<{ value?: Array<{ id?: string }> }>(
-		`/appCatalogs/teamsApps?$filter=${encodeURIComponent(filter)}&$select=id`,
+	const body = await graphJson<{ value?: Array<{ id?: string; distributionMethod?: string }> }>(
+		`/appCatalogs/teamsApps?$filter=${encodeURIComponent(filter)}&$select=id,distributionMethod`,
 		{},
 		config,
 		graphToken,
 		fetchImpl,
 		sleep,
 	);
-	const id = body.value?.[0]?.id;
-	if (!id) {
+
+	// One person sideloading the package during a pilot creates a second catalog
+	// entry with the same external id. Preferring the published one keeps the
+	// choice from depending on the order Graph happens to return them, and keeps
+	// delivery on the entry every recipient can be installed from.
+	const candidates = body.value ?? [];
+	const preference = ['organization', 'store', 'sideloaded'];
+	const chosen = [...candidates].sort(
+		(a, b) =>
+			preference.indexOf(a.distributionMethod ?? '') - preference.indexOf(b.distributionMethod ?? ''),
+	)[0];
+	if (!chosen?.id) {
 		throw new TeamsDeliveryError(
 			'not-in-catalog',
 			`No Teams app in the organisation catalog has external id ${config.appExternalId}; `
 				+ 'an administrator has to publish the app package first',
 		);
 	}
-	return id;
+	return chosen.id;
 }
 
 async function resolvePersonalChatId(

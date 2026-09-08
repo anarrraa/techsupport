@@ -26,10 +26,14 @@ reading order and non-negotiable invariants before touching any of this.
 - [x] Make an empty scan loud. `scanned: 0` now exits with error in non-dry-run mode.
 - [x] Report overdue time in working hours. `overdueMinutes` now reads `elapsedTime`
       from JSM metric instead of clock time.
-- [ ] Point the manifest's `developer.privacyUrl` and `termsOfUseUrl` at pages
-      that actually resolve, and swap the placeholder icons in
-      `packages/teams-app/` for the real brand marks. Catalog publish validates
-      both.
+- [ ] Decide what `developer.privacyUrl` and `termsOfUseUrl` should point at.
+      `https://zerotech.mn/privacy` and `/terms` both return 404, so on
+      2026-09-08 both were pointed at `https://zerotech.mn`, which returns 200.
+      A live link to the company site beats a dead link on the app's About page,
+      but it is not a privacy policy — replace it if legal wants real pages.
+- [ ] Swap the placeholder icons in `packages/teams-app/` for the real brand
+      marks. `color.png` 192x192, `outline.png` 32x32 on a transparent
+      background.
 - [x] Record the bot's Entra application id. Done 2026-09-08: **SLA Reminder
       Bot**, `b76bcdfb-5a16-44c4-81e0-860780daa2da`. Now in the evidence
       table in `docs/mvp-roadmap.md` and in `.env.example`, so no future step
