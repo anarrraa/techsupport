@@ -51,6 +51,8 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | V2 bot and escalation code | Implemented, unverified | Added 2026-09-07 with unit coverage for every `docs/sla-matrix.md` section 2 threshold; no live send |
 | Live bot direct message from this codebase | **Pass** | On 2026-09-08 `npm run verify:bot -- <object-id>` printed `Bot Framework and Graph tokens acquired` then `Direct message delivered`. First message this codebase has ever sent. The full chain ran: client-credentials tokens for both scopes, catalog lookup by external id, install-for-user, personal chat lookup, activity post |
 | Graph application consent | Pass | Implied by the run above: the Graph token was issued and the catalog and installation calls succeeded, so `AppCatalog.Read.All` and the installation permission are consented |
+| Assignees resolvable to recipients | Pass | The four agents on open DC requests — Uyanga, Unursaikhan, Delgertsetseg, Khulan — are in the directory as of 2026-09-08 with both their Jira account id and Entra object id, so a first-response breach now reaches the person who owes the reply. Before this, every such breach only raised `N breached request(s) have no assignee entry`, and the escalation chain fired above a first rung that had never been rung |
+| Jira does not expose agent email addresses | Noted | `emailAddress` is absent for `accountType: atlassian` users, so `resolve:ids` cannot map an agent by email. Their Entra object ids were resolved by Graph display-name search instead; the directory keys on `jiraAccountId`, which Jira does expose |
 | Recipient identifiers | Pass | Entra object ids for both pilot recipients recorded in `config/escalation.json` 2026-09-08. A first attempt used the app registration's own object id and Graph answered 404; that case now reports `unknown-recipient` with the distinction spelled out |
 | Jira reachable from GitHub Actions | Pass | Run `34185580185` (dispatch, `dry_run=true`, 2026-09-08) logged `Scanned 25; 5 due, 9 not breached, 0 outside calendar, 11 awaiting window` before stopping on the absent escalation directory — the Jira secrets and JQL variable resolve correctly in CI |
 | Escalation directory reaches CI | Pass | `ESCALATION_DIRECTORY_JSON` secret set 2026-09-08 from the completed directory; the workflow writes it to `config/escalation.json` before the run |
@@ -134,6 +136,15 @@ document or CI logs.
 - [x] Point `JIRA_JQL` at a service desk project that exists.
   - Set 2026-08-26: `project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC`. Dry-run scans real DC issues.
 - [ ] Confirm Jira priority mapping against the production priority scheme.
+- [ ] **Decide whether the resolution clock should pause.** Every open DC request
+      sits in status `Open` — there is no waiting-for-customer state in use — so
+      JSM never pauses the resolution SLA. DC-811 reports 9,585 working minutes
+      elapsed against a 16h goal with `paused: false`, and its first-response
+      cycle is *completed*, so the request was answered and then sat. If any of
+      that time was spent waiting on the client, the escalation levels are being
+      reached earlier than the contract intends. This is a JSM workflow
+      configuration question, not a code one: the application must not second-
+      guess the clock (`AGENTS.md`).
 - [ ] Confirm JSM First Response goals match `docs/sla-matrix.md`.
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
 - [x] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.
