@@ -191,6 +191,7 @@ test('an escalation message quotes the resolution clock, not the first-response 
 
 	const escalation = buildDirectMessages({
 		recipientName: 'Lead',
+		kind: 'escalation',
 		level: 3,
 		tickets: [escalating],
 		now: NOW,
@@ -201,6 +202,7 @@ test('an escalation message quotes the resolution clock, not the first-response 
 
 	const reminder = buildDirectMessages({
 		recipientName: 'Dev',
+		kind: 'first-response',
 		level: 1,
 		tickets: [escalating],
 		now: NOW,

@@ -64,6 +64,30 @@ export function dueLevel(severity: Severity, elapsedWorkingMinutes: number): Con
 	return due;
 }
 
+/**
+ * The next level to notify after `highestNotified`, which is not the same thing
+ * as the highest mark crossed.
+ *
+ * The contract escalates "to the next level when the previous doesn't resolve",
+ * and the workflow now runs twice a working day — gaps of 300 and 1140 minutes
+ * against Critical marks 240, 300 and 360 minutes apart. Jumping to the highest
+ * crossed mark would step over L2 entirely, and overnight could step over L2,
+ * L3 and L4 in one move, so those contacts would never be told.
+ */
+export function nextLevel(
+	severity: Severity,
+	elapsedWorkingMinutes: number,
+	highestNotified: number,
+): ContactLevel | null {
+	for (const level of CONTACT_LEVELS) {
+		if (level <= highestNotified) continue;
+		const threshold = LEVEL_MINUTES[severity][level];
+		if (threshold === null || elapsedWorkingMinutes < threshold) return null;
+		return level;
+	}
+	return null;
+}
+
 export interface EscalationPlan {
 	/** Levels to notify on this run. L1 is the assignee; L2-L5 come from the directory. */
 	levels: EscalationLevel[];
@@ -111,8 +135,8 @@ export function selectEscalations(
 		if (sla.elapsedMinutes === null) continue;
 		const severity = severityFor(ticket.priority);
 		if (!severity) continue;
-		const level = dueLevel(severity, sla.elapsedMinutes);
-		if (level === null || level <= highestNotified(ticket.key)) continue;
+		const level = nextLevel(severity, sla.elapsedMinutes, highestNotified(ticket.key));
+		if (level === null) continue;
 		candidates.push({
 			ticket,
 			severity,

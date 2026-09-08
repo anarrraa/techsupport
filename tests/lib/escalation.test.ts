@@ -71,14 +71,40 @@ test('notifies L1 and L2 in parallel off-hours for Critical and High only', () =
 	assert.deepEqual(planEscalation('low', 2, false), { levels: [2], surfaceOnCall: false });
 });
 
-test('selects only levels not already notified for that ticket', () => {
-	const tickets = [
-		ticket({ key: 'DC-1', priority: 'Highest', resolutionSla: cycle({ elapsedMinutes: 800 }) }),
-		ticket({ key: 'DC-2', priority: 'Highest', resolutionSla: cycle({ elapsedMinutes: 800 }) }),
-	];
-	const notified = new Map([['DC-2', 4]]);
-	const selected = selectEscalations(tickets, (key) => notified.get(key) ?? 0);
-	assert.deepEqual(selected.map((candidate) => [candidate.ticket.key, candidate.level]), [['DC-1', 4]]);
+test('steps one level at a time instead of jumping to the highest crossed', () => {
+	// Critical marks: L2 240, L3 480, L4 780, L5 1140. At 800 elapsed minutes
+	// L2, L3 and L4 are all behind the request — but a request nobody has been
+	// told about must start at L2. The contract escalates to the next level when
+	// the previous does not resolve, and the schedule's gaps (300 and 1140
+	// minutes) are wide enough to step over two or three marks in one move.
+	const at = (key: string, elapsedMinutes: number) =>
+		ticket({ key, priority: 'Highest', resolutionSla: cycle({ elapsedMinutes }) });
+	const notified = new Map([['DC-2', 2], ['DC-3', 4], ['DC-4', 5], ['DC-5', 4]]);
+	const selected = selectEscalations(
+		[at('DC-1', 800), at('DC-2', 800), at('DC-3', 800), at('DC-4', 800), at('DC-5', 1_200)],
+		(key) => notified.get(key) ?? 0,
+	);
+
+	assert.deepEqual(selected.map((candidate) => [candidate.ticket.key, candidate.level]), [
+		['DC-1', 2], // nothing notified, so the first rung
+		['DC-2', 3], // L2 told, step to L3
+		['DC-5', 5], // L4 told and L5's 1140 mark is behind it
+	]);
+	// DC-3 has L4 told but has not reached L5's mark; DC-4 has nowhere left to go.
+});
+
+test('never revisits a level once it has been notified', () => {
+	const tickets = [ticket({ key: 'DC-1', priority: 'Highest', resolutionSla: cycle({ elapsedMinutes: 5_000 }) })];
+	let highest = 0;
+	const levels: number[] = [];
+	// Each run notifies exactly one further level, and the chain ends at L5.
+	for (let run = 0; run < 8; run += 1) {
+		const [candidate] = selectEscalations(tickets, () => highest);
+		if (!candidate) break;
+		levels.push(candidate.level);
+		highest = candidate.level;
+	}
+	assert.deepEqual(levels, [2, 3, 4, 5]);
 });
 
 test('ignores tickets with no escalation clock to read', () => {

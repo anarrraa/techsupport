@@ -235,6 +235,33 @@ test('escalates a crossed level once and records it', async () => {
 	assert.deepEqual(second.sent.map((message) => message.entraObjectId), [DEV]);
 });
 
+test('a failed leg leaves the level unrecorded so the missed contact is reached next run', async () => {
+	// High priority, 8 working hours: L2 is due, and L2 is the lead. If the
+	// lead's message fails, nothing may be recorded — recording from a sibling
+	// leg marked the level notified for someone who never received it.
+	const tickets = [ticket({ resolutionSla: resolutionCycle({ elapsedMinutes: 8 * 60 }) })];
+	const savedOut: { value: EscalationState | null } = { value: null };
+	await assert.rejects(
+		run({
+			config: config({ bot: true }),
+			tickets,
+			savedOut,
+			failSend: (message) =>
+				message.entraObjectId === LEAD ? new TeamsDeliveryError('other', 'refused') : null,
+		}),
+		/direct-message recipient\(s\) failed/,
+	);
+	// The state was still written — that is deliberate, so partial progress
+	// survives — but this level is absent from it.
+	assert.deepEqual(savedOut.value, {}, 'a failed leg must leave the level unrecorded');
+});
+
+test('records the level when every leg delivered', async () => {
+	const tickets = [ticket({ resolutionSla: resolutionCycle({ elapsedMinutes: 8 * 60 }) })];
+	const result = await run({ config: config({ bot: true }), tickets });
+	assert.deepEqual(result.saved, { 'SYNTHETIC-1': 2 });
+});
+
 test('fails the run visibly when a recipient cannot be reached, without naming them', async () => {
 	const logs: string[] = [];
 	await assert.rejects(
@@ -276,6 +303,9 @@ test('seeds escalation state without notifying anyone', async () => {
 	});
 
 	assert.deepEqual(result.sent, []);
+	// The highest mark behind the request, not the next rung: seeding exists to
+	// suppress the backlog, and recording L2 here would deliver L3, L4 and L5
+	// one run at a time instead.
 	assert.deepEqual(result.saved, { 'SYNTHETIC-1': 4 });
 	assert.equal(result.output.escalationCount, 1);
 	assert.equal(result.output.directMessageCount, 0);
@@ -297,6 +327,8 @@ interface RunOptions {
 	escalationConfig?: EscalationConfig;
 	state?: EscalationState;
 	failSend?: (message: DirectMessage) => Error | null;
+	/** Receives the persisted state even when the run throws. */
+	savedOut?: { value: EscalationState | null };
 }
 
 async function run(options: RunOptions = {}) {
@@ -333,6 +365,7 @@ async function run(options: RunOptions = {}) {
 			readEscalationState: async () => options.state ?? {},
 			writeEscalationState: async (_path, value) => {
 				saved = { ...value };
+				if (options.savedOut) options.savedOut.value = { ...value };
 			},
 			createBotSender: async () => ({
 				send: async (message) => {

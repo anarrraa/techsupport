@@ -192,6 +192,74 @@ test('names anyone in the allowlist who is not in the directory', () => {
 	);
 });
 
+test('an off-hours escalation reaches the participants, not the vanished assignee', () => {
+	// planEscalation puts level 1 in an off-hours Critical/High plan. That leg
+	// used to resolve from assigneeAccountId, which stopped being an actionable
+	// recipient when first-response reminders moved to the participants — so the
+	// contract's "notify L1 and L2 together" reached only L2.
+	const plan = planDirectMessages({
+		due: [],
+		escalations: [candidate({ level: 2, withinCalendarHours: false, priority: 'Highest' })],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+	});
+
+	assert.deepEqual(
+		plan.messages.map((message) => [message.entraObjectId, message.kind, message.level]),
+		[[DEV, 'escalation', 1], [LEAD, 'escalation', 2]],
+	);
+	assert.equal(plan.unmappedRecipients, 0);
+	assert.equal(plan.incompleteEscalations.size, 0);
+});
+
+test('the level-1 leg of an escalation is not dressed as a first-response reminder', () => {
+	const plan = planDirectMessages({
+		due: [],
+		escalations: [candidate({ level: 2, withinCalendarHours: false, priority: 'Highest' })],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+	});
+	const leg = plan.messages.find((message) => message.level === 1);
+	const text = leg?.messages.join('\n') ?? '';
+	assert.match(text, /Эскалаци — L1/);
+	assert.doesNotMatch(text, /анхны хариу SLA хугацаа хэтэрсэн/);
+	assert.doesNotMatch(text, /гэрээний хугацаа/);
+});
+
+test('a withheld leg stops its siblings from recording the level', () => {
+	// Otherwise the delivered leg marks the level notified and the contact the
+	// gate suppressed is never told — the rung is lost, not deferred.
+	const plan = planDirectMessages({
+		due: [],
+		escalations: [candidate({ level: 2, withinCalendarHours: false, priority: 'Highest' })],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+		allowlist: [DEV],
+	});
+
+	assert.deepEqual(plan.messages.map((message) => message.entraObjectId), [DEV]);
+	assert.equal(plan.suppressedByAllowlist, 1);
+	assert.ok(plan.incompleteEscalations.has('DC-1'), 'the request must be marked incomplete');
+});
+
+test('a first-response reminder and an escalation leg stay separate messages', () => {
+	// Both are level 1 for the same person. Merging them put an escalation
+	// ticket under the first-response clock.
+	const plan = planDirectMessages({
+		due: [ticket({ key: 'DC-2' })],
+		escalations: [candidate({ level: 2, withinCalendarHours: false, priority: 'Highest' })],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+	});
+
+	const devMessages = plan.messages.filter((message) => message.entraObjectId === DEV);
+	assert.deepEqual(devMessages.map((message) => message.kind).sort(), ['escalation', 'first-response']);
+});
+
 test('fails visibly when the crossed level has no contact configured', () => {
 	assert.throws(
 		() =>

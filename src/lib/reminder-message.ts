@@ -29,6 +29,13 @@ export function buildReminderMessages(
  */
 export function buildDirectMessages(options: {
 	recipientName: string;
+	/**
+	 * What raised the message. Not derivable from the level: the off-hours
+	 * parallel rule puts level 1 in an escalation plan, and reading the level
+	 * alone dressed that as a first-response reminder and quoted a
+	 * first-response cycle that had already completed.
+	 */
+	kind: 'first-response' | 'escalation';
 	level: EscalationLevel;
 	tickets: JiraTicket[];
 	now: Date;
@@ -36,10 +43,10 @@ export function buildDirectMessages(options: {
 	/** Off-hours Critical/High only: named so a human can place the call. */
 	onCallName?: string | null;
 }): string[] {
-	const { recipientName, level, tickets, now, maxChars, onCallName } = options;
+	const { recipientName, kind, level, tickets, now, maxChars, onCallName } = options;
 	const greeting = `Сайн байна уу, ${cleanField(recipientName, 100)}.`;
 	const header =
-		level === 1
+		kind === 'first-response'
 			? [
 				DM_TITLE,
 				`${greeting} Дараах хүсэлтийн анхны хариу SLA хугацаа хэтэрсэн байна. Одоо хариу бичих эсвэл тикетийг шинэчилнэ үү.`,
@@ -53,7 +60,7 @@ export function buildDirectMessages(options: {
 			`⚠️ Ажлын бус цагийн Critical/High: дуудлагын инженер ${cleanField(onCallName, 100)}-тай утсаар холбогдоно уу.`,
 		);
 	}
-	return buildMessages(tickets, now, maxChars, header, level === 1 ? 'firstResponse' : 'resolution');
+	return buildMessages(tickets, now, maxChars, header, kind === 'first-response' ? 'firstResponse' : 'resolution');
 }
 
 function buildMessages(
@@ -64,7 +71,11 @@ function buildMessages(
 	clock: Clock,
 ): string[] {
 	if (tickets.length === 0) return [];
-	const continuation = [header[0] as string, 'SLA сануулгын үргэлжлэл:'];
+	// The on-call line is the one action the off-hours branch exists to trigger,
+	// so it survives into every chunk. Rebuilding the continuation from the
+	// title alone dropped it from chunk two onwards.
+	const onCall = header.slice(2);
+	const continuation = [header[0] as string, 'SLA сануулгын үргэлжлэл:', ...onCall];
 	const messages: string[] = [];
 	let lines = [...header];
 	let ticketCount = 0;

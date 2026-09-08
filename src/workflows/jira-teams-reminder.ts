@@ -4,7 +4,7 @@ import reminderWriter from '../agents/reminder-writer.ts';
 import { generateReminderIntro } from '../lib/reminder-intro.ts';
 import { loadConfig, type AppConfig } from '../lib/config.ts';
 import { planDirectMessages } from '../lib/direct-messages.ts';
-import { selectEscalations } from '../lib/escalation.ts';
+import { dueLevel, selectEscalations, severityFor } from '../lib/escalation.ts';
 import { loadEscalationConfig } from '../lib/escalation-config.ts';
 import {
 	highestNotified,
@@ -21,7 +21,7 @@ import {
 	type JournalSink,
 	type RunJournal,
 } from '../lib/run-journal.ts';
-import { selectReminderTickets } from '../lib/sla.ts';
+import { elapsedSinceRaisedMinutes, selectReminderTickets } from '../lib/sla.ts';
 import { createBotSender, TeamsDeliveryError } from '../lib/teams-bot.ts';
 import { postToChannel } from '../lib/teams-webhook.ts';
 
@@ -225,8 +225,15 @@ async function runBotDelivery(
 		if (config.reminder.dryRun) {
 			throw new Error('ESCALATION_SEED_ONLY writes state, so it cannot run with REMINDER_DRY_RUN');
 		}
-		for (const candidate of escalations) {
-			recordNotified(state, candidate.ticket.key, candidate.level);
+		// Seeding records the **highest** mark already behind each request, not
+		// the next rung. Ordinary runs step one level at a time, so seeding with
+		// the next rung would hand out the whole backlog one level per run
+		// instead of suppressing it, which is the opposite of what this is for.
+		for (const ticket of tickets) {
+			const severity = severityFor(ticket.priority);
+			if (!severity) continue;
+			const highest = dueLevel(severity, elapsedSinceRaisedMinutes(ticket.resolutionSla));
+			if (highest !== null) recordNotified(state, ticket.key, highest);
 		}
 		await dependencies.writeEscalationState(config.escalation.stateFile, state);
 		// The escalation event above already reported what was recorded; nothing
@@ -258,6 +265,12 @@ async function runBotDelivery(
 
 	const sender = await dependencies.createBotSender(config.bot);
 	const failures: DirectMessagesObserved['failures'] = {};
+	// A level is notified only when every leg carrying it was delivered. The
+	// off-hours rule sends one candidate to several people, and recording the
+	// level from whichever leg happened to succeed marked it notified for the
+	// contact who never received it — losing that rung permanently.
+	const delivered_ = new Set<string>();
+	const failedTickets = new Set<string>(plan.incompleteEscalations);
 	let firstFailure: unknown;
 	let delivered = 0;
 	try {
@@ -267,18 +280,24 @@ async function runBotDelivery(
 					await sender.send({ entraObjectId: planned.entraObjectId, text });
 					delivered += 1;
 				}
-				// Only a fully delivered notification counts as notified, so a failure
-				// retries next run rather than silently skipping a contractual level.
-				for (const record of planned.records) {
-					recordNotified(state, record.ticketKey, record.level);
-				}
+				for (const record of planned.records) delivered_.add(record.ticketKey);
 			} catch (error) {
 				const reason = error instanceof TeamsDeliveryError ? error.reason : 'other';
 				failures[reason] = (failures[reason] ?? 0) + 1;
 				firstFailure ??= error;
+				// Any failed leg makes the whole level unrecorded, so the contact
+				// who was missed is reached next run.
+				for (const record of planned.records) failedTickets.add(record.ticketKey);
 			}
 		}
 	} finally {
+		for (const planned of plan.messages) {
+			for (const record of planned.records) {
+				if (delivered_.has(record.ticketKey) && !failedTickets.has(record.ticketKey)) {
+					recordNotified(state, record.ticketKey, record.level);
+				}
+			}
+		}
 		await dependencies.writeEscalationState(config.escalation.stateFile, state);
 		journal.directMessages({ ...observed, delivered, dryRun: false, failures });
 	}
