@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { JiraTicket } from '../../src/lib/jira.ts';
-import { isReminderWindow, selectReminderTickets } from '../../src/lib/sla.ts';
+import {
+	elapsedSinceRaisedMinutes,
+	isReminderWindow,
+	overdueMinutes,
+	selectReminderTickets,
+} from '../../src/lib/sla.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
 
@@ -63,6 +68,38 @@ test('sorts by priority and then longest overdue', () => {
 		15,
 	);
 	assert.deepEqual(result.due.map((value) => value.key), ['HIGH-OLD', 'HIGH-NEW', 'LOW']);
+});
+
+test('overdue is time past the target, not time since the request was raised', () => {
+	// Shaped like a real JSM payload: elapsedTime runs from the cycle starting,
+	// so a breached cycle's elapsed still contains the whole allowance.
+	// DC-898 reported goal=60, elapsed=259, remaining=-200 — 199 minutes past
+	// its target, not 259. Reading elapsed made every "хэтэрсэн" figure wrong by
+	// exactly the allowance, and every fixture in this file had hidden it by
+	// leaving remainingMinutes null.
+	const breached = ticket({
+		firstResponseSla: sla({ elapsedMinutes: 259, remainingMinutes: -200 }),
+	});
+	assert.equal(overdueMinutes(breached, NOW), 200);
+	assert.notEqual(overdueMinutes(breached, NOW), 259);
+
+	// Escalation marks are stated from the request being raised, so that path
+	// keeps reading elapsed — the two must not converge again.
+	assert.equal(elapsedSinceRaisedMinutes(breached.firstResponseSla), 259);
+
+	// A cycle inside its target is not overdue at all.
+	const healthy = ticket({ firstResponseSla: sla({ elapsedMinutes: 20, remainingMinutes: 40 }) });
+	assert.equal(overdueMinutes(healthy, NOW), 0);
+
+	// With no remainingTime, fall back to clock time since the breach.
+	const noRemaining = ticket({
+		firstResponseSla: sla({
+			elapsedMinutes: 5_000,
+			remainingMinutes: null,
+			breachTimeEpochMillis: NOW.getTime() - 30 * 60_000,
+		}),
+	});
+	assert.equal(overdueMinutes(noRemaining, NOW), 30);
 });
 
 test('an open window reaches every breach on a sparse schedule', () => {
@@ -135,6 +172,7 @@ function sla(overrides: Partial<NonNullable<JiraTicket['firstResponseSla']>> = {
 		withinCalendarHours: true,
 		breachTimeEpochMillis: NOW.getTime() - 60 * 60_000,
 		elapsedMinutes: null,
+		remainingMinutes: null,
 		...overrides,
 	};
 }

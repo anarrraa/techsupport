@@ -121,6 +121,7 @@ function cycle(overrides: Partial<SlaCycle> = {}): SlaCycle {
 		withinCalendarHours: true,
 		breachTimeEpochMillis: null,
 		elapsedMinutes: 0,
+		remainingMinutes: null,
 		...overrides,
 	};
 }

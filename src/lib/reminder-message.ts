@@ -1,6 +1,6 @@
 import { firstResponseMinutes, severityFor, type EscalationLevel } from './escalation.ts';
 import type { JiraTicket } from './jira.ts';
-import { elapsedMinutesOf, overdueMinutes } from './sla.ts';
+import { elapsedSinceRaisedMinutes, overdueMinutes } from './sla.ts';
 
 const DEFAULT_INTRO = 'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.';
 const CHANNEL_TITLE = '🔔 **First response SLA сануулга**';
@@ -125,7 +125,7 @@ function renderTicket(ticket: JiraTicket, now: Date, clock: Clock): string {
 	const key = cleanField(ticket.key, 50);
 	const elapsed =
 		clock === 'resolution'
-			? `${formatDuration(elapsedMinutesOf(ticket.resolutionSla, now))} шийдэгдээгүй`
+			? `${formatDuration(elapsedSinceRaisedMinutes(ticket.resolutionSla))} шийдэгдээгүй`
 			: `${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
 	const line = `- [${key}](${ticket.url}) · **${priority}** · ${summary} · ${status} · ${elapsed}`;
 	if (clock === 'resolution') return line;
@@ -146,7 +146,7 @@ function fitTicketLine(
 	const linkedKey = `[${cleanField(ticket.key, 50)}](${ticket.url})`;
 	const elapsed =
 		clock === 'resolution'
-			? `${formatDuration(elapsedMinutesOf(ticket.resolutionSla, now))} шийдэгдээгүй`
+			? `${formatDuration(elapsedSinceRaisedMinutes(ticket.resolutionSla))} шийдэгдээгүй`
 			: `${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
 	const compact = `- ${linkedKey} · ${cleanField(ticket.priority, 30)} · ${elapsed}`;
 	if (compact.length <= available) return compact;

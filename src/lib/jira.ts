@@ -8,7 +8,20 @@ export interface SlaCycle {
 	paused: boolean;
 	withinCalendarHours: boolean;
 	breachTimeEpochMillis: number | null;
+	/**
+	 * Working minutes since the cycle **started**, which is what JSM reports in
+	 * `elapsedTime`. Not the time past the target: for a breached cycle this
+	 * still includes the whole allowance. Use it only against thresholds that
+	 * are themselves measured from the request being raised, as the escalation
+	 * matrix is.
+	 */
 	elapsedMinutes: number | null;
+	/**
+	 * JSM's `remainingTime`, negative once breached. Its negation is the working
+	 * time past the target, which is the only honest figure for "overdue".
+	 * Reading it rather than subtracting keeps the arithmetic Jira's.
+	 */
+	remainingMinutes: number | null;
 }
 
 /** A Jira account that belongs to the vendor, never to the client. */
@@ -239,6 +252,7 @@ function toSlaCycle(metric: JiraSlaMetric): SlaCycle {
 			withinCalendarHours: false,
 			breachTimeEpochMillis: null,
 			elapsedMinutes: null,
+			remainingMinutes: null,
 		};
 	}
 	return {
@@ -250,6 +264,9 @@ function toSlaCycle(metric: JiraSlaMetric): SlaCycle {
 		breachTimeEpochMillis: cycle.breachTime?.epochMillis ?? null,
 		elapsedMinutes: cycle.elapsedTime?.millis != null
 			? Math.floor(cycle.elapsedTime.millis / 60_000)
+			: null,
+		remainingMinutes: cycle.remainingTime?.millis != null
+			? Math.round(cycle.remainingTime.millis / 60_000)
 			: null,
 	};
 }
@@ -320,5 +337,6 @@ interface JiraSlaMetric {
 		withinCalendarHours: boolean;
 		breachTime?: { epochMillis?: number };
 		elapsedTime?: { millis?: number };
+		remainingTime?: { millis?: number };
 	};
 }

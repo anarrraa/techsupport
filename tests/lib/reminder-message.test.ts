@@ -185,6 +185,7 @@ test('an escalation message quotes the resolution clock, not the first-response 
 			withinCalendarHours: true,
 			breachTimeEpochMillis: null,
 			elapsedMinutes: 67 * 60,
+			remainingMinutes: null,
 		},
 	});
 
@@ -226,6 +227,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 			withinCalendarHours: true,
 			breachTimeEpochMillis: NOW.getTime() - 90 * 60_000,
 			elapsedMinutes: 90,
+			remainingMinutes: null,
 		},
 		participants: [],
 		resolutionSla: null,

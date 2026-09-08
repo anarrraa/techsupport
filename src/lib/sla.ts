@@ -76,24 +76,38 @@ export function isReminderWindow(
 	return elapsedMinutes % repeatMinutes < deliveryWindowMinutes;
 }
 
+/**
+ * Working time past the target — what "overdue" means and the only figure a
+ * reminder may print beside that word.
+ *
+ * `elapsedTime` is the wrong field for it: JSM measures that from the cycle
+ * starting, so a request breached five minutes ago against a thirty-minute
+ * allowance reports thirty-five. `remainingTime` is already the difference, so
+ * negating it keeps the arithmetic Jira's rather than recomputing it here
+ * (`AGENTS.md`).
+ */
 export function overdueMinutes(ticket: JiraTicket, now: Date): number {
-	return elapsedMinutesOf(ticket.firstResponseSla, now);
+	return overdueMinutesOf(ticket.firstResponseSla, now);
 }
 
-/**
- * Working-hours elapsed time on one SLA cycle. Which cycle matters: a message
- * about the first response must not quote the resolution clock, and an
- * escalation message must not quote the first-response clock — a request can be
- * far past its resolution mark while its first-response cycle reports nothing.
- */
-export function elapsedMinutesOf(sla: SlaCycle | null, now: Date): number {
+export function overdueMinutesOf(sla: SlaCycle | null, now: Date): number {
 	if (!sla) return 0;
-	// Prefer JSM's working-hours elapsed time when available.
-	if (sla.elapsedMinutes != null) return Math.max(0, sla.elapsedMinutes);
+	if (sla.remainingMinutes != null) return Math.max(0, -sla.remainingMinutes);
 	// Fallback to clock time (less accurate across non-working hours).
 	const breachTime = sla.breachTimeEpochMillis;
 	if (breachTime === null || breachTime === undefined) return 0;
 	return Math.max(0, Math.floor((now.getTime() - breachTime) / 60_000));
+}
+
+/**
+ * Working time since the request was raised. The escalation matrix states its
+ * marks that way, so this is the figure an escalation message quotes — and it
+ * is deliberately a different function from `overdueMinutesOf`, because the two
+ * were once one field read with two meanings.
+ */
+export function elapsedSinceRaisedMinutes(sla: SlaCycle | null): number {
+	if (!sla?.elapsedMinutes) return 0;
+	return Math.max(0, sla.elapsedMinutes);
 }
 
 function priorityRank(priority: string): number {

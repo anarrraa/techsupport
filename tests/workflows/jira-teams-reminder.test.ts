@@ -368,6 +368,7 @@ function resolutionCycle(overrides: Partial<SlaCycle> = {}): SlaCycle {
 		withinCalendarHours: true,
 		breachTimeEpochMillis: null,
 		elapsedMinutes: 0,
+		remainingMinutes: null,
 		...overrides,
 	};
 }
@@ -449,6 +450,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 			withinCalendarHours: true,
 			breachTimeEpochMillis: NOW.getTime() - 60 * 60_000,
 			elapsedMinutes: 60,
+			remainingMinutes: null,
 		},
 		participants: [{ accountId: 'synthetic-account', displayName: 'Synthetic Developer' }],
 		resolutionSla: resolutionCycle(),

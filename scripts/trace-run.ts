@@ -19,7 +19,7 @@ import { dueLevel, selectEscalations, severityFor } from '../src/lib/escalation.
 import { loadEscalationConfig, personForJiraAccount } from '../src/lib/escalation-config.ts';
 import { readEscalationState, highestNotified } from '../src/lib/escalation-state.ts';
 import { fetchTickets } from '../src/lib/jira.ts';
-import { elapsedMinutesOf, selectReminderTickets } from '../src/lib/sla.ts';
+import { elapsedSinceRaisedMinutes, overdueMinutesOf, selectReminderTickets } from '../src/lib/sla.ts';
 
 const applyAllowlist = process.argv.includes('--allowlist');
 const config = loadConfig({ ...process.env, REMINDER_DRY_RUN: 'true' });
@@ -62,7 +62,7 @@ console.log(`\nA breach may produce one reminder every ${config.reminder.repeatM
 if (selection.due.length > 0) {
 	console.log('\ndue requests:');
 	for (const t of selection.due) {
-		console.log(`  ${t.key.padEnd(8)} ${t.priority.padEnd(8)} ${String(elapsedMinutesOf(t.firstResponseSla, now)).padStart(6)}m overdue   assignee ${t.assignee}`);
+		console.log(`  ${t.key.padEnd(8)} ${t.priority.padEnd(8)} ${String(overdueMinutesOf(t.firstResponseSla, now)).padStart(6)}m overdue   assignee ${t.assignee}`);
 		console.log(`           participants: ${t.participants.map((p) => p.displayName).join(', ') || '(none)'}`);
 	}
 }
@@ -73,11 +73,11 @@ console.log(`state file: ${config.escalation.stateFile} — ${Object.keys(state)
 const escalations = selectEscalations(jira.tickets, (key) => highestNotified(state, key));
 console.log(`\ncrossed a level not yet notified: ${escalations.length}`);
 for (const c of escalations) {
-	console.log(`  ${c.ticket.key.padEnd(8)} ${c.severity.padEnd(8)} L${c.level}  ${elapsedMinutesOf(c.ticket.resolutionSla, now)}m unresolved  -> ${c.plan.levels.map((l) => 'L' + l).join(' + ')}${c.plan.surfaceOnCall ? '  + on-call' : ''}`);
+	console.log(`  ${c.ticket.key.padEnd(8)} ${c.severity.padEnd(8)} L${c.level}  ${elapsedSinceRaisedMinutes(c.ticket.resolutionSla)}m unresolved  -> ${c.plan.levels.map((l) => 'L' + l).join(' + ')}${c.plan.surfaceOnCall ? '  + on-call' : ''}`);
 }
 const alreadyNotified = jira.tickets.filter((t) => {
 	const s = severityFor(t.priority);
-	const level = s ? dueLevel(s, elapsedMinutesOf(t.resolutionSla, now)) : null;
+	const level = s ? dueLevel(s, elapsedSinceRaisedMinutes(t.resolutionSla)) : null;
 	return level !== null && level <= highestNotified(state, t.key);
 });
 if (alreadyNotified.length > 0) {

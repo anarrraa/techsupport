@@ -263,5 +263,6 @@ function cycle(): SlaCycle {
 		withinCalendarHours: true,
 		breachTimeEpochMillis: NOW.getTime() - 60 * 60_000,
 		elapsedMinutes: 60,
+		remainingMinutes: null,
 	};
 }
