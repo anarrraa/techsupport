@@ -20,13 +20,13 @@ model or the deterministic opener was used rather than failing the run.
 ## Architecture
 
 ```text
-GitHub Actions (every 15 min)
+GitHub Actions (twice a working day)
   -> Jira enhanced JQL search (paginated)
   -> JSM SLA API (paginated, bounded concurrency) — first response + resolution
   -> current breach + calendar + reminder-window selection
   -> deterministic, escaped, chunked Teams messages
   -> Teams Incoming Webhook            (channel reminder, optional)
-  -> Teams personal bot direct messages (assignee reminder + L2-L5 escalation, optional)
+  -> Teams personal bot direct messages (participant reminder + L2-L5 escalation, optional)
 ```
 
 At least one transport must be configured. The channel webhook and the personal
@@ -300,8 +300,8 @@ Teams. Dry-run logs counts only and does not log ticket content.
 
 `ci.yml` runs tests, type checking, and a build on pushes and pull requests.
 
-`jira-teams-reminder.yml` runs every 15 minutes with concurrency protection and
-Google Workload Identity Federation. Configure these repository secrets:
+`jira-teams-reminder.yml` runs at 10:00 and 15:00 Ulaanbaatar time on working
+days, with concurrency protection and Google Workload Identity Federation. Configure these repository secrets:
 
 - `GCP_WORKLOAD_IDENTITY_PROVIDER`
 - `GCP_SERVICE_ACCOUNT`

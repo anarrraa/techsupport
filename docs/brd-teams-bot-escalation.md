@@ -19,7 +19,9 @@ versus off-hours.
 The MVP (`docs/prd-priority-sla-reminders.md`) posts one aggregated message to a
 Teams channel when tickets breach the first response SLA. The workflow is
 scheduled every 15 minutes, but each breach has one delivery window per repeat
-interval, 60 minutes by default. The MVP is an implemented baseline, not yet
+interval, 60 minutes by default. **Superseded 2026-09-08:** the workflow now
+runs twice a working day and the delivery window is open, so the schedule is the
+cadence. The MVP is an implemented baseline, not yet
 production verified; see `docs/mvp-roadmap.md`. It does not:
 
 - address the individually responsible person directly,
@@ -53,8 +55,10 @@ responsible person being asked directly.
 
 ## Success measures
 
-- Every first-response breach produces a direct message to the assignee
-  within one scheduled run.
+- Every first-response breach produces a direct message within one scheduled
+  run. **Revised 2026-09-08:** to the request's participants rather than its
+  assignee — the assignee triages, the participants act. See the revision note
+  in `docs/prd-teams-bot-escalation.md`.
 - An unresolved breach escalates to the correct contractual level within the
   correct time window, without duplicate notifications inside one delivery
   window.

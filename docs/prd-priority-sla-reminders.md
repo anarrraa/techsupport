@@ -7,7 +7,7 @@ Status: implemented baseline
 Support leads need an actionable Teams digest when a Jira Service Management
 request has breached the contractual First Response SLA. The system must not
 reimplement Jira's calendar, treat arbitrary issue edits as a response, leak Jira
-data to an LLM, or repeat the same reminder every 15 minutes.
+data to an LLM, or repeat the same reminder on every scheduled run.
 
 ## Source of truth
 
@@ -24,6 +24,9 @@ or `updated`.
    `withinCalendarHours=true`.
 4. Open one reminder delivery window per configured repeat interval. Defaults are
    a 15-minute window every 60 minutes for a workflow scheduled every 15 minutes.
+   **Superseded 2026-09-08:** the workflow runs twice a working day and the
+   window is open, because a sparse schedule and a narrow window silently drop
+   most breaches. See `docs/mvp-roadmap.md`.
 5. Sort by priority and then longest overdue; group by assignee.
 6. Produce factual ticket lines deterministically, escape Jira-controlled text,
    and split oversized messages.
@@ -37,7 +40,8 @@ or `updated`.
 
 ## Delivery and security
 
-- GitHub Actions runs every 15 minutes with a concurrency group.
+- GitHub Actions runs at 10:00 and 15:00 Ulaanbaatar time on working days,
+  with a concurrency group.
 - Pull requests run test, typecheck, and build checks without production secrets.
 - Vertex authentication uses GitHub OIDC and Google Workload Identity Federation.
 - Jira and Teams credentials remain repository secrets.

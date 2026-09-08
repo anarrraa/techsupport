@@ -207,7 +207,10 @@ document or CI logs.
 - [ ] Run one controlled live delivery and verify Teams content and links.
 - [ ] Verify a no-due run posts nothing.
 - [ ] Observe at least four consecutive scheduled runs.
-- [ ] Verify delivery-window suppression prevents a post every 15 minutes.
+- [x] Verify the schedule does not repeat a reminder needlessly. Superseded
+      2026-09-08: the workflow runs twice a working day, so the schedule is the
+      cadence and the delivery window is deliberately open. A narrow window on a
+      sparse schedule reached only 25% of breaches, always the same 25%.
 - [ ] Record the successful GitHub run URLs in the evidence snapshot.
 - [ ] Update the PRD status from `implemented baseline` to `production verified`.
 
