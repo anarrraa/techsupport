@@ -155,31 +155,42 @@ document or CI logs.
       empty runs (the state file could hold the count). Left as it stands — it
       was a deliberate decision, and DC has 26 open requests, so it is not
       imminent.
-- [ ] **Make the SLA clock pause while waiting on the client.** Diagnosed
-      2026-09-08. No SLA on any open DC request has ever paused, and the reason
-      is a workflow gap rather than an SLA setting:
+- [ ] **Make the resolution clock pause while waiting on the client.** Diagnosed
+      2026-09-08; `npm run trace` reports `paused clocks: first response 0,
+      resolution 0` and `statuses in play: Open=26`.
 
-      - The project *does* define `Waiting for customer`, `Waiting for support`,
-        `Waiting for approval` and `Pending`.
-      - But all 26 open requests are issue type **`Ask a question`**, whose
-        workflow offers only `Open`, `In Progress`, `Resolved`, `Reopened`,
-        `Closed`. There is no waiting state to move them into, so there is
-        nothing for a pause condition to match.
-      - `Ask a question` is also the wrong type for the work: DC-885 carries
-        request type **Доголдол** (defect) on an `Ask a question` issue, so the
-        portal's request-type-to-issue-type mapping needs review too, and the
-        contract distinguishes defect SLAs from other request routes.
+      The cause is a workflow gap, not an SLA setting. All nine Mongolian request
+      types on service desk 69 — Доголдол, Сайжруулалт, Мэдээлэл өгсөн,
+      Үйлчилгээ үзүүлсэн, Шинэ хөгжүүлэлт, Бусад, Дараах төлбөрт өөчлөлт,
+      Төлөвлөгөөт ажил, Өөрчлөх хүсэлт — map to issue type **10138
+      `Ask a question`**, whose workflow offers only `Open`, `In Progress`,
+      `Resolved`, `Reopened`, `Closed`. There is no waiting status to move a
+      request into, so a pause condition has nothing to match. The project does
+      define `Waiting for customer`, `Waiting for support`, `Waiting for
+      approval` and `Pending`, and issue type 10193 `[System] Service request`
+      already carries the JSM set — but nothing uses it.
 
-      Fix in this order: add `Waiting for customer` to the `Ask a question`
-      workflow (or map Доголдол onto a type that already has it), add that
-      status to the metric's **Pause on** condition, then automate the
-      transition so it does not depend on habit. Changing a metric's conditions
-      makes JSM recalculate affected cycles, so expect the elapsed figures to
-      move; confirm with `npm run trace`.
+      Fix by editing the `Ask a question` workflow rather than remapping the
+      request types: editing applies to the 26 open requests immediately, where
+      a remap would only affect new ones. Check which projects share the
+      workflow before editing, and copy it if it is shared.
 
-      No code change: `src/lib/sla.ts:36` and `src/lib/escalation.ts:110`
-      already exclude a paused cycle, and both are covered by tests. The
-      application must not second-guess Jira's clock (`AGENTS.md`).
+      1. Add the existing `Waiting for customer` status to that workflow, with
+         transitions in from `Open` and `In Progress` and back to `In Progress`.
+      2. Add it to **Pause on** for `Time to resolution` only.
+         `Time to first response` should not pause: while that cycle runs, the
+         client has had no reply at all, which is exactly what the reminder is
+         for.
+      3. Automate the transition so it does not depend on habit — a public agent
+         comment moves the request to `Waiting for customer`, a customer comment
+         moves it back.
+      4. Confirm with `npm run trace`: `paused clocks` stops reading 0 and the
+         elapsed figures drop, because changing a metric's conditions makes JSM
+         recalculate.
+
+      No code change: `src/lib/sla.ts` and `src/lib/escalation.ts` already
+      exclude a paused cycle, with tests. The application must not second-guess
+      Jira's clock (`AGENTS.md`).
 - [ ] Confirm JSM First Response goals match `docs/sla-matrix.md`.
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
 - [x] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.

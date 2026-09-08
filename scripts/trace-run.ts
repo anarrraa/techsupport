@@ -46,6 +46,15 @@ for (const t of jira.tickets) byPriority[t.priority] = (byPriority[t.priority] ?
 console.log(`by priority: ${Object.entries(byPriority).map(([k, v]) => `${k}=${v}`).join('  ')}`);
 console.log(`without the first-response metric: ${jira.withoutSla}`);
 console.log(`without the resolution metric (no escalation clock): ${jira.withoutResolutionSla}`);
+// The clock only pauses when JSM says so, and JSM can only say so if the
+// workflow has a status the metric pauses on. Until then this reads 0 and every
+// figure includes time spent waiting on the client.
+const pausedFirst = jira.tickets.filter((t) => t.firstResponseSla?.paused).length;
+const pausedResolution = jira.tickets.filter((t) => t.resolutionSla?.paused).length;
+console.log(`paused clocks: first response ${pausedFirst}, resolution ${pausedResolution}`);
+const statuses: Record<string, number> = {};
+for (const t of jira.tickets) statuses[t.status] = (statuses[t.status] ?? 0) + 1;
+console.log(`statuses in play: ${Object.entries(statuses).map(([k, v]) => `${k}=${v}`).join('  ')}`);
 const vendorParticipants = new Set(jira.tickets.flatMap((t) => t.participants.map((p) => p.displayName)));
 console.log(`\nvendor participants seen: ${vendorParticipants.size}`);
 console.log('client-side participants were dropped in src/lib/jira.ts and are not visible here');
