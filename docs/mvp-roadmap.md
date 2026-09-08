@@ -140,15 +140,31 @@ document or CI logs.
 - [x] Point `JIRA_JQL` at a service desk project that exists.
   - Set 2026-08-26: `project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC`. Dry-run scans real DC issues.
 - [ ] Confirm Jira priority mapping against the production priority scheme.
-- [ ] **Decide whether the resolution clock should pause.** Every open DC request
-      sits in status `Open` — there is no waiting-for-customer state in use — so
-      JSM never pauses the resolution SLA. DC-811 reports 9,585 working minutes
-      elapsed against a 16h goal with `paused: false`, and its first-response
-      cycle is *completed*, so the request was answered and then sat. If any of
-      that time was spent waiting on the client, the escalation levels are being
-      reached earlier than the contract intends. This is a JSM workflow
-      configuration question, not a code one: the application must not second-
-      guess the clock (`AGENTS.md`).
+- [ ] **Make the SLA clock pause while waiting on the client.** Diagnosed
+      2026-09-08. No SLA on any open DC request has ever paused, and the reason
+      is a workflow gap rather than an SLA setting:
+
+      - The project *does* define `Waiting for customer`, `Waiting for support`,
+        `Waiting for approval` and `Pending`.
+      - But all 26 open requests are issue type **`Ask a question`**, whose
+        workflow offers only `Open`, `In Progress`, `Resolved`, `Reopened`,
+        `Closed`. There is no waiting state to move them into, so there is
+        nothing for a pause condition to match.
+      - `Ask a question` is also the wrong type for the work: DC-885 carries
+        request type **Доголдол** (defect) on an `Ask a question` issue, so the
+        portal's request-type-to-issue-type mapping needs review too, and the
+        contract distinguishes defect SLAs from other request routes.
+
+      Fix in this order: add `Waiting for customer` to the `Ask a question`
+      workflow (or map Доголдол onto a type that already has it), add that
+      status to the metric's **Pause on** condition, then automate the
+      transition so it does not depend on habit. Changing a metric's conditions
+      makes JSM recalculate affected cycles, so expect the elapsed figures to
+      move; confirm with `npm run trace`.
+
+      No code change: `src/lib/sla.ts:36` and `src/lib/escalation.ts:110`
+      already exclude a paused cycle, and both are covered by tests. The
+      application must not second-guess Jira's clock (`AGENTS.md`).
 - [ ] Confirm JSM First Response goals match `docs/sla-matrix.md`.
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
 - [x] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.
