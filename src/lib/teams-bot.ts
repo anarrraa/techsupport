@@ -26,6 +26,8 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const FEDERATION_AUDIENCE = 'api://AzureADTokenExchange';
 
 export type DeliveryFailureReason =
+	/** The recipient id is not a user in this tenant. */
+	| 'unknown-recipient'
 	/** The app is not published to the organisation's Teams catalog. */
 	| 'not-in-catalog'
 	/** Graph refused to install the app for this person. */
@@ -349,6 +351,18 @@ async function graphJson<T>(
 		const body = await response.text();
 		return (body ? JSON.parse(body) : {}) as T;
 	} catch (error) {
+		// Graph answers 404 on /users/{id} for anything that is not a user in this
+		// tenant, and the commonest cause is an object id copied from the wrong
+		// page: an app registration's own object id looks exactly like a user's.
+		if (error instanceof ExternalRequestError && error.status === 404) {
+			throw new TeamsDeliveryError(
+				'unknown-recipient',
+				'Microsoft Entra has no user with that object id. Check it came from '
+					+ 'Entra ID > Users > the person, not from the app registration\'s overview — '
+					+ 'the app has an object id of its own and it is not interchangeable',
+				{ cause: error },
+			);
+		}
 		if (error instanceof ExternalRequestError && error.status === 403) {
 			throw new TeamsDeliveryError(
 				'install-forbidden',

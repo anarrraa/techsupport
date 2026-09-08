@@ -29,6 +29,9 @@ if (!config) {
 }
 
 const REMEDY: Record<string, string> = {
+	'unknown-recipient':
+		'Read the object id from Entra ID > Users > the person. The app registration overview '
+			+ 'shows an object id too, and it is a different thing.',
 	'not-in-catalog':
 		'Publish the app package to the organisation catalog, then check that TEAMS_APP_EXTERNAL_ID '
 			+ 'matches the manifest id of the published package.',

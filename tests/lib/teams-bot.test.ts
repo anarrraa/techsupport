@@ -164,6 +164,14 @@ test('says so when the app is not in the organisation catalog', async () => {
 	assert.match(error.message, /administrator has to publish the app package/);
 });
 
+test('names the wrong-object-id mistake when Graph has no such user', async () => {
+	const sender = await createBotSender(config(), {}, fakeFetch([], { graphStatus: 404 }));
+	const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
+	assert.ok(error instanceof TeamsDeliveryError);
+	assert.equal(error.reason, 'unknown-recipient');
+	assert.match(error.message, /not from the app registration/);
+});
+
 test('names the missing Graph consent when installation is refused', async () => {
 	const sender = await createBotSender(config(), {}, fakeFetch([], { graphStatus: 403 }));
 	const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
@@ -221,7 +229,6 @@ function fakeFetch(calls: Recorded[], overrides: Overrides = {}): typeof fetch {
 		if (url.startsWith('https://actions.invalid/')) return json({ value: 'github-oidc-token' });
 		if (url.includes('/oauth2/v2.0/token')) return json({ access_token: 'synthetic-token' });
 
-		if (url.includes('/appCatalogs/teamsApps?')) return json({ value: catalog });
 		if (url.includes('graph.microsoft.com')) {
 			if (overrides.graphStatus) {
 				return new Response('{"error":{"code":"Authorization_RequestDenied"}}', {
@@ -229,6 +236,7 @@ function fakeFetch(calls: Recorded[], overrides: Overrides = {}): typeof fetch {
 					statusText: 'Forbidden',
 				});
 			}
+			if (url.includes('/appCatalogs/teamsApps?')) return json({ value: catalog });
 			if (url.endsWith('/chat')) return json({ id: CHAT_ID });
 			if (url.includes('installedApps?')) {
 				return json({ value: overrides.installed ? [{ id: 'install-1' }] : [] });

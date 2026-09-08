@@ -63,9 +63,8 @@ reading order and non-negotiable invariants before touching any of this.
       Then `gh secret set ESCALATION_DIRECTORY_JSON < config/escalation.json`.
       **Do not commit it.** This repository is public and the file names real
       people; it is gitignored for that reason.
-- [ ] Prove the transport from this codebase:
-      `npm run verify:bot -- <entra-object-id>`. Record the outcome in the
-      evidence snapshot in `docs/mvp-roadmap.md`.
+- [x] Prove the transport from this codebase. Done 2026-09-08:
+      `Direct message delivered`. Recorded in the evidence snapshot.
 - [ ] Stage the first live run to two people only: set the
       `TEAMS_BOT_RECIPIENT_ALLOWLIST` repository variable to
       `anar@zerotech.mn,tergel@zerotech.mn`. Widen it once the messages read the
