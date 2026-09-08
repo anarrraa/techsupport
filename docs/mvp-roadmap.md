@@ -144,7 +144,17 @@ document or CI logs.
 
 - [x] Point `JIRA_JQL` at a service desk project that exists.
   - Set 2026-08-26: `project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC`. Dry-run scans real DC issues.
-- [ ] Confirm Jira priority mapping against the production priority scheme.
+- [ ] **Decide what an empty scan should mean.** `scanned === 0` outside dry-run
+      throws, added 2026-08-26 so a misconfigured `JIRA_JQL` could not look
+      healthy. It cannot distinguish a broken query from a genuinely empty
+      queue, so a day when the team has closed everything produces a red
+      scheduled run, twice a day, until a request appears. A wholly invalid JQL
+      is already rejected by Jira with a 400, which throws on its own; what this
+      guard adds is catching a *valid* query that matches the wrong thing.
+      Options: keep it, warn and exit clean, or fail only after N consecutive
+      empty runs (the state file could hold the count). Left as it stands — it
+      was a deliberate decision, and DC has 26 open requests, so it is not
+      imminent.
 - [ ] **Make the SLA clock pause while waiting on the client.** Diagnosed
       2026-09-08. No SLA on any open DC request has ever paused, and the reason
       is a workflow gap rather than an SLA setting:
