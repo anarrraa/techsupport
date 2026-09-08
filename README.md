@@ -135,7 +135,7 @@ Prerequisites, in order:
    this repo:
 
    ```sh
-   TEAMS_BOT_APP_ID=<guid> npm run package:teams
+   npm run package:teams
    ```
 
    That produces `packages/sla-reminder-teams-app.zip` from
@@ -177,9 +177,12 @@ Prerequisites, in order:
 Prove the transport before scheduling anything:
 
 ```sh
-TEAMS_BOT_APP_ID=... TEAMS_BOT_TENANT_ID=... TEAMS_BOT_APP_PASSWORD=... \
-  npm run verify:bot -- <entra-object-id>
+npm run verify:bot -- <entra-object-id>
 ```
+
+The setup scripts read `.env` themselves, so the bot settings only have to be
+written once. They print a missing setting as a message and exit, rather than
+raising it as a stack trace — a blank credential is a setup step, not a fault.
 
 Each failure names its own fix, because they need different people to act:
 `not-in-catalog` needs an administrator to publish the package,

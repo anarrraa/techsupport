@@ -23,7 +23,13 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NIL = '00000000-0000-0000-0000-000000000000';
 
-const bot = loadTeamsBotConfig();
+let bot;
+try {
+	bot = loadTeamsBotConfig();
+} catch (error) {
+	console.error(error instanceof Error ? error.message : String(error));
+	process.exit(2);
+}
 if (!bot) {
 	console.error('Set TEAMS_BOT_APP_ID and TEAMS_BOT_TENANT_ID first (see .env.example).');
 	process.exit(2);

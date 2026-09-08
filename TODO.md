@@ -32,7 +32,7 @@ reading order and non-negotiable invariants before touching any of this.
       starts with a hunt through the Azure portal.
 - [ ] Get an administrator to publish the Teams app package to the
       organisation catalog. Build it with
-      `TEAMS_BOT_APP_ID=<guid> npm run package:teams`. **No Teams app setup
+      `npm run package:teams`. **No Teams app setup
       policy is needed** — superseded 2026-09-08 by the goOrange delivery path,
       which installs the app per recipient through Graph. See the revision note
       in `docs/mvp-roadmap.md`.

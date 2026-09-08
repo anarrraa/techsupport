@@ -16,7 +16,13 @@ if (!recipient) {
 	process.exit(2);
 }
 
-const config = loadTeamsBotConfig();
+let config: ReturnType<typeof loadTeamsBotConfig>;
+try {
+	config = loadTeamsBotConfig();
+} catch (error) {
+	console.error(error instanceof Error ? error.message : String(error));
+	process.exit(2);
+}
 if (!config) {
 	console.error('Set TEAMS_BOT_APP_ID and TEAMS_BOT_TENANT_ID first (see .env.example).');
 	process.exit(2);

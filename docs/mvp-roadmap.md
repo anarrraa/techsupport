@@ -312,7 +312,7 @@ endpoint for this tenant, and the tenant id is
 ### V2 milestone 2: verify the bot in production
 
 - [ ] Publish the Teams app package to the organisation catalog. Build it with
-      `TEAMS_BOT_APP_ID=<guid> npm run package:teams`.
+      `npm run package:teams`.
 - [ ] Grant and consent the Graph application permissions:
       `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`,
       `User.Read.All`.
