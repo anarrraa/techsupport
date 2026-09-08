@@ -49,6 +49,8 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Empty scan detection | Pass | On 2026-08-26 `scanned: 0` in non-dry-run mode throws visible error |
 | V2 bot and escalation code | Implemented, unverified | Added 2026-09-07 with unit coverage for every `docs/sla-matrix.md` section 2 threshold; no live send |
 | Live bot direct message from this codebase | Not attempted | needs `TEAMS_BOT_APP_ID`/`TEAMS_BOT_TENANT_ID` and a credential; run `npm run verify:bot -- <object-id>` |
+| Bot application id known | Pass | Read from the Azure portal 2026-09-08: `b76bcdfb-5a16-44c4-81e0-860780daa2da`, single tenant, one secret, activated |
+| Teams app package built with the real id | Pass | On 2026-09-08 `npm run package:teams` produced `packages/sla-reminder-teams-app.zip` carrying that id as both manifest `id` and `botId`, `scopes: [personal]`, `isNotificationOnly: true` |
 | Teams app published to the organisation catalog | Not attempted | administrator action; per-person custom upload only proved the path on 2026-08-20 |
 | GitHub OIDC federated credential on the Entra app | Not attempted | code path implemented and unit tested; the credential itself is not configured |
 | `config/escalation.json` populated | Not attempted | Jira account ids for the two pilot recipients resolved 2026-09-07; object ids still needed, via `npm run resolve:ids` |
@@ -206,12 +208,11 @@ and Teams is a standard channel with unmetered messages.
 
 - [x] Azure subscription available to the integration owner.
 - [x] Entra app registration, single tenant, secret held outside the repository.
-      **Its application id is not recorded anywhere.** Nothing in this repository
-      or the wiki carries it, so it has to be read back from the Azure portal
-      before the package can be built. Record it here once found; it is not a
-      secret. Do not create a second registration, and do not reuse goOrange's
-      (`bd1bc6b9-…`) — a shared id would make these reminders arrive as GoOrange
-      and collide with its catalog entry.
+      Recorded 2026-09-08: **SLA Reminder Bot**, application (client) id
+      `b76bcdfb-5a16-44c4-81e0-860780daa2da`, tenant `376a710f-b223-451f-ba55-efc974d8716c`,
+      supported account types "My organization only", one client secret, state
+      Activated. Neither the registration's own object id nor goOrange's app id
+      belongs in any of this project's configuration.
 - [x] Azure Bot resource on the free tier with the Teams channel enabled.
 - [x] Notification-only Teams app package scoped to personal chats.
 - [x] Application installed in one personal scope by custom app upload.
