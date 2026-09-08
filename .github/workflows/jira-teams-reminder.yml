@@ -2,7 +2,12 @@ name: Jira to Teams reminder
 
 on:
   schedule:
-    - cron: '0 0 * * *'   
+    # Every 15 minutes, which the delivery-window logic depends on. A daily
+    # schedule is not merely coarse: it advances elapsed-since-breach by exactly
+    # 1440 minutes, and 1440 % REMINDER_REPEAT_MINUTES is 0 at the 60-minute
+    # default, so a breach outside the window stays outside it every day
+    # forever. Three quarters of breaches were never reminded at all.
+    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -79,9 +84,12 @@ jobs:
           REMINDER_USE_LLM_INTRO: ${{ vars.REMINDER_USE_LLM_INTRO }}
           REMINDER_DRY_RUN: ${{ inputs.dry_run || 'false' }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
-          # No client secret: the bot token comes from the OIDC federated
-          # credential on the Entra app registration (id-token: write above).
           TEAMS_BOT_APP_ID: ${{ vars.TEAMS_BOT_APP_ID }}
+          # Prefer the OIDC federated credential on the app registration
+          # (id-token: write above), which stores no secret. This secret is the
+          # fallback for a tenant where the credential is not configured yet;
+          # unset, it is empty and the OIDC path is taken.
+          TEAMS_BOT_APP_PASSWORD: ${{ secrets.TEAMS_BOT_APP_PASSWORD }}
           TEAMS_BOT_TENANT_ID: ${{ vars.TEAMS_BOT_TENANT_ID }}
           TEAMS_BOT_SERVICE_URL: ${{ vars.TEAMS_BOT_SERVICE_URL }}
           TEAMS_APP_EXTERNAL_ID: ${{ vars.TEAMS_APP_EXTERNAL_ID }}

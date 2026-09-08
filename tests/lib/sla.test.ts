@@ -65,6 +65,27 @@ test('sorts by priority and then longest overdue', () => {
 	assert.deepEqual(result.due.map((value) => value.key), ['HIGH-OLD', 'HIGH-NEW', 'LOW']);
 });
 
+test('a run interval that is a whole multiple of the repeat locks tickets out', () => {
+	// The reason the schedule is */15 and not daily. A daily run advances
+	// elapsed-since-breach by 1440 minutes, and 1440 % 60 === 0, so the verdict
+	// for a given breach never changes: whoever is outside the window is outside
+	// it forever. Sampling every 15 minutes reaches every offset instead.
+	const daily = (offset: number) =>
+		Array.from({ length: 7 }, (_, day) =>
+			isReminderWindow(0, (offset + day * 1_440) * 60_000, 60, 15));
+	assert.deepEqual(new Set(daily(20)), new Set([false]));
+	assert.deepEqual(new Set(daily(47)), new Set([false]));
+
+	for (const offset of [3, 20, 47]) {
+		const quarterHourly = Array.from({ length: 8 }, (_, run) =>
+			isReminderWindow(0, (offset + run * 15) * 60_000, 60, 15));
+		assert.ok(
+			quarterHourly.some(Boolean),
+			`offset ${offset} must be reminded at least once per hour`,
+		);
+	}
+});
+
 function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 	return {
 		key: 'SUP-1',

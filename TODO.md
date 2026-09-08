@@ -8,6 +8,11 @@ reading order and non-negotiable invariants before touching any of this.
 
 ## Now — blocking, in order
 
+- [x] Fix the reminder schedule. Was `0 0 * * *`; a daily run made the delivery
+      window permanently unreachable for three quarters of breaches, because
+      1440 minutes is a whole multiple of the 60-minute repeat interval. Set to
+      `*/15 * * * *` on 2026-09-08, which is what `README.md` always described.
+
 - [x] Point `JIRA_JQL` at a service desk project that exists.
   - Done 2026-08-26: set to `project = DC AND statusCategory != Done AND assignee is not EMPTY`.
 - [x] Give the Jira integration account **agent** access on the service desk
