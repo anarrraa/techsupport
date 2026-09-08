@@ -39,7 +39,11 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Type checking | Pass | `npm run typecheck` exit 0 on 2026-09-07 |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-09-07 |
 | GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
-| Scheduled reminder workflow | Failing on `main` | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/lib/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; needs a green scheduled run to confirm |
+| **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
+| Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
+| Scheduled run verified in production | Pass | The dry-run immediately after reported `Scanned 26; 17 due, 9 not breached, 0 outside calendar, 0 awaiting window`, `0 request(s) crossed an escalation level` — the seed held — and `2 direct message(s) to 2 recipient(s)` with `11 withheld` by the rollout gate |
+| Production logs are aggregate-only | Pass | The run log above contains no ticket key, no assignee or participant name, no email, and no object id. Checked against `DC-8`, `DC-6`, `uyanga`, `Khulan`, `anar@zerotech`, a Cyrillic summary fragment, and a recipient object id |
+| Scheduled reminder workflow (before) | Was failing | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/lib/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; needs a green scheduled run to confirm |
 | Scoped JQL correctness | Pass | On 2026-08-26 `JIRA_JQL` set to `project = DC AND statusCategory != Done AND assignee is not EMPTY` |
 | Local production dry-run | Pass | On 2026-08-26 dry-run scans real DC issues and reaches SLA endpoint |
 | JSM SLA read access | Pass | On 2026-08-26 `GET /rest/servicedeskapi/request/DC-844/sla` returns 200 OK (agent access granted) |

@@ -8,6 +8,15 @@ reading order and non-negotiable invariants before touching any of this.
 
 ## Now — blocking, in order
 
+- [x] Deploy. PR #2 and #3 merged 2026-09-08; escalation state seeded in the
+      Actions cache (run `34203911077`, 0 messages sent); a dry-run on `main`
+      confirms 2 recipients through the gate and 11 withheld, with no identity
+      in the log. First scheduled run: Wed 2026-09-09 10:00 Ulaanbaatar.
+- [ ] Rotate `TEAMS_BOT_APP_PASSWORD`. The value was pasted into a chat
+      transcript while getting the transport working. Entra > SLA Reminder Bot >
+      Certificates & secrets > new secret, then update `.env` and
+      `gh secret set TEAMS_BOT_APP_PASSWORD`, then delete the old one.
+
 - [ ] Check how Teams renders an escaped `>` in a bot message. `DC-863`'s summary
       contains `EZ Store > Орлого`, and the sanitiser turns that into `&gt;`,
       which is correct for the channel webhook but may show literally in a
