@@ -54,7 +54,10 @@ export function planDirectMessages(input: {
 	config: EscalationConfig;
 	now: Date;
 	maxChars: number;
-	/** Entra object ids allowed to receive a message; null means everyone. */
+	/**
+	 * Who may receive a message, by email, directory handle, or object id. Null
+	 * means everyone.
+	 */
 	allowlist?: string[] | null;
 }): DirectMessagePlan {
 	const { due, escalations, config, now, maxChars } = input;
@@ -119,25 +122,38 @@ export function planDirectMessages(input: {
 }
 
 /**
- * A typo here would silently deliver nothing, so an id that no one in the
- * directory has is an error rather than a gate that matches nobody.
+ * Resolves each entry to the object id the sender addresses, accepting whichever
+ * of the three identifiers the operator had to hand. A typo would otherwise
+ * produce a gate that matches nobody and a run that looks healthy while
+ * delivering nothing, so an unrecognised entry is named and raised.
  */
 function normalizeAllowlist(
 	allowlist: string[] | null | undefined,
 	config: EscalationConfig,
 ): Set<string> | null {
 	if (!allowlist?.length) return null;
-	const known = new Set(
-		Object.values(config.people).map((person) => person.entraObjectId.toLowerCase()),
-	);
-	const unknown = allowlist.map((id) => id.toLowerCase()).filter((id) => !known.has(id));
+	const byIdentifier = new Map<string, string>();
+	for (const [handle, person] of Object.entries(config.people)) {
+		const objectId = person.entraObjectId.toLowerCase();
+		byIdentifier.set(objectId, objectId);
+		byIdentifier.set(handle.toLowerCase(), objectId);
+		if (person.email) byIdentifier.set(person.email.toLowerCase(), objectId);
+	}
+
+	const resolved = new Set<string>();
+	const unknown: string[] = [];
+	for (const entry of allowlist) {
+		const objectId = byIdentifier.get(entry.trim().toLowerCase());
+		if (objectId) resolved.add(objectId);
+		else unknown.push(entry);
+	}
 	if (unknown.length > 0) {
 		throw new Error(
-			`Recipient allowlist has ${unknown.length} object id(s) that no one in the escalation `
-				+ 'directory has; check TEAMS_BOT_RECIPIENT_ALLOWLIST against the directory',
+			`Recipient allowlist names ${unknown.join(', ')}, who are not in the escalation `
+				+ 'directory; entries are matched by email, directory handle, or object id',
 		);
 	}
-	return new Set(allowlist.map((id) => id.toLowerCase()));
+	return resolved;
 }
 
 function add(

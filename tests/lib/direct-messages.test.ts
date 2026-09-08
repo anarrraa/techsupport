@@ -121,20 +121,22 @@ test('withholds everyone outside the staged-rollout allowlist', () => {
 	assert.deepEqual(plan.messages.flatMap((message) => message.records), []);
 });
 
-test('matches allowlist object ids regardless of case', () => {
-	const plan = planDirectMessages({
-		due: [ticket({ key: 'DC-1' })],
-		escalations: [],
-		config: directory(),
-		now: NOW,
-		maxChars: 12_000,
-		allowlist: [DEV.toUpperCase()],
-	});
-	assert.equal(plan.messages.length, 1);
-	assert.equal(plan.suppressedByAllowlist, 0);
+test('names the allowlist by email, handle, or object id, in any case', () => {
+	for (const entry of [DEV.toUpperCase(), 'dev', 'Dev@Example.Invalid']) {
+		const plan = planDirectMessages({
+			due: [ticket({ key: 'DC-1' })],
+			escalations: [],
+			config: directory(),
+			now: NOW,
+			maxChars: 12_000,
+			allowlist: [entry],
+		});
+		assert.equal(plan.messages.length, 1, entry);
+		assert.equal(plan.suppressedByAllowlist, 0, entry);
+	}
 });
 
-test('rejects an allowlist id that nobody in the directory has', () => {
+test('names anyone in the allowlist who is not in the directory', () => {
 	assert.throws(
 		() =>
 			planDirectMessages({
@@ -143,9 +145,9 @@ test('rejects an allowlist id that nobody in the directory has', () => {
 				config: directory(),
 				now: NOW,
 				maxChars: 12_000,
-				allowlist: ['99999999-9999-4999-8999-999999999999'],
+				allowlist: ['nobody@example.invalid'],
 			}),
-		/1 object id\(s\) that no one in the escalation directory has/,
+		/names nobody@example\.invalid, who are not in the escalation directory/,
 	);
 });
 
@@ -166,7 +168,12 @@ test('fails visibly when the crossed level has no contact configured', () => {
 function directory(): EscalationConfig {
 	return {
 		people: {
-			dev: { name: 'Developer', entraObjectId: DEV, jiraAccountId: 'jira-dev' },
+			dev: {
+				name: 'Developer',
+				email: 'dev@example.invalid',
+				entraObjectId: DEV,
+				jiraAccountId: 'jira-dev',
+			},
 			lead: { name: 'Team Lead', entraObjectId: LEAD, jiraAccountId: 'jira-lead' },
 			noc: { name: 'NOC On-call', entraObjectId: NOC },
 		},

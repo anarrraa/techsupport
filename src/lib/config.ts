@@ -44,11 +44,15 @@ export interface TeamsBotConfig {
 	/** Bot Connector service URL for the tenant's Teams region. */
 	serviceUrl: string;
 	/**
-	 * Staged rollout gate. When set, only these Entra object ids can be sent to;
-	 * anyone else the policy selects is dropped and counted. Null means no gate.
-	 * Independent of the escalation directory on purpose: the directory has to
-	 * hold everyone for the policy to resolve a level, so it cannot double as
-	 * the pilot's blast radius.
+	 * Staged rollout gate. When set, only these people can be sent to; anyone
+	 * else the policy selects is dropped and counted. Entries are matched against
+	 * the escalation directory by email, directory handle, or object id, so a
+	 * pilot can be named the way people actually refer to each other. Null means
+	 * no gate.
+	 *
+	 * Separate from the directory on purpose: the directory has to hold everyone
+	 * for the policy to resolve a level at all, so it cannot double as the
+	 * pilot's blast radius.
 	 */
 	recipientAllowlist: string[] | null;
 	http: HttpConfig;
@@ -205,17 +209,10 @@ function loadBotConfig(
 }
 
 function parseAllowlist(raw: string | undefined): string[] | null {
+	// Entries are resolved against the escalation directory rather than validated
+	// here, so an unrecognised one can be reported by name.
 	const entries = raw?.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-	if (!entries?.length) return null;
-	for (const entry of entries) {
-		if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(entry)) {
-			throw new Error(
-				'TEAMS_BOT_RECIPIENT_ALLOWLIST takes comma-separated Microsoft Entra object ids '
-					+ '(UUIDs), not names or email addresses',
-			);
-		}
-	}
-	return entries;
+	return entries?.length ? entries : null;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
