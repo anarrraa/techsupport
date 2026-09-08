@@ -191,7 +191,18 @@ Prove the transport before scheduling anything:
 
 ```sh
 npm run verify:bot -- <entra-object-id>
+npm run trace
 ```
+
+`npm run trace` runs the real selection and routing against live Jira and
+narrates every stage with names — which requests are in scope, which are due and
+which are waiting for their window, which crossed a contractual level, how each
+Jira account resolved to a Teams recipient, and the exact message each person
+would receive. It sends nothing.
+
+It is the counterpart to the run journal, which is deliberately unable to name a
+request or a person because it goes to CI logs. That is why the trace is a local
+command and is not wired into the workflow: the two have opposite jobs.
 
 The setup scripts read `.env` themselves, so the bot settings only have to be
 written once. They print a missing setting as a message and exit, rather than
