@@ -106,6 +106,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		assigneeAccountId: 'account-1',
 		url: 'https://jira.invalid/browse/DC-1',
 		firstResponseSla: null,
+		participants: [],
 		resolutionSla: cycle(),
 		...overrides,
 	};

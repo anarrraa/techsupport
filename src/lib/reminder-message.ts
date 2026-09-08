@@ -1,6 +1,6 @@
 import { firstResponseMinutes, severityFor, type EscalationLevel } from './escalation.ts';
 import type { JiraTicket } from './jira.ts';
-import { overdueMinutes } from './sla.ts';
+import { elapsedMinutesOf, overdueMinutes } from './sla.ts';
 
 const DEFAULT_INTRO = 'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.';
 const CHANNEL_TITLE = '🔔 **First response SLA сануулга**';
@@ -18,7 +18,7 @@ export function buildReminderMessages(
 	maxChars: number,
 	intro = DEFAULT_INTRO,
 ): string[] {
-	return buildMessages(tickets, now, maxChars, [CHANNEL_TITLE, cleanIntro(intro)], false);
+	return buildMessages(tickets, now, maxChars, [CHANNEL_TITLE, cleanIntro(intro)], 'firstResponse');
 }
 
 /**
@@ -53,7 +53,7 @@ export function buildDirectMessages(options: {
 			`⚠️ Ажлын бус цагийн Critical/High: дуудлагын инженер ${cleanField(onCallName, 100)}-тай утсаар холбогдоно уу.`,
 		);
 	}
-	return buildMessages(tickets, now, maxChars, header, level === 1);
+	return buildMessages(tickets, now, maxChars, header, level === 1 ? 'firstResponse' : 'resolution');
 }
 
 function buildMessages(
@@ -61,7 +61,7 @@ function buildMessages(
 	now: Date,
 	maxChars: number,
 	header: string[],
-	withContractWindow: boolean,
+	clock: Clock,
 ): string[] {
 	if (tickets.length === 0) return [];
 	const continuation = [header[0] as string, 'SLA сануулгын үргэлжлэл:'];
@@ -73,7 +73,7 @@ function buildMessages(
 		const heading = `**${cleanField(assignee, 100)}**`;
 		let headingAdded = false;
 		for (const ticket of assignedTickets) {
-			let ticketLine = renderTicket(ticket, now, withContractWindow);
+			let ticketLine = renderTicket(ticket, now, clock);
 			const additions = headingAdded ? [ticketLine] : ['', heading, ticketLine];
 			if ([...lines, ...additions].join('\n').length > maxChars && ticketCount > 0) {
 				messages.push(lines.join('\n'));
@@ -87,7 +87,7 @@ function buildMessages(
 				headingAdded = true;
 			}
 			const available = maxChars - lines.join('\n').length - 1;
-			ticketLine = fitTicketLine(ticketLine, ticket, now, available);
+			ticketLine = fitTicketLine(ticketLine, ticket, now, available, clock);
 			lines.push(ticketLine);
 			ticketCount += 1;
 		}
@@ -111,23 +111,44 @@ function groupByAssignee(tickets: JiraTicket[]): Map<string, JiraTicket[]> {
 	return groups;
 }
 
-function renderTicket(ticket: JiraTicket, now: Date, withContractWindow = false): string {
+/**
+ * `firstResponse` quotes the first-response clock and reads "overdue";
+ * `resolution` quotes the resolution clock and reads "unresolved for", because
+ * that is the clock an escalation level came due on.
+ */
+type Clock = 'firstResponse' | 'resolution';
+
+function renderTicket(ticket: JiraTicket, now: Date, clock: Clock): string {
 	const summary = cleanField(ticket.summary, 180);
 	const priority = cleanField(ticket.priority, 30);
 	const status = cleanField(ticket.status, 80);
 	const key = cleanField(ticket.key, 50);
-	const line = `- [${key}](${ticket.url}) · **${priority}** · ${summary} · ${status} · ${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
-	if (!withContractWindow) return line;
+	const elapsed =
+		clock === 'resolution'
+			? `${formatDuration(elapsedMinutesOf(ticket.resolutionSla, now))} шийдэгдээгүй`
+			: `${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
+	const line = `- [${key}](${ticket.url}) · **${priority}** · ${summary} · ${status} · ${elapsed}`;
+	if (clock === 'resolution') return line;
 	const severity = severityFor(ticket.priority);
 	return severity
 		? `${line} · гэрээний хугацаа ${firstResponseMinutes(severity)} мин`
 		: line;
 }
 
-function fitTicketLine(line: string, ticket: JiraTicket, now: Date, available: number): string {
+function fitTicketLine(
+	line: string,
+	ticket: JiraTicket,
+	now: Date,
+	available: number,
+	clock: Clock,
+): string {
 	if (line.length <= available) return line;
 	const linkedKey = `[${cleanField(ticket.key, 50)}](${ticket.url})`;
-	const compact = `- ${linkedKey} · ${cleanField(ticket.priority, 30)} · ${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
+	const elapsed =
+		clock === 'resolution'
+			? `${formatDuration(elapsedMinutesOf(ticket.resolutionSla, now))} шийдэгдээгүй`
+			: `${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
+	const compact = `- ${linkedKey} · ${cleanField(ticket.priority, 30)} · ${elapsed}`;
 	if (compact.length <= available) return compact;
 	const linkOnly = `- ${linkedKey}`;
 	if (linkOnly.length <= available) return linkOnly;

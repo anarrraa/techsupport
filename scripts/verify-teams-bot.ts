@@ -16,19 +16,29 @@ if (!recipient) {
 	process.exit(2);
 }
 
-const config = loadTeamsBotConfig();
+let config: ReturnType<typeof loadTeamsBotConfig>;
+try {
+	config = loadTeamsBotConfig();
+} catch (error) {
+	console.error(error instanceof Error ? error.message : String(error));
+	process.exit(2);
+}
 if (!config) {
 	console.error('Set TEAMS_BOT_APP_ID and TEAMS_BOT_TENANT_ID first (see .env.example).');
 	process.exit(2);
 }
 
 const REMEDY: Record<string, string> = {
+	'unknown-recipient':
+		'Read the object id from Entra ID > Users > the person. The app registration overview '
+			+ 'shows an object id too, and it is a different thing.',
 	'not-in-catalog':
 		'Publish the app package to the organisation catalog, then check that TEAMS_APP_EXTERNAL_ID '
 			+ 'matches the manifest id of the published package.',
 	'install-forbidden':
-		'Grant the app registration TeamsAppInstallation.ReadWriteForUser.All and AppCatalog.Read.All '
-			+ 'as application permissions, with admin consent.',
+		'Grant the app registration AppCatalog.Read.All and one of '
+			+ 'TeamsAppInstallation.ReadWriteSelfForUser.All (limited to this app, try this first) or '
+			+ 'TeamsAppInstallation.ReadWriteForUser.All, as application permissions with admin consent.',
 	'not-installed':
 		'Graph reported no personal installation even after installing. Confirm the recipient is a '
 			+ 'licensed Teams user in this tenant.',

@@ -18,9 +18,10 @@
     "dev": "flue dev --target node",
     "build": "flue build --target node",
     "remind": "flue run jira-teams-reminder --target node",
-    "verify:bot": "node scripts/verify-teams-bot.ts",
-    "package:teams": "node scripts/build-teams-package.mjs",
-    "resolve:ids": "node scripts/resolve-entra-ids.mjs",
+    "verify:bot": "node --env-file-if-exists=.env scripts/verify-teams-bot.ts",
+    "package:teams": "node --env-file-if-exists=.env scripts/build-teams-package.mjs",
+    "resolve:ids": "node --env-file-if-exists=.env scripts/resolve-entra-ids.mjs",
+    "trace": "node --env-file-if-exists=.env scripts/trace-run.ts",
     "typecheck": "tsc --noEmit",
 		"test": "node --test tests/lib/*.test.ts tests/workflows/*.test.ts"
   },

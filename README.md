@@ -82,10 +82,26 @@ Management. The application does not duplicate Jira's calendar math. It reads th
 metric named by `JIRA_FIRST_RESPONSE_SLA_NAME` and only selects an ongoing cycle
 when it is breached, not paused, and currently inside its JSM calendar.
 
-The workflow runs every 15 minutes. By default each breached ticket has a
-15-minute delivery window once every 60 minutes. This keeps the workflow stateless
-while avoiding a post on every scheduled run. GitHub Actions is best-effort, so a
-strict paging/on-call system must be implemented separately.
+The workflow runs **twice a working day**, at 10:00 and 15:00 Ulaanbaatar time,
+inside the two windows the team asked for. Mongolia is UTC+8 all year, so the
+cron entries need no seasonal adjustment.
+
+The schedule is the cadence: `REMINDER_DELIVERY_WINDOW_MINUTES` equals
+`REMINDER_REPEAT_MINUTES`, so every eligible breach is reminded on every run.
+A narrower window is only meaningful when the workflow runs far more often than
+a reminder should be sent, and it interacts badly with a sparse schedule — if
+the gap between runs is a whole multiple of the repeat interval, `elapsed %
+repeat` is identical at every run and the breaches that start outside the window
+never enter it. A test pins that relationship.
+
+**A request that has been answered is never reminded about.** The first-response
+cycle completes on the first reply, and only an `ongoing` cycle is eligible, so
+replying inside or outside the SLA both stop the reminders. Of 26 open DC
+requests on 2026-09-08, 9 had answered cycles and were excluded before any
+window or schedule logic ran.
+
+GitHub Actions is best-effort, so a strict paging/on-call system must be
+implemented separately.
 
 ## Setup
 
@@ -135,7 +151,7 @@ Prerequisites, in order:
    this repo:
 
    ```sh
-   TEAMS_BOT_APP_ID=<guid> npm run package:teams
+   npm run package:teams
    ```
 
    That produces `packages/sla-reminder-teams-app.zip` from
@@ -153,15 +169,28 @@ Prerequisites, in order:
    the app for each recipient on first delivery. The catalog publish is the one
    step that cannot be automated away, because Graph finds the app by its
    catalog entry.
-5. Graph application permissions with admin consent:
-   `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`, and
-   `User.Read.All` for `npm run resolve:ids`.
+5. Graph **application** permissions with admin consent — delegated ones are
+   useless here, because nobody is signed in when the schedule fires:
+
+   | Permission | What it is for |
+   | --- | --- |
+   | `AppCatalog.Read.All` | find the app in the organisation catalog |
+   | `TeamsAppInstallation.ReadWriteSelfForUser.All` | install this app for a recipient. Try this one first: it is limited to this app. Fall back to `TeamsAppInstallation.ReadWriteForUser.All` if Graph refuses |
+   | `User.Read.All` | only for `npm run resolve:ids`. Skip it if the object ids are read from the Azure portal instead |
 6. A GitHub OIDC federated credential on the app registration, so no client
    secret is stored. Subject `repo:<owner>/<repo>:ref:refs/heads/main`, audience
    `api://AzureADTokenExchange`.
-7. `config/escalation.json`, copied from the example. Fill in each person's
-   `email` and `jiraAccountId`, then let the object ids be looked up rather than
-   pasted:
+7. `config/escalation.json`, copied from the example. **It is gitignored**: it
+   names real people, and this repository is public. GitHub Actions reads it from
+   the `ESCALATION_DIRECTORY_JSON` secret instead, which the workflow writes to
+   that path before the run:
+
+   ```sh
+   gh secret set ESCALATION_DIRECTORY_JSON < config/escalation.json
+   ```
+
+   Re-run that whenever the directory changes. Fill in each person's `email` and
+   `jiraAccountId`, then let the object ids be looked up rather than pasted:
 
    ```sh
    npm run resolve:ids
@@ -177,14 +206,46 @@ Prerequisites, in order:
 Prove the transport before scheduling anything:
 
 ```sh
-TEAMS_BOT_APP_ID=... TEAMS_BOT_TENANT_ID=... TEAMS_BOT_APP_PASSWORD=... \
-  npm run verify:bot -- <entra-object-id>
+npm run verify:bot -- <entra-object-id>
+npm run trace
 ```
+
+`npm run trace` runs the real selection and routing against live Jira and
+narrates every stage with names — which requests are in scope, which are due and
+which are waiting for their window, which crossed a contractual level, how each
+Jira account resolved to a Teams recipient, and the exact message each person
+would receive. It sends nothing.
+
+It is the counterpart to the run journal, which is deliberately unable to name a
+request or a person because it goes to CI logs. That is why the trace is a local
+command and is not wired into the workflow: the two have opposite jobs.
+
+The setup scripts read `.env` themselves, so the bot settings only have to be
+written once. They print a missing setting as a message and exit, rather than
+raising it as a stack trace — a blank credential is a setup step, not a fault.
 
 Each failure names its own fix, because they need different people to act:
 `not-in-catalog` needs an administrator to publish the package,
 `install-forbidden` needs Graph consent, `writes-blocked` is a tenant policy,
 and `not-installed` means Graph installed the app but Teams still had no chat.
+
+## Who gets the first-response reminder
+
+The **request participants**, not the assignee. On this service desk the
+assignee is the support team that triages a request; the participants are the
+people expected to act on it. The field is
+`JIRA_PARTICIPANTS_FIELD`, `customfield_10065` by default.
+
+That field mixes vendor staff with the client's own portal users, and the client
+must never be told they owe a response. `src/lib/jira.ts` keeps only
+`accountType: 'atlassian'` when it builds `JiraTicket.participants`, so the
+filter happens once at the boundary rather than in every caller — a client
+contact cannot reach routing at all. Two tests hold that line, one at the
+adapter and one at the router.
+
+A request whose participants are all absent from the directory is counted as
+`unmappedRecipients` and warned about. It is not an error: one person missing
+must not stop everyone else's reminders.
 
 ## Escalation
 
@@ -199,7 +260,9 @@ level is never notified twice. A cache miss re-notifies a level rather than
 skipping one.
 
 **Stage the rollout.** Set `TEAMS_BOT_RECIPIENT_ALLOWLIST` and nobody else can
-be messaged, whatever the escalation directory says:
+be messaged, whatever the escalation directory says. Set it in **both** places
+— the repository variable and your `.env` — so a local `npm run remind` cannot
+reach people a scheduled run would not:
 
 ```sh
 TEAMS_BOT_RECIPIENT_ALLOWLIST=anar@zerotech.mn,tergel@zerotech.mn

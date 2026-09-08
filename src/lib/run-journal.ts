@@ -40,8 +40,8 @@ export interface DirectMessagesObserved {
 	messages: number;
 	delivered: number;
 	dryRun: boolean;
-	/** A breached request whose assignee is absent from the escalation directory. */
-	unmappedAssignees: number;
+	/** Breached requests with no participant the directory could resolve. */
+	unmappedRecipients: number;
 	missingOnCall: number;
 	/** Recipients withheld by the staged-rollout gate. */
 	suppressedByAllowlist: number;
@@ -124,10 +124,10 @@ export function createRunJournal(sink: JournalSink): RunJournal {
 					{ ...event },
 				);
 			}
-			if (event.unmappedAssignees > 0) {
+			if (event.unmappedRecipients > 0) {
 				sink.warn(
-					`${event.unmappedAssignees} breached request(s) have no assignee entry in the escalation directory`,
-					{ unmappedAssignees: event.unmappedAssignees },
+					`${event.unmappedRecipients} breached request(s) have no participant in the escalation directory`,
+					{ unmappedRecipients: event.unmappedRecipients },
 				);
 			}
 			if (event.suppressedByAllowlist > 0) {

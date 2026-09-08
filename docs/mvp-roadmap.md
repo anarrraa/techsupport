@@ -44,14 +44,31 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Local production dry-run | Pass | On 2026-08-26 dry-run scans real DC issues and reaches SLA endpoint |
 | JSM SLA read access | Pass | On 2026-08-26 `GET /rest/servicedeskapi/request/DC-844/sla` returns 200 OK (agent access granted) |
 | First response metric name | Pass | On 2026-08-20 `GET /rest/api/3/field` lists `Time to first response`; `JIRA_FIRST_RESPONSE_SLA_NAME` matches it case-insensitively |
-| Live Jira-to-Teams delivery | Not attempted | User authorized dry-run only; no Teams post was made |
+| Live Jira-to-Teams delivery | **Pass** (bot transport) | On 2026-09-08 a local live run delivered 3 escalation messages covering 7 real DC requests to the two pilot recipients, then re-ran and delivered nothing. The channel-webhook transport remains unattempted and is not configured |
+| Escalation message quotes the right clock | Fixed 2026-09-08 | The first preview printed `0м хэтэрсэн` on escalation rows: it quoted the first-response clock on a message raised by the resolution clock, and a request past its resolution mark can have no first-response cycle at all. Escalation rows now read the resolution cycle and say `шийдэгдээгүй`; DC-811 went from `0м` to `158ц` |
 | Overdue uses working hours | Pass | On 2026-08-26 `elapsedMinutes` from JSM used instead of clock time |
 | Empty scan detection | Pass | On 2026-08-26 `scanned: 0` in non-dry-run mode throws visible error |
 | V2 bot and escalation code | Implemented, unverified | Added 2026-09-07 with unit coverage for every `docs/sla-matrix.md` section 2 threshold; no live send |
-| Live bot direct message from this codebase | Not attempted | needs `TEAMS_BOT_APP_ID`/`TEAMS_BOT_TENANT_ID` and a credential; run `npm run verify:bot -- <object-id>` |
+| Live bot direct message from this codebase | **Pass** | On 2026-09-08 `npm run verify:bot -- <object-id>` printed `Bot Framework and Graph tokens acquired` then `Direct message delivered`. First message this codebase has ever sent. The full chain ran: client-credentials tokens for both scopes, catalog lookup by external id, install-for-user, personal chat lookup, activity post |
+| Graph application consent | Pass | Implied by the run above: the Graph token was issued and the catalog and installation calls succeeded, so `AppCatalog.Read.All` and the installation permission are consented |
+| First-response reminders route to participants | Pass | Changed 2026-09-08 on the user's instruction: the assignee is the triaging support team, the participants are who acts. A dry-run plans 6 recipients across the open DC requests with `unmappedRecipients: 0`. The three assignee-only support accounts are no longer in the directory and can no longer be messaged |
+| Client contacts excluded from routing | Pass | The participants field on open DC requests holds 14 `atlassian` accounts and 9 `customer` accounts — the latter are Digital Concept's own people, including the reporter of every request. `src/lib/jira.ts` drops `accountType != 'atlassian'` at the adapter, so the client cannot reach routing; asserted at both the adapter and the router |
+| Assignees resolvable to recipients | Superseded | The four agents on open DC requests — Uyanga, Unursaikhan, Delgertsetseg, Khulan — are in the directory as of 2026-09-08 with both their Jira account id and Entra object id, so a first-response breach now reaches the person who owes the reply. Before this, every such breach only raised `N breached request(s) have no assignee entry`, and the escalation chain fired above a first rung that had never been rung |
+| Jira does not expose agent email addresses | Noted | `emailAddress` is absent for `accountType: atlassian` users, so `resolve:ids` cannot map an agent by email. Their Entra object ids were resolved by Graph display-name search instead; the directory keys on `jiraAccountId`, which Jira does expose |
+| Recipient identifiers | Pass | Entra object ids for both pilot recipients recorded in `config/escalation.json` 2026-09-08. A first attempt used the app registration's own object id and Graph answered 404; that case now reports `unknown-recipient` with the distinction spelled out |
+| Staged rollout gate verified end to end | Pass | On 2026-09-08 `npm run trace -- --allowlist` reported 2 recipients and 8 withheld. The same command had previously reported 10 recipients and 0 withheld: the variable is set on the repository but was absent from `.env`, so a local run had wider reach than a scheduled one, and `--allowlist` applied nothing without saying so. The flag now exits with an error when no allowlist is configured, and `.env` mirrors the deployed value |
+| Jira reachable from GitHub Actions | Pass | Run `34185580185` (dispatch, `dry_run=true`, 2026-09-08) logged `Scanned 25; 5 due, 9 not breached, 0 outside calendar, 11 awaiting window` before stopping on the absent escalation directory — the Jira secrets and JQL variable resolve correctly in CI |
+| Escalation directory reaches CI | Pass | `ESCALATION_DIRECTORY_JSON` secret set 2026-09-08 from the completed directory; the workflow writes it to `config/escalation.json` before the run |
+| Escalation directory reaches CI (superseded) | Was | The 2026-09-08 dry-run failed with `Escalation config file not readable at config/escalation.json`. The repository is **public** and the directory names real people — emails, Jira account ids, Entra object ids — so committing it was the wrong fix. It is now gitignored and carried as the `ESCALATION_DIRECTORY_JSON` secret, which the workflow writes to that path before the run |
+| Bot application id known | Pass | Read from the Azure portal 2026-09-08: `b76bcdfb-5a16-44c4-81e0-860780daa2da`, single tenant, one secret, activated |
+| Package accepted by Teams | Fixed 2026-09-08 | The first upload was rejected: `Schema validation failed at 'packageName': Property "packageName" has not been defined and the schema does not allow additional properties`. Manifest 1.23 sets `additionalProperties: false`, and `packageName` — valid in 1.16, which this manifest was first written against — is not in it. Removed. Teams names the offending property exactly, so no local allowlist was added to duplicate that check |
+| Teams app package built with the real id | Pass | On 2026-09-08 `npm run package:teams` produced `packages/sla-reminder-teams-app.zip` carrying that id as both manifest `id` and `botId`, `scopes: [personal]`, `isNotificationOnly: true` |
 | Teams app published to the organisation catalog | Not attempted | administrator action; per-person custom upload only proved the path on 2026-08-20 |
 | GitHub OIDC federated credential on the Entra app | Not attempted | code path implemented and unit tested; the credential itself is not configured |
 | `config/escalation.json` populated | Not attempted | Jira account ids for the two pilot recipients resolved 2026-09-07; object ids still needed, via `npm run resolve:ids` |
+| Schedule set to the team's working rhythm | Changed 2026-09-08 | Twice a working day: `0 2 * * 1-5` and `0 7 * * 1-5`, which are 10:00 and 15:00 in Ulaanbaatar (UTC+8, no daylight saving since 2016). `REMINDER_DELIVERY_WINDOW_MINUTES` was raised to equal `REMINDER_REPEAT_MINUTES` in the same change: the gaps between these runs are 300 and 1140 minutes, both whole multiples of 60, so a 15-minute window would have reached only 25% of breaches and always the same 25% |
+| Answered requests stop being reminded | Pass | Verified against live Jira 2026-09-08: 9 of 26 open DC requests have a completed first-response cycle and are excluded by `selectReminderTickets` before any window logic. Replying inside or outside the SLA both end the reminders; only an `ongoing` cycle is eligible |
+| Schedule matches the delivery-window design | Superseded 2026-09-08 | The schedule was `0 0 * * *`. A daily run advances elapsed-since-breach by 1440 minutes and `1440 % 60 == 0`, so `isReminderWindow` returned the same verdict for a given ticket on every run: breaches whose age mod 60 fell outside the 15-minute window were **never** reminded, permanently, not occasionally. Reproduced against `src/lib/sla.ts`: offsets 20 and 47 answered `no` on seven consecutive days; at `*/15 * * * *` every offset is reminded once an hour |
 | Delivery path matches a working bot in this tenant | Pass | On 2026-09-08 the Graph install + chat + activity sequence was taken from `zero/goOrange`'s production edge function rather than designed here |
 | Resolution metric present on DC requests | Pass | On 2026-09-07 a local dry-run scanned 28 DC requests and read the escalation clock on enough of them to select 9 crossings (L2:4, L3:3, L5:2) |
 | Bot dry-run is aggregate-only | Pass | On 2026-09-07 the dry-run output named no request, assignee, or object id |
@@ -124,6 +141,31 @@ document or CI logs.
 - [x] Point `JIRA_JQL` at a service desk project that exists.
   - Set 2026-08-26: `project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC`. Dry-run scans real DC issues.
 - [ ] Confirm Jira priority mapping against the production priority scheme.
+- [ ] **Make the SLA clock pause while waiting on the client.** Diagnosed
+      2026-09-08. No SLA on any open DC request has ever paused, and the reason
+      is a workflow gap rather than an SLA setting:
+
+      - The project *does* define `Waiting for customer`, `Waiting for support`,
+        `Waiting for approval` and `Pending`.
+      - But all 26 open requests are issue type **`Ask a question`**, whose
+        workflow offers only `Open`, `In Progress`, `Resolved`, `Reopened`,
+        `Closed`. There is no waiting state to move them into, so there is
+        nothing for a pause condition to match.
+      - `Ask a question` is also the wrong type for the work: DC-885 carries
+        request type **Доголдол** (defect) on an `Ask a question` issue, so the
+        portal's request-type-to-issue-type mapping needs review too, and the
+        contract distinguishes defect SLAs from other request routes.
+
+      Fix in this order: add `Waiting for customer` to the `Ask a question`
+      workflow (or map Доголдол onto a type that already has it), add that
+      status to the metric's **Pause on** condition, then automate the
+      transition so it does not depend on habit. Changing a metric's conditions
+      makes JSM recalculate affected cycles, so expect the elapsed figures to
+      move; confirm with `npm run trace`.
+
+      No code change: `src/lib/sla.ts:36` and `src/lib/escalation.ts:110`
+      already exclude a paused cycle, and both are covered by tests. The
+      application must not second-guess Jira's clock (`AGENTS.md`).
 - [ ] Confirm JSM First Response goals match `docs/sla-matrix.md`.
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
 - [x] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.
@@ -138,7 +180,14 @@ document or CI logs.
     including `elapsedTime` (working-hours elapsed time from JSM).
 - [ ] Confirm the Teams webhook accepts the payload and renders escaped text.
   - The webhook is now optional; a bot-only deployment skips this check.
-- [ ] Confirm required GitHub secrets and variables are configured.
+- [x] Confirm required GitHub secrets and variables are configured.
+  - Configured 2026-09-08. The repository had **none** of either, so the nightly
+    schedule could never have worked regardless of the webhook break.
+    Secrets: `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`. Variables:
+    `JIRA_JQL`, `JIRA_FIRST_RESPONSE_SLA_NAME`, `JIRA_RESOLUTION_SLA_NAME`,
+    `TEAMS_BOT_APP_ID`, `TEAMS_BOT_TENANT_ID`, `TEAMS_BOT_RECIPIENT_ALLOWLIST`.
+    Still missing: `TEAMS_BOT_APP_PASSWORD` as a secret, or the OIDC federated
+    credential in its place.
 - [ ] Confirm `JIRA_RESOLUTION_SLA_NAME` exactly matches the production metric.
   - `GET /rest/api/3/field` listed `Time to resolution` on 2026-08-20, which is
     the configured default; confirm it is the metric JSM actually attaches to DC
@@ -205,12 +254,11 @@ and Teams is a standard channel with unmetered messages.
 
 - [x] Azure subscription available to the integration owner.
 - [x] Entra app registration, single tenant, secret held outside the repository.
-      **Its application id is not recorded anywhere.** Nothing in this repository
-      or the wiki carries it, so it has to be read back from the Azure portal
-      before the package can be built. Record it here once found; it is not a
-      secret. Do not create a second registration, and do not reuse goOrange's
-      (`bd1bc6b9-…`) — a shared id would make these reminders arrive as GoOrange
-      and collide with its catalog entry.
+      Recorded 2026-09-08: **SLA Reminder Bot**, application (client) id
+      `b76bcdfb-5a16-44c4-81e0-860780daa2da`, tenant `376a710f-b223-451f-ba55-efc974d8716c`,
+      supported account types "My organization only", one client secret, state
+      Activated. Neither the registration's own object id nor goOrange's app id
+      belongs in any of this project's configuration.
 - [x] Azure Bot resource on the free tier with the Teams channel enabled.
 - [x] Notification-only Teams app package scoped to personal chats.
 - [x] Application installed in one personal scope by custom app upload.
@@ -310,7 +358,7 @@ endpoint for this tenant, and the tenant id is
 ### V2 milestone 2: verify the bot in production
 
 - [ ] Publish the Teams app package to the organisation catalog. Build it with
-      `TEAMS_BOT_APP_ID=<guid> npm run package:teams`.
+      `npm run package:teams`.
 - [ ] Grant and consent the Graph application permissions:
       `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`,
       `User.Read.All`.
@@ -325,9 +373,17 @@ endpoint for this tenant, and the tenant id is
       including two to the L5 contact.
 - [ ] Run `workflow_dispatch` with `dry_run=true` and confirm the direct-message
       counts look right and no identity appears in the log.
-- [ ] Run one controlled live delivery with `TEAMS_BOT_RECIPIENT_ALLOWLIST` set
-      to `anar@zerotech.mn` and `tergel@zerotech.mn` (as object ids), so the
-      first live run cannot reach anyone else.
+- [x] Run one controlled live delivery with the allowlist set to the two pilot
+      recipients. Done 2026-09-08 from a local run: `Delivered 3 direct
+      message(s) to 3 recipient(s)` covering 7 requests at L2, L3 and L5, with
+      `withheld by allowlist: 0` — the directory holds only those two, so no
+      other recipient was even planned.
+- [x] Confirm no level is notified twice. The immediately following run reported
+      `0 request(s) crossed an escalation level` and delivered nothing, against
+      the state file the first run wrote.
+- [ ] Seed the **Actions cache** state before the first scheduled run. The state
+      written above is local; the cache is separate and starts empty, so a
+      scheduled run would re-deliver all 7 without `seed_only=true` first.
 - [ ] Confirm the escalation state cache survives between scheduled runs and that
       no level is notified twice.
 - [ ] Confirm the Low L5 threshold question with the client.

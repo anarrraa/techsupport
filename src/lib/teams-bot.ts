@@ -26,6 +26,8 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const FEDERATION_AUDIENCE = 'api://AzureADTokenExchange';
 
 export type DeliveryFailureReason =
+	/** The recipient id is not a user in this tenant. */
+	| 'unknown-recipient'
 	/** The app is not published to the organisation's Teams catalog. */
 	| 'not-in-catalog'
 	/** Graph refused to install the app for this person. */
@@ -180,23 +182,38 @@ async function resolveCatalogAppId(
 	sleep?: Sleep,
 ): Promise<string> {
 	const filter = `externalId eq '${config.appExternalId.replaceAll("'", "''")}'`;
-	const body = await graphJson<{ value?: Array<{ id?: string }> }>(
-		`/appCatalogs/teamsApps?$filter=${encodeURIComponent(filter)}&$select=id`,
+	const body = await graphJson<{ value?: Array<{ id?: string; distributionMethod?: string }> }>(
+		`/appCatalogs/teamsApps?$filter=${encodeURIComponent(filter)}&$select=id,distributionMethod`,
 		{},
 		config,
 		graphToken,
 		fetchImpl,
 		sleep,
 	);
-	const id = body.value?.[0]?.id;
-	if (!id) {
+
+	// One person sideloading the package during a pilot creates a second catalog
+	// entry with the same external id. Preferring the published one keeps the
+	// choice from depending on the order Graph happens to return them, and keeps
+	// delivery on the entry every recipient can be installed from.
+	// A method Graph does not report, or one added later, ranks last rather than
+	// first: indexOf answers -1 for both, which would have preferred an unknown
+	// entry over the published one.
+	const preference = ['organization', 'store', 'sideloaded'];
+	const rank = (method: string | undefined): number => {
+		const index = preference.indexOf(method ?? '');
+		return index === -1 ? preference.length : index;
+	};
+	const chosen = [...(body.value ?? [])].sort(
+		(a, b) => rank(a.distributionMethod) - rank(b.distributionMethod),
+	)[0];
+	if (!chosen?.id) {
 		throw new TeamsDeliveryError(
 			'not-in-catalog',
 			`No Teams app in the organisation catalog has external id ${config.appExternalId}; `
 				+ 'an administrator has to publish the app package first',
 		);
 	}
-	return id;
+	return chosen.id;
 }
 
 async function resolvePersonalChatId(
@@ -334,11 +351,26 @@ async function graphJson<T>(
 		const body = await response.text();
 		return (body ? JSON.parse(body) : {}) as T;
 	} catch (error) {
+		// Graph answers 404 on /users/{id} for anything that is not a user in this
+		// tenant, and the commonest cause is an object id copied from the wrong
+		// page: an app registration's own object id looks exactly like a user's.
+		if (error instanceof ExternalRequestError && error.status === 404) {
+			throw new TeamsDeliveryError(
+				'unknown-recipient',
+				'Microsoft Entra has no user with that object id. Check it came from '
+					+ 'Entra ID > Users > the person, not from the app registration\'s overview — '
+					+ 'the app has an object id of its own and it is not interchangeable',
+				{ cause: error },
+			);
+		}
 		if (error instanceof ExternalRequestError && error.status === 403) {
 			throw new TeamsDeliveryError(
 				'install-forbidden',
-				'Graph refused the app installation: the app registration needs '
-					+ 'TeamsAppInstallation.ReadWriteForUser.All and AppCatalog.Read.All with admin consent',
+				'Graph refused the app installation. The app registration needs '
+					+ 'AppCatalog.Read.All plus permission to install itself for a user, with admin '
+					+ 'consent: try TeamsAppInstallation.ReadWriteSelfForUser.All first, which is '
+					+ 'limited to this app, and fall back to TeamsAppInstallation.ReadWriteForUser.All '
+					+ 'if Graph still refuses',
 				{ cause: error },
 			);
 		}

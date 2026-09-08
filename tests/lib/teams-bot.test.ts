@@ -18,7 +18,7 @@ interface Recorded {
 
 interface Overrides {
 	installed?: boolean;
-	catalog?: Array<{ id: string }>;
+	catalog?: Array<{ id: string; distributionMethod?: string }>;
 	graphStatus?: number;
 	activity?: { status: number; body: string };
 }
@@ -33,7 +33,7 @@ test('installs the app for the recipient, then posts one activity into their cha
 		[
 			`POST https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`,
 			`POST https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`,
-			`GET /appCatalogs/teamsApps?$filter=externalId%20eq%20'${APP_ID}'&$select=id`,
+			`GET /appCatalogs/teamsApps?$filter=externalId%20eq%20'${APP_ID}'&$select=id,distributionMethod`,
 			`GET /users/${RECIPIENT}/teamwork/installedApps?$expand=teamsApp&$filter=teamsApp%2Fid%20eq%20'${CATALOG_ID}'`,
 			`POST /users/${RECIPIENT}/teamwork/installedApps`,
 			`GET /users/${RECIPIENT}/teamwork/installedApps/install-1/chat`,
@@ -116,12 +116,60 @@ test('refuses to run without either credential', async () => {
 	);
 });
 
+test('prefers the published catalog entry over a sideloaded duplicate', async () => {
+	const calls: Recorded[] = [];
+	const sender = await createBotSender(
+		config(),
+		{},
+		fakeFetch(calls, {
+			installed: true,
+			// Graph returns the sideloaded copy first; the published one must win.
+			catalog: [
+				{ id: 'sideloaded-copy', distributionMethod: 'sideloaded' },
+				{ id: CATALOG_ID, distributionMethod: 'organization' },
+			],
+		}),
+	);
+	await sender.send({ entraObjectId: RECIPIENT, text: 'x' });
+	assert.ok(
+		calls.some((call) => call.url.includes(`teamsApp%2Fid%20eq%20'${CATALOG_ID}'`)),
+		'the installed-apps lookup must use the published catalog id',
+	);
+});
+
+test('a sideloaded-only catalog entry is still usable, and outranks an unknown method', async () => {
+	// Sideloading during a pilot is the only entry that exists until an
+	// administrator publishes, so it has to work on its own.
+	const calls: Recorded[] = [];
+	const sender = await createBotSender(
+		config(),
+		{},
+		fakeFetch(calls, {
+			installed: true,
+			catalog: [{ id: 'unknown-method' }, { id: CATALOG_ID, distributionMethod: 'sideloaded' }],
+		}),
+	);
+	await sender.send({ entraObjectId: RECIPIENT, text: 'x' });
+	assert.ok(
+		calls.some((call) => call.url.includes(`teamsApp%2Fid%20eq%20'${CATALOG_ID}'`)),
+		'a known distribution method must outrank one Graph did not report',
+	);
+});
+
 test('says so when the app is not in the organisation catalog', async () => {
 	const sender = await createBotSender(config(), {}, fakeFetch([], { catalog: [] }));
 	const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
 	assert.ok(error instanceof TeamsDeliveryError);
 	assert.equal(error.reason, 'not-in-catalog');
 	assert.match(error.message, /administrator has to publish the app package/);
+});
+
+test('names the wrong-object-id mistake when Graph has no such user', async () => {
+	const sender = await createBotSender(config(), {}, fakeFetch([], { graphStatus: 404 }));
+	const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
+	assert.ok(error instanceof TeamsDeliveryError);
+	assert.equal(error.reason, 'unknown-recipient');
+	assert.match(error.message, /not from the app registration/);
 });
 
 test('names the missing Graph consent when installation is refused', async () => {
@@ -168,7 +216,7 @@ function config(): TeamsBotConfig {
 }
 
 function fakeFetch(calls: Recorded[], overrides: Overrides = {}): typeof fetch {
-	const catalog = overrides.catalog ?? [{ id: CATALOG_ID }];
+	const catalog = overrides.catalog ?? [{ id: CATALOG_ID, distributionMethod: 'organization' }];
 	return (async (input: string | URL | Request, init?: RequestInit) => {
 		const url = String(input);
 		calls.push({
@@ -181,7 +229,6 @@ function fakeFetch(calls: Recorded[], overrides: Overrides = {}): typeof fetch {
 		if (url.startsWith('https://actions.invalid/')) return json({ value: 'github-oidc-token' });
 		if (url.includes('/oauth2/v2.0/token')) return json({ access_token: 'synthetic-token' });
 
-		if (url.includes('/appCatalogs/teamsApps?')) return json({ value: catalog });
 		if (url.includes('graph.microsoft.com')) {
 			if (overrides.graphStatus) {
 				return new Response('{"error":{"code":"Authorization_RequestDenied"}}', {
@@ -189,6 +236,7 @@ function fakeFetch(calls: Recorded[], overrides: Overrides = {}): typeof fetch {
 					statusText: 'Forbidden',
 				});
 			}
+			if (url.includes('/appCatalogs/teamsApps?')) return json({ value: catalog });
 			if (url.endsWith('/chat')) return json({ id: CHAT_ID });
 			if (url.includes('installedApps?')) {
 				return json({ value: overrides.installed ? [{ id: 'install-1' }] : [] });

@@ -2,7 +2,19 @@ name: Jira to Teams reminder
 
 on:
   schedule:
-    - cron: '0 0 * * *'   
+    # Twice a working day, in Ulaanbaatar time: 10:00 and 15:00, which sit
+    # inside the two windows the team asked for (09:00-12:00 and 14:00-18:00).
+    # Cron is UTC and Mongolia is UTC+8 all year — it dropped daylight saving
+    # after 2016 — so no seasonal drift to correct for.
+    #
+    # The schedule is now the cadence, which is why
+    # REMINDER_DELIVERY_WINDOW_MINUTES must equal REMINDER_REPEAT_MINUTES. Any
+    # narrower window would silently drop breaches: the gaps between these runs
+    # are 300 and 1140 minutes, both whole multiples of 60, so `elapsed % 60`
+    # never changes for a given request and whoever starts outside the window
+    # stays outside it forever.
+    - cron: '0 2 * * 1-5'
+    - cron: '0 7 * * 1-5'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -40,6 +52,21 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
+      # The escalation directory names real people — emails, Jira account ids and
+      # Entra object ids — and this repository is public, so the file is
+      # gitignored and carried as a secret instead. Locally it is just a file.
+      - name: Write the escalation directory
+        env:
+          ESCALATION_DIRECTORY_JSON: ${{ secrets.ESCALATION_DIRECTORY_JSON }}
+        run: |
+          if [ -n "$ESCALATION_DIRECTORY_JSON" ]; then
+            mkdir -p config
+            printf '%s' "$ESCALATION_DIRECTORY_JSON" > config/escalation.json
+            echo "Escalation directory written from the repository secret."
+          else
+            echo "No ESCALATION_DIRECTORY_JSON secret set; the run will fail if the bot is configured."
+          fi
+
       # Carries "highest escalation level notified per ticket" between runs. The
       # key is unique per run and the prefix restores the newest entry, because a
       # cache entry cannot be overwritten in place. A miss re-notifies a level
@@ -68,6 +95,7 @@ jobs:
           JIRA_JQL: ${{ vars.JIRA_JQL }}
           JIRA_FIRST_RESPONSE_SLA_NAME: ${{ vars.JIRA_FIRST_RESPONSE_SLA_NAME }}
           JIRA_RESOLUTION_SLA_NAME: ${{ vars.JIRA_RESOLUTION_SLA_NAME }}
+          JIRA_PARTICIPANTS_FIELD: ${{ vars.JIRA_PARTICIPANTS_FIELD }}
           JIRA_PAGE_SIZE: ${{ vars.JIRA_PAGE_SIZE }}
           JIRA_MAX_RESULTS: ${{ vars.JIRA_MAX_RESULTS }}
           JIRA_MAX_SEARCH_PAGES: ${{ vars.JIRA_MAX_SEARCH_PAGES }}
@@ -79,9 +107,12 @@ jobs:
           REMINDER_USE_LLM_INTRO: ${{ vars.REMINDER_USE_LLM_INTRO }}
           REMINDER_DRY_RUN: ${{ inputs.dry_run || 'false' }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
-          # No client secret: the bot token comes from the OIDC federated
-          # credential on the Entra app registration (id-token: write above).
           TEAMS_BOT_APP_ID: ${{ vars.TEAMS_BOT_APP_ID }}
+          # Prefer the OIDC federated credential on the app registration
+          # (id-token: write above), which stores no secret. This secret is the
+          # fallback for a tenant where the credential is not configured yet;
+          # unset, it is empty and the OIDC path is taken.
+          TEAMS_BOT_APP_PASSWORD: ${{ secrets.TEAMS_BOT_APP_PASSWORD }}
           TEAMS_BOT_TENANT_ID: ${{ vars.TEAMS_BOT_TENANT_ID }}
           TEAMS_BOT_SERVICE_URL: ${{ vars.TEAMS_BOT_SERVICE_URL }}
           TEAMS_APP_EXTERNAL_ID: ${{ vars.TEAMS_APP_EXTERNAL_ID }}

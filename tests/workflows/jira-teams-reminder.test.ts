@@ -399,6 +399,7 @@ function config(
 			slaConcurrency: 1,
 			firstResponseSlaName: 'First response',
 			resolutionSlaName: 'Time to resolution',
+			participantsField: 'customfield_10065',
 			http,
 		},
 		teamsWebhookUrl: overrides.webhook === false ? null : 'https://teams.invalid/webhook',
@@ -449,6 +450,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 			breachTimeEpochMillis: NOW.getTime() - 60 * 60_000,
 			elapsedMinutes: 60,
 		},
+		participants: [{ accountId: 'synthetic-account', displayName: 'Synthetic Developer' }],
 		resolutionSla: resolutionCycle(),
 		...overrides,
 	};

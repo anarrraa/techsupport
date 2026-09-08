@@ -8,6 +8,24 @@ reading order and non-negotiable invariants before touching any of this.
 
 ## Now — blocking, in order
 
+- [ ] Check how Teams renders an escaped `>` in a bot message. `DC-863`'s summary
+      contains `EZ Store > Орлого`, and the sanitiser turns that into `&gt;`,
+      which is correct for the channel webhook but may show literally in a
+      direct message. Look at that line in the next real delivery before
+      deciding whether the bot needs its own escape target.
+
+- [x] Configure the GitHub secrets and variables. Done 2026-09-08; the
+      repository previously had none of either. Dispatch run `34185580185`
+      proves Jira resolves in CI.
+
+- [x] Set the schedule to the team's rhythm: twice a working day, 10:00 and
+      15:00 Ulaanbaatar. Done 2026-09-08, with the delivery window opened to
+      match so a sparse schedule cannot lock breaches out.
+- [x] Fix the reminder schedule. Was `0 0 * * *`; a daily run made the delivery
+      window permanently unreachable for three quarters of breaches, because
+      1440 minutes is a whole multiple of the 60-minute repeat interval. Set to
+      `*/15 * * * *` on 2026-09-08, which is what `README.md` always described.
+
 - [x] Point `JIRA_JQL` at a service desk project that exists.
   - Done 2026-08-26: set to `project = DC AND statusCategory != Done AND assignee is not EMPTY`.
 - [x] Give the Jira integration account **agent** access on the service desk
@@ -17,25 +35,31 @@ reading order and non-negotiable invariants before touching any of this.
 - [x] Make an empty scan loud. `scanned: 0` now exits with error in non-dry-run mode.
 - [x] Report overdue time in working hours. `overdueMinutes` now reads `elapsedTime`
       from JSM metric instead of clock time.
-- [ ] Point the manifest's `developer.privacyUrl` and `termsOfUseUrl` at pages
-      that actually resolve, and swap the placeholder icons in
-      `packages/teams-app/` for the real brand marks. Catalog publish validates
-      both.
-- [ ] Record the bot's Entra application id in the evidence table in
-      `docs/mvp-roadmap.md`. The registration was created on 2026-08-20 but its
-      id was never written down anywhere in this repository or the wiki, so
-      every step that needs it starts with a hunt through the Azure portal. It
-      is not a secret — the tenant id is already recorded beside it.
+- [ ] Decide what `developer.privacyUrl` and `termsOfUseUrl` should point at.
+      `https://zerotech.mn/privacy` and `/terms` both return 404, so on
+      2026-09-08 both were pointed at `https://zerotech.mn`, which returns 200.
+      A live link to the company site beats a dead link on the app's About page,
+      but it is not a privacy policy — replace it if legal wants real pages.
+- [ ] Swap the placeholder icons in `packages/teams-app/` for the real brand
+      marks. `color.png` 192x192, `outline.png` 32x32 on a transparent
+      background.
+- [x] Record the bot's Entra application id. Done 2026-09-08: **SLA Reminder
+      Bot**, `b76bcdfb-5a16-44c4-81e0-860780daa2da`. Now in the evidence
+      table in `docs/mvp-roadmap.md` and in `.env.example`, so no future step
+      starts with a hunt through the Azure portal.
 - [ ] Get an administrator to publish the Teams app package to the
       organisation catalog. Build it with
-      `TEAMS_BOT_APP_ID=<guid> npm run package:teams`. **No Teams app setup
+      `npm run package:teams`. **No Teams app setup
       policy is needed** — superseded 2026-09-08 by the goOrange delivery path,
       which installs the app per recipient through Graph. See the revision note
       in `docs/mvp-roadmap.md`.
-- [ ] Grant and consent the Graph application permissions on the app
-      registration: `TeamsAppInstallation.ReadWriteForUser.All`,
-      `AppCatalog.Read.All`, and `User.Read.All` (for `npm run resolve:ids`).
-      goOrange already holds these in this tenant, so the pattern is approved.
+- [ ] Grant and consent the Graph **application** permissions on the app
+      registration: `AppCatalog.Read.All`, and
+      `TeamsAppInstallation.ReadWriteSelfForUser.All` (narrower — limited to this
+      app; fall back to `TeamsAppInstallation.ReadWriteForUser.All` if Graph
+      refuses). `User.Read.All` only if `npm run resolve:ids` is used rather than
+      reading the two object ids from the portal. goOrange already holds this
+      shape of permission in the tenant, so the pattern is approved.
 - [ ] Configure a GitHub OIDC federated credential on the Entra app
       registration (decided 2026-08-24, matching the existing Vertex
       authentication pattern) instead of a client secret. Audience
@@ -43,12 +67,13 @@ reading order and non-negotiable invariants before touching any of this.
       `repo:<owner>/<repo>:ref:refs/heads/main`. The code path exists and is
       unit tested; only the credential is missing.
 - [ ] Fill in `config/escalation.json`: it already carries both pilot
-      recipients' emails and real Jira account ids, so
-      `npm run resolve:ids` fills the rest. Commit it — GitHub Actions reads it
-      from the repository.
-- [ ] Prove the transport from this codebase:
-      `npm run verify:bot -- <entra-object-id>`. Record the outcome in the
-      evidence snapshot in `docs/mvp-roadmap.md`.
+      recipients' emails and real Jira account ids, so `npm run resolve:ids`
+      fills the rest — or read the two object ids straight from the Azure portal.
+      Then `gh secret set ESCALATION_DIRECTORY_JSON < config/escalation.json`.
+      **Do not commit it.** This repository is public and the file names real
+      people; it is gitignored for that reason.
+- [x] Prove the transport from this codebase. Done 2026-09-08:
+      `Direct message delivered`. Recorded in the evidence snapshot.
 - [ ] Stage the first live run to two people only: set the
       `TEAMS_BOT_RECIPIENT_ALLOWLIST` repository variable to
       `anar@zerotech.mn,tergel@zerotech.mn`. Widen it once the messages read the
