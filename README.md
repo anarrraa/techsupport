@@ -22,11 +22,15 @@ model or the deterministic opener was used rather than failing the run.
 ```text
 GitHub Actions (every 15 min)
   -> Jira enhanced JQL search (paginated)
-  -> JSM SLA API (paginated, bounded concurrency)
+  -> JSM SLA API (paginated, bounded concurrency) — first response + resolution
   -> current breach + calendar + reminder-window selection
   -> deterministic, escaped, chunked Teams messages
-  -> Teams Incoming Webhook
+  -> Teams Incoming Webhook            (channel reminder, optional)
+  -> Teams personal bot direct messages (assignee reminder + L2-L5 escalation, optional)
 ```
+
+At least one transport must be configured. The channel webhook and the personal
+bot are independent: either alone is a working deployment.
 
 Key modules:
 
@@ -37,6 +41,11 @@ src/lib/jira.ts                      Jira search + JSM SLA adapter
 src/lib/sla.ts                       pure reminder selection policy
 src/lib/reminder-message.ts          deterministic Teams message builder
 src/lib/teams-webhook.ts             Teams webhook adapter
+src/lib/teams-bot.ts                 Bot Connector direct-message adapter
+src/lib/escalation.ts                pure L2-L5 threshold and routing policy
+src/lib/escalation-config.ts         person directory and contact resolver
+src/lib/escalation-state.ts          highest level notified per ticket
+src/lib/direct-messages.ts           pure per-recipient message planning
 src/lib/reminder-intro.ts            optional aggregate-only intro writer
 src/workflows/jira-teams-reminder.ts workflow orchestration
 ```
@@ -84,16 +93,131 @@ strict paging/on-call system must be implemented separately.
    `docs/sla-matrix.md`.
 2. Create a Jira API token for an account that can read the selected requests and
    their SLA information.
-3. Create a Teams channel Incoming Webhook. If classic connectors are disabled,
-   create the equivalent Teams Workflows webhook and adapt the payload contract.
+3. Optional: create a Teams channel Incoming Webhook for the aggregated channel
+   reminder. If classic connectors are disabled, create the equivalent Teams
+   Workflows webhook and adapt the payload contract.
 4. For the optional Gemini intro, enable Vertex AI and authenticate locally with
    Application Default Credentials.
 5. Copy `.env.example` to `.env` and fill in the local values. Never commit `.env`
    or a service-account JSON key.
+6. For direct messages and contract escalation, set up the personal Teams bot and
+   copy `config/escalation.example.json` to `config/escalation.json`. See
+   "Personal Teams bot" below.
 
 Non-dry runs require an explicit, project-specific `JIRA_JQL`. The fallback query
 is dry-run-only and scans every assigned, non-Done issue visible to the integration
 account.
+
+## Personal Teams bot
+
+Microsoft Graph cannot post the message: `POST /chats/{id}/messages` has no
+usable application permission. But it can do the two things that make a message
+deliverable, and this is the split the tenant's own production bot
+(`zero/goOrange`) already uses:
+
+```text
+Graph  -> install the app for the recipient, read back their personal chat id
+Bot    -> POST {serviceUrl}/v3/conversations/{chatId}/activities
+```
+
+The obvious alternative, `POST /v3/conversations`, returns
+`403 ForbiddenOperationException` for anyone who has not installed the app
+themselves. Installing first removes that failure rather than reporting it,
+which is worth two Graph calls per recipient. No hosting and no inbound endpoint
+are involved either way.
+
+Prerequisites, in order:
+
+1. An Azure subscription, and a single-tenant Entra app registration.
+2. An Azure Bot resource (free tier) with the Teams channel enabled and the
+   messaging endpoint left empty.
+3. A notification-only Teams app package scoped to personal chats. Build it from
+   this repo:
+
+   ```sh
+   TEAMS_BOT_APP_ID=<guid> npm run package:teams
+   ```
+
+   That produces `packages/sla-reminder-teams-app.zip` from
+   `packages/teams-app/`. Teams requires `manifest.json` and both icons at the
+   **root** of the archive, which is why this is a script and not a manual zip.
+   `isNotificationOnly: true` in the manifest is what removes the reply box, so
+   the app cannot become a two-way chat by accident.
+
+   The icons are placeholders. Replace them with the real brand marks, keeping
+   `color.png` at 192x192 and `outline.png` at 32x32 with a transparent
+   background. The `developer` URLs in the manifest must resolve before the
+   organisation catalog will accept the package.
+4. An administrator publishes the package to the **organisation catalog**. No
+   Teams app setup policy and no per-person upload are needed: Graph installs
+   the app for each recipient on first delivery. The catalog publish is the one
+   step that cannot be automated away, because Graph finds the app by its
+   catalog entry.
+5. Graph application permissions with admin consent:
+   `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`, and
+   `User.Read.All` for `npm run resolve:ids`.
+6. A GitHub OIDC federated credential on the app registration, so no client
+   secret is stored. Subject `repo:<owner>/<repo>:ref:refs/heads/main`, audience
+   `api://AzureADTokenExchange`.
+7. `config/escalation.json`, copied from the example. Fill in each person's
+   `email` and `jiraAccountId`, then let the object ids be looked up rather than
+   pasted:
+
+   ```sh
+   npm run resolve:ids
+   ```
+
+   That reuses the same app-only Graph credential the bot uses, so there is no
+   Azure CLI to install and no interactive sign-in. Teams rejects an email or
+   user principal name when addressing someone, so the object id is what the bot
+   needs; the email is recorded only so the id can be resolved. A hand-pasted
+   GUID off by a character is a recipient who is silently unreachable, which is
+   why this is a script that validates the file afterwards.
+
+Prove the transport before scheduling anything:
+
+```sh
+TEAMS_BOT_APP_ID=... TEAMS_BOT_TENANT_ID=... TEAMS_BOT_APP_PASSWORD=... \
+  npm run verify:bot -- <entra-object-id>
+```
+
+Each failure names its own fix, because they need different people to act:
+`not-in-catalog` needs an administrator to publish the package,
+`install-forbidden` needs Graph consent, `writes-blocked` is a tenant policy,
+and `not-installed` means Graph installed the app but Teams still had no chat.
+
+## Escalation
+
+`docs/sla-matrix.md` sections 2 and 3 are implemented in `src/lib/escalation.ts`:
+elapsed working time on the JSM **resolution** metric selects the contractual
+level, and `config/escalation.json` names the person for it. Inside calendar
+hours escalation is sequential; off-hours Critical/High notifies L1 and L2
+together and names the on-call engineer for a human to call.
+
+"Highest level notified per ticket" persists in a GitHub Actions cache, so a
+level is never notified twice. A cache miss re-notifies a level rather than
+skipping one.
+
+**Stage the rollout.** Set `TEAMS_BOT_RECIPIENT_ALLOWLIST` and nobody else can
+be messaged, whatever the escalation directory says:
+
+```sh
+TEAMS_BOT_RECIPIENT_ALLOWLIST=anar@zerotech.mn,tergel@zerotech.mn
+```
+
+Entries match the directory by email, directory handle, or object id. The
+directory cannot serve as the pilot's blast radius, because it has to hold
+everyone for the policy to resolve a level at all. A withheld level is **not**
+recorded as notified, so it is delivered once the gate opens rather than lost.
+An entry that matches nobody is an error naming the entry, not a gate that
+quietly delivers nothing.
+
+**Seed the state before the first live run.** Requests that have been open for a
+while have already crossed several levels, and an empty state file treats every
+one of them as new. A dry-run against the DC project on 2026-09-07 found 9 such
+requests, two of them already past the L5 executive mark. Run once with
+`ESCALATION_SEED_ONLY=true` (and `REMINDER_DRY_RUN` unset) to record the current
+levels and notify nobody; from then on only new crossings are delivered.
 
 ## Commands
 
@@ -103,6 +227,7 @@ npm test
 npm run typecheck
 npm run build
 npm run remind
+npm run verify:bot -- <entra-object-id>
 ```
 
 Set `REMINDER_DRY_RUN=true` to execute Jira/SLA selection without posting to
@@ -122,16 +247,28 @@ Google Workload Identity Federation. Configure these repository secrets:
 - `JIRA_BASE_URL`
 - `JIRA_EMAIL`
 - `JIRA_API_TOKEN`
-- `TEAMS_WEBHOOK_URL`
+- `TEAMS_WEBHOOK_URL` (only for the channel reminder)
 
-Configure `JIRA_JQL` as a required repository variable for non-dry runs. Other
-optional repository variables are documented in `.env.example`; verify
-`JIRA_FIRST_RESPONSE_SLA_NAME` against production Jira.
+Configure `JIRA_JQL` as a required repository variable for non-dry runs. For the
+personal bot, configure `TEAMS_BOT_APP_ID`, `TEAMS_BOT_TENANT_ID`, and if the
+default endpoint is wrong for the tenant's region `TEAMS_BOT_SERVICE_URL`, as
+repository **variables** — none of them is a secret, and the token comes from the
+OIDC federated credential. Other optional repository variables are documented in
+`.env.example`; verify `JIRA_FIRST_RESPONSE_SLA_NAME` and
+`JIRA_RESOLUTION_SLA_NAME` against production Jira.
 
 ## Operational limits
 
-- Off-hours Critical/High phone escalation from the contract is not implemented;
-  use the organization's paging/on-call platform for that requirement.
+- The bot never places a phone call. Off-hours Critical/High escalation names the
+  on-call engineer in the message; a human places the call.
+- A chat reply is never evidence that an SLA was satisfied. Jira ticket state is
+  the only source of resolution.
+- The contract sets no clock mark for Low L5 ("only if SLA breached"), so Low
+  never escalates past L4 automatically. Confirm the intent with the client
+  before adding a threshold.
+- The first-response reminder follows JSM's calendar, which pauses the clock
+  outside working hours, so a first-response direct message is only sent inside
+  calendar hours. Off-hours contact is the escalation path's job.
 - Public-holiday behavior is owned by the configured JSM SLA calendar.
 - Jira and Teams calls have timeouts and bounded retries for rate limits and
   transient server errors.

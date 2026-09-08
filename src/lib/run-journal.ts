@@ -13,6 +13,8 @@ import type { IntroReason, IntroResult } from './reminder-intro.ts';
 export interface SelectionObserved {
 	scanned: number;
 	withoutSla: number;
+	/** No resolution metric, so no escalation clock to read. */
+	withoutResolutionSla: number;
 	truncated: boolean;
 	due: number;
 	ineligible: number;
@@ -27,6 +29,26 @@ export type DeliveryObserved =
 	| { dryRun: true; messages: number }
 	| { dryRun: false; messages: number; delivered: number };
 
+/** Escalation levels that came due this run, counted per level. */
+export interface EscalationObserved {
+	candidates: number;
+	byLevel: Record<string, number>;
+}
+
+export interface DirectMessagesObserved {
+	recipients: number;
+	messages: number;
+	delivered: number;
+	dryRun: boolean;
+	/** A breached request whose assignee is absent from the escalation directory. */
+	unmappedAssignees: number;
+	missingOnCall: number;
+	/** Recipients withheld by the staged-rollout gate. */
+	suppressedByAllowlist: number;
+	/** Delivery failures counted by cause, never by recipient. */
+	failures: Record<string, number>;
+}
+
 /** The subset of the runtime logger this module needs. Attributes are structured. */
 export interface JournalSink {
 	info(message: string, attributes?: Record<string, unknown>): void;
@@ -37,6 +59,8 @@ export interface RunJournal {
 	selection(event: SelectionObserved): void;
 	intro(event: IntroObserved): void;
 	delivery(event: DeliveryObserved): void;
+	escalation(event: EscalationObserved): void;
+	directMessages(event: DirectMessagesObserved): void;
 }
 
 /** Reasons that are ordinary operation rather than a degraded run. */
@@ -70,6 +94,54 @@ export function createRunJournal(sink: JournalSink): RunJournal {
 				return;
 			}
 			sink.warn(`Reminder intro fell back to the deterministic opener: ${reason}`, attributes);
+		},
+
+		escalation(event) {
+			const levels = Object.entries(event.byLevel)
+				.map(([level, count]) => `L${level}:${count}`)
+				.join(' ');
+			sink.info(
+				`${event.candidates} request(s) crossed an escalation level${levels ? ` (${levels})` : ''}`,
+				{ ...event },
+			);
+		},
+
+		directMessages(event) {
+			const failed = Object.values(event.failures).reduce((total, count) => total + count, 0);
+			if (event.dryRun) {
+				sink.info(
+					`Dry run: skipped ${event.messages} direct message(s) to ${event.recipients} recipient(s)`,
+					{ ...event },
+				);
+			} else if (failed === 0) {
+				sink.info(
+					`Delivered ${event.delivered} direct message(s) to ${event.recipients} recipient(s)`,
+					{ ...event },
+				);
+			} else {
+				sink.warn(
+					`Delivered ${event.delivered} of ${event.messages} direct message(s); ${failed} recipient(s) failed`,
+					{ ...event },
+				);
+			}
+			if (event.unmappedAssignees > 0) {
+				sink.warn(
+					`${event.unmappedAssignees} breached request(s) have no assignee entry in the escalation directory`,
+					{ unmappedAssignees: event.unmappedAssignees },
+				);
+			}
+			if (event.suppressedByAllowlist > 0) {
+				sink.info(
+					`Staged rollout withheld ${event.suppressedByAllowlist} recipient(s) outside the allowlist`,
+					{ suppressedByAllowlist: event.suppressedByAllowlist },
+				);
+			}
+			if (event.missingOnCall > 0) {
+				sink.warn(
+					`${event.missingOnCall} off-hours escalation(s) could not name an on-call contact`,
+					{ missingOnCall: event.missingOnCall },
+				);
+			}
 		},
 
 		delivery(event) {

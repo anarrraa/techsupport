@@ -72,8 +72,10 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		status: 'Waiting for support',
 		priority: 'Medium',
 		assignee: 'Developer',
+		assigneeAccountId: 'account-1',
 		url: 'https://example.atlassian.net/browse/SUP-1',
 		firstResponseSla: sla(),
+		resolutionSla: null,
 		...overrides,
 	};
 }
@@ -86,6 +88,7 @@ function sla(overrides: Partial<NonNullable<JiraTicket['firstResponseSla']>> = {
 		paused: false,
 		withinCalendarHours: true,
 		breachTimeEpochMillis: NOW.getTime() - 60 * 60_000,
+		elapsedMinutes: null,
 		...overrides,
 	};
 }

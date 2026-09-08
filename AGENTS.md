@@ -86,18 +86,15 @@ The dashboard, analytics database, Microsoft Entra group login, personal Teams
 bot, durable delivery ledger, read receipts, and acknowledgements are post-MVP V2
 work. They require an explicit PRD and roadmap update before implementation.
 
-The personal Teams bot / escalation feature now has a BRD and PRD
-(`docs/brd-teams-bot-escalation.md`, `docs/prd-teams-bot-escalation.md`), but
-that only satisfies the "explicit PRD" gate — it does not clear it for
-implementation. Do not write bot code until:
+The personal Teams bot / escalation feature cleared that gate: every open
+decision in `docs/brd-teams-bot-escalation.md` is answered, `docs/mvp-roadmap.md`
+carries the V2 milestones, and the implementation landed on 2026-09-07
+(`src/lib/teams-bot.ts`, `escalation.ts`, `escalation-config.ts`,
+`escalation-state.ts`, `direct-messages.ts`). It is unit tested and **not
+production verified**: no message has been sent from this codebase. V2 milestone
+2 in the roadmap lists what is left, all of it external.
 
-- every open decision listed in `docs/brd-teams-bot-escalation.md` has an
-  answer from the user (bot delivery mechanism, escalation contact directory,
-  off-hours phone-call handling, response-detection scope), and
-- `docs/mvp-roadmap.md` has a V2 milestone reflecting those answers.
-
-Once implementation starts, these invariants apply in addition to the ones
-above:
+These invariants apply to that code in addition to the ones above:
 
 - Never hardcode or guess an escalation contact (L2-L5). Resolve every
   recipient through the directory the user supplies; fail visibly if a level's

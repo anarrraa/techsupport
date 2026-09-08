@@ -1,0 +1,38 @@
+{
+	"$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.23/MicrosoftTeams.schema.json",
+	"manifestVersion": "1.23",
+	"version": "1.0.0",
+	"id": "${TEAMS_BOT_APP_ID}",
+	"packageName": "mn.zerotech.techsupport.slareminder",
+	"developer": {
+		"name": "Zerotech",
+		"websiteUrl": "https://zerotech.mn",
+		"privacyUrl": "https://zerotech.mn/privacy",
+		"termsOfUseUrl": "https://zerotech.mn/terms"
+	},
+	"name": {
+		"short": "SLA сануулга",
+		"full": "Tech Support SLA сануулга"
+	},
+	"description": {
+		"short": "Анхны хариу SLA хэтэрсэн хүсэлтийг хариуцагчид сануулна.",
+		"full": "Jira Service Management-ийн анхны хариу SLA хэтэрсэн хүсэлтийг хариуцагч хүнд шууд сануулж, шийдэгдээгүй тохиолдолд гэрээний L2-L5 эскалацийн шатлалаар мэдэгдэнэ. Зөвхөн мэдэгдэл илгээх бот: хариу уншихгүй, чат дахь хариуг тикет шийдэгдсэн гэж үзэхгүй. Тикетийн бүх цаг хугацааг Jira Service Management тооцно."
+	},
+	"icons": {
+		"color": "color.png",
+		"outline": "outline.png"
+	},
+	"accentColor": "#0F6CBD",
+	"bots": [
+		{
+			"botId": "${TEAMS_BOT_APP_ID}",
+			"scopes": ["personal"],
+			"isNotificationOnly": true,
+			"supportsFiles": false,
+			"supportsCalling": false,
+			"supportsVideo": false
+		}
+	],
+	"permissions": ["identity"],
+	"validDomains": []
+}

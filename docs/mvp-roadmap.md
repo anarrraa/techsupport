@@ -1,6 +1,6 @@
 # MVP completion roadmap
 
-Last reviewed: 2026-08-20
+Last reviewed: 2026-09-07
 
 ## Goal
 
@@ -12,17 +12,22 @@ requirements.
 
 ## Current verdict
 
-**Baseline implemented; production MVP not complete.**
+**Baseline implemented; production MVP not complete. V2 bot implemented, not
+verified.**
 
-The implementation and local release-hardening work are complete. Local
-acceptance commands pass, dry-run output is aggregate-only, release-critical
-workflow branches are covered, and GitHub CI is green.
+The Jira and SLA blockers that masked each other are cleared: `JIRA_JQL` is
+scoped to DC and the integration account reads SLA data. Local acceptance
+commands pass, dry-run output is aggregate-only, and release-critical workflow
+branches are covered.
 
-Two external blockers remain, and they mask each other. The configured
-`JIRA_JQL` matches zero issues, so the workflow dry-run completes successfully
-having scanned nothing. Probing the SLA endpoint directly shows the second
-blocker: the integration account cannot read SLA data. Until the query is
-scoped correctly, a healthy-looking run proves nothing.
+What is left for the MVP is external verification, not code: a controlled
+Jira-to-Teams delivery and observed scheduled runs (milestones 3 and 4).
+
+The V2 personal-bot and escalation code landed on 2026-09-07 and is unit tested,
+but **no message has been sent from this codebase**. It is gated on three
+administrator actions — publishing the Teams app package, configuring the OIDC
+federated credential, and collecting Entra object ids — tracked in V2 milestone
+2 below.
 
 ## Evidence snapshot
 
@@ -30,16 +35,26 @@ scoped correctly, a healthy-looking run proves nothing.
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 44 passed, 0 failed on 2026-08-20 |
-| Type checking | Pass | `npm run typecheck` exit 0 on 2026-08-20 |
-| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-08-20 |
+| Unit tests | Pass | `npm test`: 93 passed, 0 failed on 2026-09-07 |
+| Type checking | Pass | `npm run typecheck` exit 0 on 2026-09-07 |
+| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-09-07 |
 | GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
-| Scheduled reminder workflow | Unverified | Workflow is active but has 0 completed runs as of 2026-08-03 |
-| Scoped JQL correctness | Fail | On 2026-08-20 the configured `JIRA_JQL` matched zero issues; it targets a project key absent from the tenant. Broader queries return results, so search itself works |
-| Local production dry-run | Inconclusive | On 2026-08-20 `REMINDER_DRY_RUN=true npm run remind` completed with `scanned: 0`. It never reached the SLA endpoint, so a passing run currently carries no information |
-| JSM SLA read access | Blocked | Probed directly on 2026-08-20: project search, `servicedeskapi/servicedesk`, and issue search return `200`; `servicedeskapi/request/{key}/sla` returns `403 Forbidden` on both `DC` and `SHT` |
-| First response metric name | Pass | On 2026-08-20 `GET /rest/api/3/field` lists `Time to first response`; `JIRA_FIRST_RESPONSE_SLA_NAME` matches it case-insensitively. `Time to resolution` also exists |
+| Scheduled reminder workflow | Failing on `main` | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/lib/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; needs a green scheduled run to confirm |
+| Scoped JQL correctness | Pass | On 2026-08-26 `JIRA_JQL` set to `project = DC AND statusCategory != Done AND assignee is not EMPTY` |
+| Local production dry-run | Pass | On 2026-08-26 dry-run scans real DC issues and reaches SLA endpoint |
+| JSM SLA read access | Pass | On 2026-08-26 `GET /rest/servicedeskapi/request/DC-844/sla` returns 200 OK (agent access granted) |
+| First response metric name | Pass | On 2026-08-20 `GET /rest/api/3/field` lists `Time to first response`; `JIRA_FIRST_RESPONSE_SLA_NAME` matches it case-insensitively |
 | Live Jira-to-Teams delivery | Not attempted | User authorized dry-run only; no Teams post was made |
+| Overdue uses working hours | Pass | On 2026-08-26 `elapsedMinutes` from JSM used instead of clock time |
+| Empty scan detection | Pass | On 2026-08-26 `scanned: 0` in non-dry-run mode throws visible error |
+| V2 bot and escalation code | Implemented, unverified | Added 2026-09-07 with unit coverage for every `docs/sla-matrix.md` section 2 threshold; no live send |
+| Live bot direct message from this codebase | Not attempted | needs `TEAMS_BOT_APP_ID`/`TEAMS_BOT_TENANT_ID` and a credential; run `npm run verify:bot -- <object-id>` |
+| Teams app published to the organisation catalog | Not attempted | administrator action; per-person custom upload only proved the path on 2026-08-20 |
+| GitHub OIDC federated credential on the Entra app | Not attempted | code path implemented and unit tested; the credential itself is not configured |
+| `config/escalation.json` populated | Not attempted | Jira account ids for the two pilot recipients resolved 2026-09-07; object ids still needed, via `npm run resolve:ids` |
+| Delivery path matches a working bot in this tenant | Pass | On 2026-09-08 the Graph install + chat + activity sequence was taken from `zero/goOrange`'s production edge function rather than designed here |
+| Resolution metric present on DC requests | Pass | On 2026-09-07 a local dry-run scanned 28 DC requests and read the escalation clock on enough of them to select 9 crossings (L2:4, L3:3, L5:2) |
+| Bot dry-run is aggregate-only | Pass | On 2026-09-07 the dry-run output named no request, assignee, or object id |
 
 Update this table when newer evidence supersedes it. Do not mark an external
 integration complete from code inspection or a local mock alone.
@@ -106,9 +121,8 @@ These checks require the real Jira, Teams, GitHub, and optional Google Cloud
 environments. Record only names and outcomes; never copy secret values into this
 document or CI logs.
 
-- [ ] Point `JIRA_JQL` at a service desk project that exists. As of 2026-08-20 it
-      matches zero issues. The tenant's JSM projects are `APUT`, `DC`, `SHT`, and
-      `AM`; `DC` and `SHT` have open issues.
+- [x] Point `JIRA_JQL` at a service desk project that exists.
+  - Set 2026-08-26: `project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC`. Dry-run scans real DC issues.
 - [ ] Confirm Jira priority mapping against the production priority scheme.
 - [ ] Confirm JSM First Response goals match `docs/sla-matrix.md`.
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
@@ -118,20 +132,17 @@ document or CI logs.
     response`, `Time to resolution`, `Time to close after resolution`, and `Time
     to review normal change`. Metrics are named by purpose, not by duration, so a
     single configured name is correct for every priority.
-- [ ] Confirm the integration account can search the scoped project and read SLAs.
-  - Current evidence (2026-08-20): the account can list projects, list service
-    desks, and search issues in `DC` and `SHT`, but `GET
-    /rest/servicedeskapi/request/{key}/sla` returns `403 Forbidden` for both.
-    Read access to SLA data is an agent-level permission in Jira Service
-    Management, so portal or browse access is not sufficient.
-  - Required action: add the integration account as an **agent** on the service
-    desk projects in scope, then repeat this probe. Note that a JSM agent role
-    consumes a licensed seat.
-  - Also blocked behind this 403: confirming that `ongoingCycle` exposes
-    `elapsedTime`, which both the overdue-duration display and the V2 escalation
-    clock need.
+- [x] Confirm the integration account can search the scoped project and read SLAs.
+  - Confirmed 2026-08-26: agent access granted on DC project. `GET
+    /rest/servicedeskapi/request/DC-844/sla` returns 200 OK with full SLA data
+    including `elapsedTime` (working-hours elapsed time from JSM).
 - [ ] Confirm the Teams webhook accepts the payload and renders escaped text.
+  - The webhook is now optional; a bot-only deployment skips this check.
 - [ ] Confirm required GitHub secrets and variables are configured.
+- [ ] Confirm `JIRA_RESOLUTION_SLA_NAME` exactly matches the production metric.
+  - `GET /rest/api/3/field` listed `Time to resolution` on 2026-08-20, which is
+    the configured default; confirm it is the metric JSM actually attaches to DC
+    requests.
 - [ ] If Gemini is enabled, confirm WIF, Vertex IAM, region, and model access.
 - [ ] Run `workflow_dispatch` with `dry_run=true` and verify aggregate-only output.
 
@@ -194,9 +205,44 @@ and Teams is a standard channel with unmetered messages.
 
 - [x] Azure subscription available to the integration owner.
 - [x] Entra app registration, single tenant, secret held outside the repository.
+      **Its application id is not recorded anywhere.** Nothing in this repository
+      or the wiki carries it, so it has to be read back from the Azure portal
+      before the package can be built. Record it here once found; it is not a
+      secret. Do not create a second registration, and do not reuse goOrange's
+      (`bd1bc6b9-…`) — a shared id would make these reminders arrive as GoOrange
+      and collide with its catalog entry.
 - [x] Azure Bot resource on the free tier with the Teams channel enabled.
 - [x] Notification-only Teams app package scoped to personal chats.
 - [x] Application installed in one personal scope by custom app upload.
+
+### Implementation, 2026-09-07
+
+The transport, the escalation policy, the directory resolver, the state store,
+and the workflow wiring are implemented and unit tested. Nothing here is
+production evidence: no message has been sent from this codebase.
+
+| Module | What it owns |
+| --- | --- |
+| `src/lib/teams-bot.ts` | Bot Connector token (client secret or GitHub OIDC), conversation create, activity post, distinct 403 reasons |
+| `src/lib/escalation.ts` | `docs/sla-matrix.md` section 2 thresholds and section 3 routing, pure |
+| `src/lib/escalation-config.ts` | `config/escalation.json` schema, load-time referential integrity, contact resolution that fails visibly |
+| `src/lib/escalation-state.ts` | highest level notified per ticket, restored and saved through `actions/cache` |
+| `src/lib/direct-messages.ts` | who gets which message, pure |
+
+Decisions taken during implementation, both recorded because neither was settled
+by the contract:
+
+- The escalation clock reads the JSM **resolution** metric, not elapsed time
+  since the first-response breach. Both metrics come from the same SLA response,
+  so the escalation clock costs no extra request.
+- Low L5 has no clock mark in the contract ("only if SLA breached"), so Low never
+  escalates past L4. Escalating an executive on a guessed threshold is worse than
+  not escalating. **Needs client confirmation.**
+
+Known behavioural limit: JSM pauses the first-response clock outside calendar
+hours, so `withinCalendarHours` is false off-hours and the first-response direct
+message is only sent inside working hours. Off-hours contact is delivered by the
+escalation path, which is what contract section 3 describes.
 
 ### Remaining before bot code enters `src/`
 
@@ -207,9 +253,12 @@ and Teams is a standard channel with unmetered messages.
       mapping); off-hours step surfaces the on-call contact only, no paging
       integration; escalation state persists in a GitHub Actions cache keyed
       per ticket. See `docs/brd-teams-bot-escalation.md` decisions 2-6.
-- [ ] Design and add the config file itself (schema for the person directory
-      and the per-project/team L2-L5 mapping decided above). No bot code
-      reads it until it exists and is populated with real Entra object ids.
+- [x] Design and add the config file itself (schema for the person directory
+      and the per-project/team L2-L5 mapping decided above). Added 2026-09-07 as
+      `config/escalation.example.json`, validated by `src/lib/escalation-config.ts`.
+      `config/escalation.json` itself is deliberately absent: the loader fails
+      visibly by path rather than shipping placeholder object ids that would
+      misdirect messages.
 - [x] Choose the recipient installation model. **Decided 2026-08-24:** a
       Teams app setup policy assigned to a known group, over
       `TeamsAppInstallation.ReadWriteSelfForUser.All` (broader standing
@@ -224,8 +273,64 @@ and Teams is a standard channel with unmetered messages.
 - [ ] Resolve an Entra object id for every intended recipient (every possible
       assignee plus L2-L5 contacts) to populate the new config file. Teams
       rejects email and user principal name for proactive direct messages.
-- [ ] Confirm the escalation clock reads the JSM resolution metric rather than
-      elapsed time since the first-response breach.
+- [x] Confirm the escalation clock reads the JSM resolution metric rather than
+      elapsed time since the first-response breach. Implemented 2026-09-07:
+      `src/lib/escalation.ts` reads `resolutionSla.elapsedMinutes`, which is
+      JSM's working-hours elapsed time.
+
+### Delivery path revised 2026-09-08, from a working bot in the same tenant
+
+`zero/goOrange` is a Teams Tab + Bot already published and running in this
+tenant, and it solves proactive delivery differently. Its edge function
+(`supabase/functions/teams-bot/index.ts`) does not call
+`POST /v3/conversations` at all:
+
+1. Graph finds the app in the catalog by `externalId`.
+2. Graph reads `/users/{oid}/teamwork/installedApps`, and **installs the app for
+   that person** if it is absent.
+3. Graph reads `.../installedApps/{id}/chat` for the personal chat id.
+4. The Bot Connector posts one activity into that chat.
+
+This was adopted on 2026-09-08. It changes two things previously recorded here:
+
+- **The Teams app setup policy is no longer needed.** The decision of 2026-08-24
+  chose a setup policy over `TeamsAppInstallation.ReadWrite*` because the
+  standing permission looked broader. But that permission is already granted and
+  consented in this tenant for goOrange, so the narrower-looking option costs an
+  admin request that the broader one does not. Publishing to the organisation
+  catalog is still required — Graph finds the app by its catalog entry.
+- **`403 ForbiddenOperationException` stops being the common failure.** It was
+  the expected outcome for anyone who had not installed the app; installing
+  first removes the condition instead of reporting it.
+
+`https://smba.trafficmanager.net/teams` is confirmed as the Bot Connector
+endpoint for this tenant, and the tenant id is
+`376a710f-b223-451f-ba55-efc974d8716c`, both read from goOrange's configuration.
+
+### V2 milestone 2: verify the bot in production
+
+- [ ] Publish the Teams app package to the organisation catalog. Build it with
+      `TEAMS_BOT_APP_ID=<guid> npm run package:teams`.
+- [ ] Grant and consent the Graph application permissions:
+      `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`,
+      `User.Read.All`.
+- [ ] Configure the GitHub OIDC federated credential on the Entra app
+      registration (audience `api://AzureADTokenExchange`).
+- [ ] Populate `config/escalation.json` with real object ids and commit it.
+- [ ] Run `npm run verify:bot -- <object-id>` and record the outcome here.
+- [ ] Seed the escalation state before the first live run:
+      `ESCALATION_SEED_ONLY=true` with `REMINDER_DRY_RUN` unset. A dry-run on
+      2026-09-07 found 9 DC requests that have already crossed a level (L2:4,
+      L3:3, L5:2); without seeding, the first live run delivers all of them,
+      including two to the L5 contact.
+- [ ] Run `workflow_dispatch` with `dry_run=true` and confirm the direct-message
+      counts look right and no identity appears in the log.
+- [ ] Run one controlled live delivery with `TEAMS_BOT_RECIPIENT_ALLOWLIST` set
+      to `anar@zerotech.mn` and `tergel@zerotech.mn` (as object ids), so the
+      first live run cannot reach anyone else.
+- [ ] Confirm the escalation state cache survives between scheduled runs and that
+      no level is notified twice.
+- [ ] Confirm the Low L5 threshold question with the client.
 
 ## Post-MVP direction
 

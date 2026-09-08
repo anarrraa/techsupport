@@ -221,6 +221,46 @@ test('requires HTTPS before constructing generated Jira ticket URLs', async () =
 	assert.equal(requestCount, 0);
 });
 
+test('reads both configured metrics and the assignee account from one SLA response', async () => {
+	const slaRequests: string[] = [];
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		slaRequests.push(url);
+		return Response.json({
+			start: 0,
+			limit: 10,
+			isLastPage: true,
+			values: [metric('First response'), metric('Time to resolution')],
+		});
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	// One request carries both clocks; the escalation clock costs nothing extra.
+	assert.equal(slaRequests.length, 1);
+	assert.equal(result.tickets[0]?.assigneeAccountId, 'account-SUP-1');
+	assert.equal(result.tickets[0]?.firstResponseSla?.elapsedMinutes, 120);
+	assert.equal(result.tickets[0]?.resolutionSla?.name, 'Time to resolution');
+	assert.equal(result.withoutResolutionSla, 0);
+});
+
+test('reports a missing resolution metric without failing the first-response path', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.equal(result.withoutSla, 0);
+	assert.equal(result.withoutResolutionSla, 1);
+	assert.equal(result.tickets[0]?.resolutionSla, null);
+});
+
 function config(): JiraConfig {
 	return {
 		baseUrl: 'https://example.atlassian.net',
@@ -234,6 +274,7 @@ function config(): JiraConfig {
 		maxSlaPages: 10,
 		slaConcurrency: 2,
 		firstResponseSlaName: 'First response',
+		resolutionSlaName: 'Time to resolution',
 		http: { timeoutMs: 1_000, maxRetries: 0 },
 	};
 }
@@ -245,7 +286,7 @@ function issue(key: string) {
 			summary: `Summary ${key}`,
 			status: { name: 'Waiting for support' },
 			priority: { name: 'High' },
-			assignee: { displayName: 'Developer' },
+			assignee: { displayName: 'Developer', accountId: `account-${key}` },
 		},
 	};
 }
@@ -258,6 +299,7 @@ function metric(name: string) {
 			paused: false,
 			withinCalendarHours: true,
 			breachTime: { epochMillis: 1_722_500_000_000 },
+			elapsedTime: { millis: 7_200_000 },
 		},
 	};
 }

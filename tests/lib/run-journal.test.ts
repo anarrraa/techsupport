@@ -22,6 +22,7 @@ function sink(): { emitted: Emitted[]; sink: JournalSink } {
 const COUNTERS = {
 	scanned: 10,
 	withoutSla: 0,
+	withoutResolutionSla: 0,
 	truncated: false,
 	due: 2,
 	ineligible: 5,

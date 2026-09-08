@@ -1,13 +1,14 @@
 import type { JiraConfig } from './config.ts';
 import { fetchOk, type Fetch, type Sleep } from './http.ts';
 
-export interface FirstResponseSla {
+export interface SlaCycle {
 	name: string;
 	state: 'ongoing' | 'completed';
 	breached: boolean;
 	paused: boolean;
 	withinCalendarHours: boolean;
 	breachTimeEpochMillis: number | null;
+	elapsedMinutes: number | null;
 }
 
 export interface JiraTicket {
@@ -16,14 +17,20 @@ export interface JiraTicket {
 	status: string;
 	priority: string;
 	assignee: string;
+	/** Needed to resolve the assignee's Entra object id; absent when unassigned. */
+	assigneeAccountId: string | null;
 	url: string;
-	firstResponseSla: FirstResponseSla | null;
+	firstResponseSla: SlaCycle | null;
+	/** The escalation clock of `docs/sla-matrix.md` section 2. */
+	resolutionSla: SlaCycle | null;
 }
 
 export interface JiraFetchResult {
 	tickets: JiraTicket[];
 	scanned: number;
 	withoutSla: number;
+	/** Tickets carrying no resolution metric, so no escalation clock. */
+	withoutResolutionSla: number;
 	truncated: boolean;
 }
 
@@ -35,7 +42,7 @@ export async function fetchTickets(
 	const ticketBaseUrl = canonicalTicketBaseUrl(config.baseUrl);
 	const issues = await fetchIssuePages(config, fetchImpl, sleep);
 	const slas = await mapConcurrent(issues.values, config.slaConcurrency, (issue) =>
-		fetchFirstResponseSla(issue.key, config, fetchImpl, sleep),
+		fetchSlaCycles(issue.key, config, fetchImpl, sleep),
 	);
 
 	const tickets = issues.values.map((issue, index): JiraTicket => ({
@@ -44,8 +51,10 @@ export async function fetchTickets(
 		status: issue.fields.status?.name ?? 'Unknown',
 		priority: issue.fields.priority?.name ?? 'None',
 		assignee: issue.fields.assignee?.displayName ?? 'Unassigned',
+		assigneeAccountId: issue.fields.assignee?.accountId ?? null,
 		url: buildTicketUrl(ticketBaseUrl, issue.key),
-		firstResponseSla: slas[index] ?? null,
+		firstResponseSla: slas[index]?.firstResponse ?? null,
+		resolutionSla: slas[index]?.resolution ?? null,
 	}));
 	const withoutSla = tickets.filter((ticket) => ticket.firstResponseSla === null).length;
 	if (tickets.length > 0 && withoutSla === tickets.length) {
@@ -58,6 +67,7 @@ export async function fetchTickets(
 		tickets,
 		scanned: tickets.length,
 		withoutSla,
+		withoutResolutionSla: tickets.filter((ticket) => ticket.resolutionSla === null).length,
 		truncated: issues.truncated,
 	};
 }
@@ -132,12 +142,22 @@ async function fetchIssuePages(
 	return { values, truncated: pageWasTruncated || (hasMore && values.length >= config.maxResults) };
 }
 
-async function fetchFirstResponseSla(
+interface TicketSlaCycles {
+	firstResponse: SlaCycle | null;
+	resolution: SlaCycle | null;
+}
+
+/**
+ * Both configured metrics come from the same paginated JSM response, so the
+ * escalation clock costs no extra request.
+ */
+async function fetchSlaCycles(
 	issueKey: string,
 	config: JiraConfig,
 	fetchImpl: Fetch,
 	sleep?: Sleep,
-): Promise<FirstResponseSla | null> {
+): Promise<TicketSlaCycles> {
+	const found: TicketSlaCycles = { firstResponse: null, resolution: null };
 	let start = 0;
 	for (let page = 0; page < config.maxSlaPages; page += 1) {
 		const url = new URL(
@@ -156,16 +176,15 @@ async function fetchFirstResponseSla(
 				sleep,
 			);
 		} catch (error) {
-			if (error instanceof Error && error.message.includes('404')) return null;
+			if (error instanceof Error && error.message.includes('404')) return found;
 			throw error;
 		}
 
 		const data = (await response.json()) as JiraSlaPage;
-		const metric = data.values?.find(
-			(value) => value.name.trim().toLowerCase() === config.firstResponseSlaName.toLowerCase(),
-		);
-		if (metric) return toFirstResponseSla(metric);
-		if (data.isLastPage || !data.values?.length) return null;
+		found.firstResponse ??= findMetric(data, config.firstResponseSlaName);
+		found.resolution ??= findMetric(data, config.resolutionSlaName);
+		if (found.firstResponse && found.resolution) return found;
+		if (data.isLastPage || !data.values?.length) return found;
 		const nextStart = data.start + data.limit;
 		if (!Number.isInteger(nextStart) || nextStart <= start) {
 			throw new Error(`JSM SLA pagination did not advance for ${issueKey}`);
@@ -175,7 +194,14 @@ async function fetchFirstResponseSla(
 	throw new Error(`JSM SLA pagination exceeded ${config.maxSlaPages} pages for ${issueKey}`);
 }
 
-function toFirstResponseSla(metric: JiraSlaMetric): FirstResponseSla {
+function findMetric(page: JiraSlaPage, name: string): SlaCycle | null {
+	const metric = page.values?.find(
+		(value) => value.name.trim().toLowerCase() === name.toLowerCase(),
+	);
+	return metric ? toSlaCycle(metric) : null;
+}
+
+function toSlaCycle(metric: JiraSlaMetric): SlaCycle {
 	const cycle = metric.ongoingCycle;
 	if (!cycle) {
 		return {
@@ -185,6 +211,7 @@ function toFirstResponseSla(metric: JiraSlaMetric): FirstResponseSla {
 			paused: false,
 			withinCalendarHours: false,
 			breachTimeEpochMillis: null,
+			elapsedMinutes: null,
 		};
 	}
 	return {
@@ -194,6 +221,9 @@ function toFirstResponseSla(metric: JiraSlaMetric): FirstResponseSla {
 		paused: cycle.paused,
 		withinCalendarHours: cycle.withinCalendarHours,
 		breachTimeEpochMillis: cycle.breachTime?.epochMillis ?? null,
+		elapsedMinutes: cycle.elapsedTime?.millis != null
+			? Math.floor(cycle.elapsedTime.millis / 60_000)
+			: null,
 	};
 }
 
@@ -230,7 +260,7 @@ interface JiraIssue {
 		summary?: string;
 		status?: { name?: string };
 		priority?: { name?: string };
-		assignee?: { displayName?: string };
+		assignee?: { displayName?: string; accountId?: string };
 	};
 }
 
@@ -254,5 +284,6 @@ interface JiraSlaMetric {
 		paused: boolean;
 		withinCalendarHours: boolean;
 		breachTime?: { epochMillis?: number };
+		elapsedTime?: { millis?: number };
 	};
 }

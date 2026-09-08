@@ -1,7 +1,10 @@
+import { firstResponseMinutes, severityFor, type EscalationLevel } from './escalation.ts';
 import type { JiraTicket } from './jira.ts';
 import { overdueMinutes } from './sla.ts';
 
 const DEFAULT_INTRO = 'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.';
+const CHANNEL_TITLE = '🔔 **First response SLA сануулга**';
+const DM_TITLE = '🔔 **Танд хамаарах First response SLA сануулга**';
 const DOMAIN_PATTERN = String.raw`(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+[\p{L}]{2,63}`;
 const URL_PATTERN = /[a-z][a-z\d+.-]*:\/\/[^\s<>{}\[\]()]+/giu;
 const EMAIL_PATTERN = new RegExp(String.raw`[\p{L}\p{N}._%+-]+@${DOMAIN_PATTERN}`, 'gu');
@@ -15,20 +18,66 @@ export function buildReminderMessages(
 	maxChars: number,
 	intro = DEFAULT_INTRO,
 ): string[] {
+	return buildMessages(tickets, now, maxChars, [CHANNEL_TITLE, cleanIntro(intro)], false);
+}
+
+/**
+ * The same escaped, chunked body as the channel post, addressed to one person.
+ * Level 1 is the assignee's own first-response reminder and carries the
+ * contractual response window; levels 2-5 are the contract's escalation
+ * contacts (`docs/sla-matrix.md` section 2).
+ */
+export function buildDirectMessages(options: {
+	recipientName: string;
+	level: EscalationLevel;
+	tickets: JiraTicket[];
+	now: Date;
+	maxChars: number;
+	/** Off-hours Critical/High only: named so a human can place the call. */
+	onCallName?: string | null;
+}): string[] {
+	const { recipientName, level, tickets, now, maxChars, onCallName } = options;
+	const greeting = `Сайн байна уу, ${cleanField(recipientName, 100)}.`;
+	const header =
+		level === 1
+			? [
+				DM_TITLE,
+				`${greeting} Дараах хүсэлтийн анхны хариу SLA хугацаа хэтэрсэн байна. Одоо хариу бичих эсвэл тикетийг шинэчилнэ үү.`,
+			]
+			: [
+				`🚨 **Эскалаци — L${level}**`,
+				`${greeting} Дараах хүсэлт шийдэгдээгүй тул гэрээний L${level} шатанд эскалаци хийгдлээ.`,
+			];
+	if (onCallName) {
+		header.push(
+			`⚠️ Ажлын бус цагийн Critical/High: дуудлагын инженер ${cleanField(onCallName, 100)}-тай утсаар холбогдоно уу.`,
+		);
+	}
+	return buildMessages(tickets, now, maxChars, header, level === 1);
+}
+
+function buildMessages(
+	tickets: JiraTicket[],
+	now: Date,
+	maxChars: number,
+	header: string[],
+	withContractWindow: boolean,
+): string[] {
 	if (tickets.length === 0) return [];
+	const continuation = [header[0] as string, 'SLA сануулгын үргэлжлэл:'];
 	const messages: string[] = [];
-	let lines = headerLines(cleanIntro(intro));
+	let lines = [...header];
 	let ticketCount = 0;
 
 	for (const [assignee, assignedTickets] of groupByAssignee(tickets)) {
 		const heading = `**${cleanField(assignee, 100)}**`;
 		let headingAdded = false;
 		for (const ticket of assignedTickets) {
-			let ticketLine = renderTicket(ticket, now);
+			let ticketLine = renderTicket(ticket, now, withContractWindow);
 			const additions = headingAdded ? [ticketLine] : ['', heading, ticketLine];
 			if ([...lines, ...additions].join('\n').length > maxChars && ticketCount > 0) {
 				messages.push(lines.join('\n'));
-				lines = headerLines('SLA сануулгын үргэлжлэл:');
+				lines = [...continuation];
 				ticketCount = 0;
 				headingAdded = false;
 			}
@@ -62,16 +111,17 @@ function groupByAssignee(tickets: JiraTicket[]): Map<string, JiraTicket[]> {
 	return groups;
 }
 
-function headerLines(intro: string): string[] {
-	return ['🔔 **First response SLA сануулга**', intro];
-}
-
-function renderTicket(ticket: JiraTicket, now: Date): string {
+function renderTicket(ticket: JiraTicket, now: Date, withContractWindow = false): string {
 	const summary = cleanField(ticket.summary, 180);
 	const priority = cleanField(ticket.priority, 30);
 	const status = cleanField(ticket.status, 80);
 	const key = cleanField(ticket.key, 50);
-	return `- [${key}](${ticket.url}) · **${priority}** · ${summary} · ${status} · ${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
+	const line = `- [${key}](${ticket.url}) · **${priority}** · ${summary} · ${status} · ${formatDuration(overdueMinutes(ticket, now))} хэтэрсэн`;
+	if (!withContractWindow) return line;
+	const severity = severityFor(ticket.priority);
+	return severity
+		? `${line} · гэрээний хугацаа ${firstResponseMinutes(severity)} мин`
+		: line;
 }
 
 function fitTicketLine(line: string, ticket: JiraTicket, now: Date, available: number): string {

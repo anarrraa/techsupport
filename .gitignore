@@ -5,3 +5,5 @@ dist/
 !.env.example
 gcp-sa.json
 *.log
+.escalation-state/
+packages/*.zip
