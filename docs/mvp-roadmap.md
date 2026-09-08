@@ -205,6 +205,12 @@ and Teams is a standard channel with unmetered messages.
 
 - [x] Azure subscription available to the integration owner.
 - [x] Entra app registration, single tenant, secret held outside the repository.
+      **Its application id is not recorded anywhere.** Nothing in this repository
+      or the wiki carries it, so it has to be read back from the Azure portal
+      before the package can be built. Record it here once found; it is not a
+      secret. Do not create a second registration, and do not reuse goOrange's
+      (`bd1bc6b9-…`) — a shared id would make these reminders arrive as GoOrange
+      and collide with its catalog entry.
 - [x] Azure Bot resource on the free tier with the Teams channel enabled.
 - [x] Notification-only Teams app package scoped to personal chats.
 - [x] Application installed in one personal scope by custom app upload.

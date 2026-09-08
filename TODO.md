@@ -21,6 +21,11 @@ reading order and non-negotiable invariants before touching any of this.
       that actually resolve, and swap the placeholder icons in
       `packages/teams-app/` for the real brand marks. Catalog publish validates
       both.
+- [ ] Record the bot's Entra application id in the evidence table in
+      `docs/mvp-roadmap.md`. The registration was created on 2026-08-20 but its
+      id was never written down anywhere in this repository or the wiki, so
+      every step that needs it starts with a hunt through the Azure portal. It
+      is not a secret — the tenant id is already recorded beside it.
 - [ ] Get an administrator to publish the Teams app package to the
       organisation catalog. Build it with
       `TEAMS_BOT_APP_ID=<guid> npm run package:teams`. **No Teams app setup
