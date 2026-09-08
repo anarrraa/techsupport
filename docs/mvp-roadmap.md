@@ -49,6 +49,8 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Empty scan detection | Pass | On 2026-08-26 `scanned: 0` in non-dry-run mode throws visible error |
 | V2 bot and escalation code | Implemented, unverified | Added 2026-09-07 with unit coverage for every `docs/sla-matrix.md` section 2 threshold; no live send |
 | Live bot direct message from this codebase | Not attempted | needs `TEAMS_BOT_APP_ID`/`TEAMS_BOT_TENANT_ID` and a credential; run `npm run verify:bot -- <object-id>` |
+| Jira reachable from GitHub Actions | Pass | Run `34185580185` (dispatch, `dry_run=true`, 2026-09-08) logged `Scanned 25; 5 due, 9 not breached, 0 outside calendar, 11 awaiting window` before stopping on the absent escalation directory — the Jira secrets and JQL variable resolve correctly in CI |
+| `config/escalation.json` committed | No | The run above failed with `Escalation config file not readable at config/escalation.json`. GitHub Actions reads the directory from the repository, so it has to be committed, not just present locally |
 | Bot application id known | Pass | Read from the Azure portal 2026-09-08: `b76bcdfb-5a16-44c4-81e0-860780daa2da`, single tenant, one secret, activated |
 | Teams app package built with the real id | Pass | On 2026-09-08 `npm run package:teams` produced `packages/sla-reminder-teams-app.zip` carrying that id as both manifest `id` and `botId`, `scopes: [personal]`, `isNotificationOnly: true` |
 | Teams app published to the organisation catalog | Not attempted | administrator action; per-person custom upload only proved the path on 2026-08-20 |
@@ -141,7 +143,14 @@ document or CI logs.
     including `elapsedTime` (working-hours elapsed time from JSM).
 - [ ] Confirm the Teams webhook accepts the payload and renders escaped text.
   - The webhook is now optional; a bot-only deployment skips this check.
-- [ ] Confirm required GitHub secrets and variables are configured.
+- [x] Confirm required GitHub secrets and variables are configured.
+  - Configured 2026-09-08. The repository had **none** of either, so the nightly
+    schedule could never have worked regardless of the webhook break.
+    Secrets: `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`. Variables:
+    `JIRA_JQL`, `JIRA_FIRST_RESPONSE_SLA_NAME`, `JIRA_RESOLUTION_SLA_NAME`,
+    `TEAMS_BOT_APP_ID`, `TEAMS_BOT_TENANT_ID`, `TEAMS_BOT_RECIPIENT_ALLOWLIST`.
+    Still missing: `TEAMS_BOT_APP_PASSWORD` as a secret, or the OIDC federated
+    credential in its place.
 - [ ] Confirm `JIRA_RESOLUTION_SLA_NAME` exactly matches the production metric.
   - `GET /rest/api/3/field` listed `Time to resolution` on 2026-08-20, which is
     the configured default; confirm it is the metric JSM actually attaches to DC

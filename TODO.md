@@ -8,6 +8,10 @@ reading order and non-negotiable invariants before touching any of this.
 
 ## Now — blocking, in order
 
+- [x] Configure the GitHub secrets and variables. Done 2026-09-08; the
+      repository previously had none of either. Dispatch run `34185580185`
+      proves Jira resolves in CI.
+
 - [x] Fix the reminder schedule. Was `0 0 * * *`; a daily run made the delivery
       window permanently unreachable for three quarters of breaches, because
       1440 minutes is a whole multiple of the 60-minute repeat interval. Set to
