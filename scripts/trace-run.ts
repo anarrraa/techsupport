@@ -55,9 +55,40 @@ console.log(`paused clocks: first response ${pausedFirst}, resolution ${pausedRe
 const statuses: Record<string, number> = {};
 for (const t of jira.tickets) statuses[t.status] = (statuses[t.status] ?? 0) + 1;
 console.log(`statuses in play: ${Object.entries(statuses).map(([k, v]) => `${k}=${v}`).join('  ')}`);
+
+// "Nothing is paused" has two very different causes: no status to pause on, or
+// a status that exists but nothing has moved into yet. Only the workflow can
+// tell them apart, so ask it directly rather than inferring.
+await reportPausableStatuses(config.jira);
 const vendorParticipants = new Set(jira.tickets.flatMap((t) => t.participants.map((p) => p.displayName)));
 console.log(`\nvendor participants seen: ${vendorParticipants.size}`);
 console.log('client-side participants were dropped in src/lib/jira.ts and are not visible here');
+
+async function reportPausableStatuses(jiraConfig: typeof config.jira): Promise<void> {
+	const project = jiraConfig.jql.match(/project\s*=\s*"?([A-Za-z][A-Za-z0-9_]*)"?/i)?.[1];
+	if (!project) return;
+	const auth = Buffer.from(`${jiraConfig.email}:${jiraConfig.apiToken}`).toString('base64');
+	const response = await fetch(`${jiraConfig.baseUrl}/rest/api/2/project/${project}/statuses`, {
+		headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' },
+	});
+	if (!response.ok) {
+		console.log(`could not read the ${project} workflow statuses: ${response.status}`);
+		return;
+	}
+	const byType = (await response.json()) as Array<{ name: string; statuses: Array<{ name: string }> }>;
+	const inPlay = new Set(jira.tickets.map((ticket) => ticket.status));
+	for (const type of byType) {
+		const names = type.statuses.map((status) => status.name);
+		if (!names.some((name) => inPlay.has(name))) continue;
+		const pausable = names.filter((name) => /wait|hold|pending/i.test(name));
+		console.log(`workflow for "${type.name}" offers: ${names.join(' · ')}`);
+		console.log(
+			pausable.length > 0
+				? `  a metric can pause on: ${pausable.join(' · ')}`
+				: '  NOTHING to pause on — add a waiting status to this workflow and publish the draft',
+		);
+	}
+}
 
 stage(2, 'First response: who is eligible for a reminder right now');
 const selection = selectReminderTickets(
