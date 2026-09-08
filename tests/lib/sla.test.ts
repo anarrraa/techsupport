@@ -65,6 +65,30 @@ test('sorts by priority and then longest overdue', () => {
 	assert.deepEqual(result.due.map((value) => value.key), ['HIGH-OLD', 'HIGH-NEW', 'LOW']);
 });
 
+test('an open window reaches every breach on a sparse schedule', () => {
+	// The schedule is twice a working day, at 10:00 and 15:00 Ulaanbaatar time.
+	// The gaps are 300 and 1140 minutes, both whole multiples of 60, so
+	// `elapsed % 60` is the same at every run for a given request: a narrower
+	// window than the repeat interval would lock three quarters of breaches out
+	// permanently. Equal window and repeat is what makes the schedule the
+	// cadence rather than a lottery.
+	const runsOverAWeek: number[] = [];
+	for (let day = 0; day < 5; day += 1) {
+		runsOverAWeek.push(day * 1_440 + 600, day * 1_440 + 900);
+	}
+	const reachable = (repeat: number, window: number) => {
+		let count = 0;
+		for (let offset = 0; offset < 60; offset += 1) {
+			if (runsOverAWeek.some((run) => isReminderWindow(0, (offset + run) * 60_000, repeat, window))) {
+				count += 1;
+			}
+		}
+		return count;
+	};
+	assert.equal(reachable(60, 60), 60, 'an open window must reach every breach');
+	assert.ok(reachable(60, 15) < 20, 'a narrow window on this schedule locks most breaches out');
+});
+
 test('a run interval that is a whole multiple of the repeat locks tickets out', () => {
 	// The reason the schedule is */15 and not daily. A daily run advances
 	// elapsed-since-breach by 1440 minutes, and 1440 % 60 === 0, so the verdict

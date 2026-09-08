@@ -82,10 +82,26 @@ Management. The application does not duplicate Jira's calendar math. It reads th
 metric named by `JIRA_FIRST_RESPONSE_SLA_NAME` and only selects an ongoing cycle
 when it is breached, not paused, and currently inside its JSM calendar.
 
-The workflow runs every 15 minutes. By default each breached ticket has a
-15-minute delivery window once every 60 minutes. This keeps the workflow stateless
-while avoiding a post on every scheduled run. GitHub Actions is best-effort, so a
-strict paging/on-call system must be implemented separately.
+The workflow runs **twice a working day**, at 10:00 and 15:00 Ulaanbaatar time,
+inside the two windows the team asked for. Mongolia is UTC+8 all year, so the
+cron entries need no seasonal adjustment.
+
+The schedule is the cadence: `REMINDER_DELIVERY_WINDOW_MINUTES` equals
+`REMINDER_REPEAT_MINUTES`, so every eligible breach is reminded on every run.
+A narrower window is only meaningful when the workflow runs far more often than
+a reminder should be sent, and it interacts badly with a sparse schedule — if
+the gap between runs is a whole multiple of the repeat interval, `elapsed %
+repeat` is identical at every run and the breaches that start outside the window
+never enter it. A test pins that relationship.
+
+**A request that has been answered is never reminded about.** The first-response
+cycle completes on the first reply, and only an `ongoing` cycle is eligible, so
+replying inside or outside the SLA both stop the reminders. Of 26 open DC
+requests on 2026-09-08, 9 had answered cycles and were excluded before any
+window or schedule logic ran.
+
+GitHub Actions is best-effort, so a strict paging/on-call system must be
+implemented separately.
 
 ## Setup
 

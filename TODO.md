@@ -18,6 +18,9 @@ reading order and non-negotiable invariants before touching any of this.
       repository previously had none of either. Dispatch run `34185580185`
       proves Jira resolves in CI.
 
+- [x] Set the schedule to the team's rhythm: twice a working day, 10:00 and
+      15:00 Ulaanbaatar. Done 2026-09-08, with the delivery window opened to
+      match so a sparse schedule cannot lock breaches out.
 - [x] Fix the reminder schedule. Was `0 0 * * *`; a daily run made the delivery
       window permanently unreachable for three quarters of breaches, because
       1440 minutes is a whole multiple of the 60-minute repeat interval. Set to

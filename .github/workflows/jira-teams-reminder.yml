@@ -2,12 +2,19 @@ name: Jira to Teams reminder
 
 on:
   schedule:
-    # Every 15 minutes, which the delivery-window logic depends on. A daily
-    # schedule is not merely coarse: it advances elapsed-since-breach by exactly
-    # 1440 minutes, and 1440 % REMINDER_REPEAT_MINUTES is 0 at the 60-minute
-    # default, so a breach outside the window stays outside it every day
-    # forever. Three quarters of breaches were never reminded at all.
-    - cron: '*/15 * * * *'
+    # Twice a working day, in Ulaanbaatar time: 10:00 and 15:00, which sit
+    # inside the two windows the team asked for (09:00-12:00 and 14:00-18:00).
+    # Cron is UTC and Mongolia is UTC+8 all year — it dropped daylight saving
+    # after 2016 — so no seasonal drift to correct for.
+    #
+    # The schedule is now the cadence, which is why
+    # REMINDER_DELIVERY_WINDOW_MINUTES must equal REMINDER_REPEAT_MINUTES. Any
+    # narrower window would silently drop breaches: the gaps between these runs
+    # are 300 and 1140 minutes, both whole multiples of 60, so `elapsed % 60`
+    # never changes for a given request and whoever starts outside the window
+    # stays outside it forever.
+    - cron: '0 2 * * 1-5'
+    - cron: '0 7 * * 1-5'
   workflow_dispatch:
     inputs:
       dry_run:
