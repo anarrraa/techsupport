@@ -193,11 +193,16 @@ async function resolveCatalogAppId(
 	// entry with the same external id. Preferring the published one keeps the
 	// choice from depending on the order Graph happens to return them, and keeps
 	// delivery on the entry every recipient can be installed from.
-	const candidates = body.value ?? [];
+	// A method Graph does not report, or one added later, ranks last rather than
+	// first: indexOf answers -1 for both, which would have preferred an unknown
+	// entry over the published one.
 	const preference = ['organization', 'store', 'sideloaded'];
-	const chosen = [...candidates].sort(
-		(a, b) =>
-			preference.indexOf(a.distributionMethod ?? '') - preference.indexOf(b.distributionMethod ?? ''),
+	const rank = (method: string | undefined): number => {
+		const index = preference.indexOf(method ?? '');
+		return index === -1 ? preference.length : index;
+	};
+	const chosen = [...(body.value ?? [])].sort(
+		(a, b) => rank(a.distributionMethod) - rank(b.distributionMethod),
 	)[0];
 	if (!chosen?.id) {
 		throw new TeamsDeliveryError(

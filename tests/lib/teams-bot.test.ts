@@ -137,6 +137,25 @@ test('prefers the published catalog entry over a sideloaded duplicate', async ()
 	);
 });
 
+test('a sideloaded-only catalog entry is still usable, and outranks an unknown method', async () => {
+	// Sideloading during a pilot is the only entry that exists until an
+	// administrator publishes, so it has to work on its own.
+	const calls: Recorded[] = [];
+	const sender = await createBotSender(
+		config(),
+		{},
+		fakeFetch(calls, {
+			installed: true,
+			catalog: [{ id: 'unknown-method' }, { id: CATALOG_ID, distributionMethod: 'sideloaded' }],
+		}),
+	);
+	await sender.send({ entraObjectId: RECIPIENT, text: 'x' });
+	assert.ok(
+		calls.some((call) => call.url.includes(`teamsApp%2Fid%20eq%20'${CATALOG_ID}'`)),
+		'a known distribution method must outrank one Graph did not report',
+	);
+});
+
 test('says so when the app is not in the organisation catalog', async () => {
 	const sender = await createBotSender(config(), {}, fakeFetch([], { catalog: [] }));
 	const error = await failureOf(sender.send({ entraObjectId: RECIPIENT, text: 'x' }));
