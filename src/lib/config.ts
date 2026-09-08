@@ -28,6 +28,19 @@ export interface TeamsBotConfig {
 	 * obtained through the OIDC federated credential instead.
 	 */
 	appPassword: string | null;
+	/**
+	 * The manifest `id` of the Teams app package. Graph matches it as
+	 * `externalId` to find the app in the organisation catalog. Usually the same
+	 * GUID as `appId`, which is why it defaults to it.
+	 */
+	appExternalId: string;
+	/**
+	 * Graph credentials, used only to install the app for a recipient and read
+	 * back their personal chat id. Default to the bot's own registration, as
+	 * goOrange does; override only if Graph lives on a separate app.
+	 */
+	graphClientId: string;
+	graphClientSecret: string | null;
 	/** Bot Connector service URL for the tenant's Teams region. */
 	serviceUrl: string;
 	/**
@@ -76,11 +89,23 @@ export interface AppConfig {
 const DEFAULT_JQL =
 'project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC';
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-	const http = {
+export function loadHttpConfig(env: NodeJS.ProcessEnv = process.env): HttpConfig {
+	return {
 		timeoutMs: integer(env, 'HTTP_TIMEOUT_MS', 10_000, 1_000, 120_000),
 		maxRetries: integer(env, 'HTTP_MAX_RETRIES', 2, 0, 5),
 	};
+}
+
+/**
+ * The bot transport on its own, for the setup scripts. They talk to Entra and
+ * Graph and have no business demanding Jira credentials.
+ */
+export function loadTeamsBotConfig(env: NodeJS.ProcessEnv = process.env): TeamsBotConfig | null {
+	return loadBotConfig(env, loadHttpConfig(env), false);
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+	const http = loadHttpConfig(env);
 	const repeatMinutes = integer(env, 'REMINDER_REPEAT_MINUTES', 60, 15, 1_440);
 	const deliveryWindowMinutes = integer(env, 'REMINDER_DELIVERY_WINDOW_MINUTES', 15, 1, 60);
 	if (deliveryWindowMinutes > repeatMinutes) {
@@ -163,12 +188,16 @@ function loadBotConfig(
 		);
 	}
 
-	const serviceUrl = env.TEAMS_BOT_SERVICE_URL?.trim() || 'https://smba.trafficmanager.net/teams/';
+	// The value proven in this tenant by goOrange's production bot.
+	const serviceUrl = env.TEAMS_BOT_SERVICE_URL?.trim() || 'https://smba.trafficmanager.net/teams';
 	validateHttpsUrl(serviceUrl, 'TEAMS_BOT_SERVICE_URL');
 	return {
 		appId,
 		tenantId,
 		appPassword,
+		appExternalId: env.TEAMS_APP_EXTERNAL_ID?.trim() || appId,
+		graphClientId: env.GRAPH_CLIENT_ID?.trim() || appId,
+		graphClientSecret: env.GRAPH_CLIENT_SECRET?.trim() || appPassword,
 		serviceUrl,
 		recipientAllowlist: parseAllowlist(env.TEAMS_BOT_RECIPIENT_ALLOWLIST),
 		http,

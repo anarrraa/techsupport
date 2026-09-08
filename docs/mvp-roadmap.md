@@ -51,7 +51,8 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Live bot direct message from this codebase | Not attempted | needs `TEAMS_BOT_APP_ID`/`TEAMS_BOT_TENANT_ID` and a credential; run `npm run verify:bot -- <object-id>` |
 | Teams app published to the organisation catalog | Not attempted | administrator action; per-person custom upload only proved the path on 2026-08-20 |
 | GitHub OIDC federated credential on the Entra app | Not attempted | code path implemented and unit tested; the credential itself is not configured |
-| `config/escalation.json` populated | Not attempted | `config/escalation.example.json` added 2026-09-07; real Entra object ids still needed |
+| `config/escalation.json` populated | Not attempted | Jira account ids for the two pilot recipients resolved 2026-09-07; object ids still needed, via `npm run resolve:ids` |
+| Delivery path matches a working bot in this tenant | Pass | On 2026-09-08 the Graph install + chat + activity sequence was taken from `zero/goOrange`'s production edge function rather than designed here |
 | Resolution metric present on DC requests | Pass | On 2026-09-07 a local dry-run scanned 28 DC requests and read the escalation clock on enough of them to select 9 crossings (L2:4, L3:3, L5:2) |
 | Bot dry-run is aggregate-only | Pass | On 2026-09-07 the dry-run output named no request, assignee, or object id |
 
@@ -271,10 +272,42 @@ escalation path, which is what contract section 3 describes.
       `src/lib/escalation.ts` reads `resolutionSla.elapsedMinutes`, which is
       JSM's working-hours elapsed time.
 
+### Delivery path revised 2026-09-08, from a working bot in the same tenant
+
+`zero/goOrange` is a Teams Tab + Bot already published and running in this
+tenant, and it solves proactive delivery differently. Its edge function
+(`supabase/functions/teams-bot/index.ts`) does not call
+`POST /v3/conversations` at all:
+
+1. Graph finds the app in the catalog by `externalId`.
+2. Graph reads `/users/{oid}/teamwork/installedApps`, and **installs the app for
+   that person** if it is absent.
+3. Graph reads `.../installedApps/{id}/chat` for the personal chat id.
+4. The Bot Connector posts one activity into that chat.
+
+This was adopted on 2026-09-08. It changes two things previously recorded here:
+
+- **The Teams app setup policy is no longer needed.** The decision of 2026-08-24
+  chose a setup policy over `TeamsAppInstallation.ReadWrite*` because the
+  standing permission looked broader. But that permission is already granted and
+  consented in this tenant for goOrange, so the narrower-looking option costs an
+  admin request that the broader one does not. Publishing to the organisation
+  catalog is still required — Graph finds the app by its catalog entry.
+- **`403 ForbiddenOperationException` stops being the common failure.** It was
+  the expected outcome for anyone who had not installed the app; installing
+  first removes the condition instead of reporting it.
+
+`https://smba.trafficmanager.net/teams` is confirmed as the Bot Connector
+endpoint for this tenant, and the tenant id is
+`376a710f-b223-451f-ba55-efc974d8716c`, both read from goOrange's configuration.
+
 ### V2 milestone 2: verify the bot in production
 
-- [ ] Publish the Teams app package to the organisation catalog and assign a
-      Teams app setup policy to the recipient group.
+- [ ] Publish the Teams app package to the organisation catalog. Build it with
+      `TEAMS_BOT_APP_ID=<guid> npm run package:teams`.
+- [ ] Grant and consent the Graph application permissions:
+      `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`,
+      `User.Read.All`.
 - [ ] Configure the GitHub OIDC federated credential on the Entra app
       registration (audience `api://AzureADTokenExchange`).
 - [ ] Populate `config/escalation.json` with real object ids and commit it.

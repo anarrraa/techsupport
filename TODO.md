@@ -22,20 +22,25 @@ reading order and non-negotiable invariants before touching any of this.
       `packages/teams-app/` for the real brand marks. Catalog publish validates
       both.
 - [ ] Get an administrator to publish the Teams app package to the
-      organisation catalog and assign a Teams app setup policy to the
-      recipient group (model decided 2026-08-24; see the V2 milestone in
-      `docs/mvp-roadmap.md`). Per-person custom app upload is a spike
-      technique, not a deployment model.
+      organisation catalog. Build it with
+      `TEAMS_BOT_APP_ID=<guid> npm run package:teams`. **No Teams app setup
+      policy is needed** — superseded 2026-09-08 by the goOrange delivery path,
+      which installs the app per recipient through Graph. See the revision note
+      in `docs/mvp-roadmap.md`.
+- [ ] Grant and consent the Graph application permissions on the app
+      registration: `TeamsAppInstallation.ReadWriteForUser.All`,
+      `AppCatalog.Read.All`, and `User.Read.All` (for `npm run resolve:ids`).
+      goOrange already holds these in this tenant, so the pattern is approved.
 - [ ] Configure a GitHub OIDC federated credential on the Entra app
       registration (decided 2026-08-24, matching the existing Vertex
       authentication pattern) instead of a client secret. Audience
       `api://AzureADTokenExchange`, subject
       `repo:<owner>/<repo>:ref:refs/heads/main`. The code path exists and is
       unit tested; only the credential is missing.
-- [ ] Copy `config/escalation.example.json` to `config/escalation.json` and fill
-      in a real Microsoft Entra object id for every possible assignee and every
-      L2-L5 contact, plus the on-call handle. Until this file exists the bot path
-      fails visibly by path, on purpose.
+- [ ] Fill in `config/escalation.json`: it already carries both pilot
+      recipients' emails and real Jira account ids, so
+      `npm run resolve:ids` fills the rest. Commit it — GitHub Actions reads it
+      from the repository.
 - [ ] Prove the transport from this codebase:
       `npm run verify:bot -- <entra-object-id>`. Record the outcome in the
       evidence snapshot in `docs/mvp-roadmap.md`.

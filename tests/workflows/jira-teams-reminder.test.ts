@@ -407,7 +407,10 @@ function config(
 				appId: '11111111-2222-3333-4444-555555555555',
 				tenantId: '99999999-8888-7777-6666-555555555555',
 				appPassword: 'synthetic-secret',
-				serviceUrl: 'https://smba.invalid/teams/',
+				appExternalId: '11111111-2222-3333-4444-555555555555',
+				graphClientId: '11111111-2222-3333-4444-555555555555',
+				graphClientSecret: 'synthetic-secret',
+				serviceUrl: 'https://smba.invalid/teams',
 				recipientAllowlist: overrides.allowlist ?? null,
 				http,
 			}

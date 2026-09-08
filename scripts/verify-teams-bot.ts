@@ -1,14 +1,13 @@
 /**
- * Proves the Bot Connector delivery path end to end before the scheduled
- * workflow depends on it.
+ * Proves the delivery path end to end before the scheduled workflow depends on
+ * it: token, catalog lookup, install for the recipient, chat lookup, activity.
  *
  *   node scripts/verify-teams-bot.ts <entra-object-id>
  *
- * Reads TEAMS_BOT_APP_ID, TEAMS_BOT_TENANT_ID and either TEAMS_BOT_APP_PASSWORD
- * or the GitHub OIDC runner variables. Prints outcomes only: no token, secret,
- * or recipient identifier is written to the output.
+ * Prints outcomes only: no token, secret, or recipient identifier reaches the
+ * output.
  */
-import type { TeamsBotConfig } from '../src/lib/config.ts';
+import { loadTeamsBotConfig } from '../src/lib/config.ts';
 import { createBotSender, TeamsDeliveryError } from '../src/lib/teams-bot.ts';
 
 const recipient = process.argv[2]?.trim();
@@ -17,27 +16,28 @@ if (!recipient) {
 	process.exit(2);
 }
 
-const appId = process.env.TEAMS_BOT_APP_ID?.trim();
-const tenantId = process.env.TEAMS_BOT_TENANT_ID?.trim();
-if (!appId || !tenantId) {
-	console.error('Set TEAMS_BOT_APP_ID and TEAMS_BOT_TENANT_ID first');
+const config = loadTeamsBotConfig();
+if (!config) {
+	console.error('Set TEAMS_BOT_APP_ID and TEAMS_BOT_TENANT_ID first (see .env.example).');
 	process.exit(2);
 }
 
-const config: TeamsBotConfig = {
-	appId,
-	tenantId,
-	appPassword: process.env.TEAMS_BOT_APP_PASSWORD?.trim() || null,
-	serviceUrl:
-		process.env.TEAMS_BOT_SERVICE_URL?.trim() || 'https://smba.trafficmanager.net/teams/',
-	// The check addresses exactly the id given on the command line.
-	recipientAllowlist: null,
-	http: { timeoutMs: 15_000, maxRetries: 1 },
+const REMEDY: Record<string, string> = {
+	'not-in-catalog':
+		'Publish the app package to the organisation catalog, then check that TEAMS_APP_EXTERNAL_ID '
+			+ 'matches the manifest id of the published package.',
+	'install-forbidden':
+		'Grant the app registration TeamsAppInstallation.ReadWriteForUser.All and AppCatalog.Read.All '
+			+ 'as application permissions, with admin consent.',
+	'not-installed':
+		'Graph reported no personal installation even after installing. Confirm the recipient is a '
+			+ 'licensed Teams user in this tenant.',
+	'writes-blocked': 'A tenant or app policy forbids bot messages to this recipient.',
 };
 
 try {
 	const sender = await createBotSender(config);
-	console.log('Bot Framework token acquired');
+	console.log('Bot Framework and Graph tokens acquired');
 	await sender.send({
 		entraObjectId: recipient,
 		text: 'Delivery check from the SLA reminder workflow. No action needed.',
@@ -46,13 +46,8 @@ try {
 } catch (error) {
 	if (error instanceof TeamsDeliveryError) {
 		console.error(`Delivery failed (${error.reason}): ${error.message}`);
-		if (error.reason === 'not-installed') {
-			console.error(
-				'The recipient has no personal installation of the Teams app. Publish the app '
-					+ 'package to the organisation catalog and assign a Teams app setup policy, or '
-					+ 'have the recipient upload it once.',
-			);
-		}
+		const remedy = REMEDY[error.reason];
+		if (remedy) console.error(remedy);
 	} else {
 		console.error(error instanceof Error ? error.message : String(error));
 	}

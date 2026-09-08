@@ -110,11 +110,21 @@ account.
 
 ## Personal Teams bot
 
-Microsoft Graph cannot direct-message a person from an unattended job:
-`POST /chats/{id}/messages` has no usable application permission. The verified
-path is a Bot Framework bot, which needs no hosting and no inbound endpoint —
-only a token, a conversation, and an activity. `docs/mvp-roadmap.md` records the
-executed evidence.
+Microsoft Graph cannot post the message: `POST /chats/{id}/messages` has no
+usable application permission. But it can do the two things that make a message
+deliverable, and this is the split the tenant's own production bot
+(`zero/goOrange`) already uses:
+
+```text
+Graph  -> install the app for the recipient, read back their personal chat id
+Bot    -> POST {serviceUrl}/v3/conversations/{chatId}/activities
+```
+
+The obvious alternative, `POST /v3/conversations`, returns
+`403 ForbiddenOperationException` for anyone who has not installed the app
+themselves. Installing first removes that failure rather than reporting it,
+which is worth two Graph calls per recipient. No hosting and no inbound endpoint
+are involved either way.
 
 Prerequisites, in order:
 
@@ -138,30 +148,31 @@ Prerequisites, in order:
    `color.png` at 192x192 and `outline.png` at 32x32 with a transparent
    background. The `developer` URLs in the manifest must resolve before the
    organisation catalog will accept the package.
-4. The app installed in each recipient's personal scope. At organisation scale
-   that means an administrator publishes the package to the organisation catalog
-   and assigns a Teams app setup policy to the recipient group; a per-person
-   custom upload only proves the path.
-5. A GitHub OIDC federated credential on the app registration, so no client
+4. An administrator publishes the package to the **organisation catalog**. No
+   Teams app setup policy and no per-person upload are needed: Graph installs
+   the app for each recipient on first delivery. The catalog publish is the one
+   step that cannot be automated away, because Graph finds the app by its
+   catalog entry.
+5. Graph application permissions with admin consent:
+   `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`, and
+   `User.Read.All` for `npm run resolve:ids`.
+6. A GitHub OIDC federated credential on the app registration, so no client
    secret is stored. Subject `repo:<owner>/<repo>:ref:refs/heads/main`, audience
    `api://AzureADTokenExchange`.
-6. `config/escalation.json`, copied from the example. Fill in each person's
+7. `config/escalation.json`, copied from the example. Fill in each person's
    `email` and `jiraAccountId`, then let the object ids be looked up rather than
    pasted:
 
    ```sh
-   brew install azure-cli
-   az login --tenant zerotech.mn
    npm run resolve:ids
    ```
 
-   Teams rejects an email or user principal name when addressing someone, so the
-   object id is what the bot needs; the email is recorded only so the id can be
-   resolved. A hand-pasted GUID that is off by a character is a recipient who is
-   silently unreachable, which is why this is a script that validates the file
-   afterwards. With no Azure CLI available, read each id from
-   [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer):
-   `GET https://graph.microsoft.com/v1.0/users/<email>?$select=id,displayName`.
+   That reuses the same app-only Graph credential the bot uses, so there is no
+   Azure CLI to install and no interactive sign-in. Teams rejects an email or
+   user principal name when addressing someone, so the object id is what the bot
+   needs; the email is recorded only so the id can be resolved. A hand-pasted
+   GUID off by a character is a recipient who is silently unreachable, which is
+   why this is a script that validates the file afterwards.
 
 Prove the transport before scheduling anything:
 
@@ -170,9 +181,10 @@ TEAMS_BOT_APP_ID=... TEAMS_BOT_TENANT_ID=... TEAMS_BOT_APP_PASSWORD=... \
   npm run verify:bot -- <entra-object-id>
 ```
 
-`403 ForbiddenOperationException` means the recipient has no personal
-installation; `403 MessageWritesBlocked` means a tenant or app policy forbids the
-message. The two need different fixes, so the code reports them separately.
+Each failure names its own fix, because they need different people to act:
+`not-in-catalog` needs an administrator to publish the package,
+`install-forbidden` needs Graph consent, `writes-blocked` is a tenant policy,
+and `not-installed` means Graph installed the app but Teams still had no chat.
 
 ## Escalation
 
