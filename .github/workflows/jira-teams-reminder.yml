@@ -67,12 +67,18 @@ jobs:
             echo "No ESCALATION_DIRECTORY_JSON secret set; the run will fail if the bot is configured."
           fi
 
-      # Carries "highest escalation level notified per ticket" between runs. The
-      # key is unique per run and the prefix restores the newest entry, because a
-      # cache entry cannot be overwritten in place. A miss re-notifies a level
-      # rather than skipping one.
+      # Carries "highest escalation level notified per ticket" between runs.
+      # Restore and save are separate steps on purpose: actions/cache skips its
+      # post-run upload when the job fails, and this job deliberately fails when
+      # any recipient could not be reached — so the runs whose partial progress
+      # matters most were exactly the ones that discarded it, re-notifying every
+      # level that had succeeded. `if: always()` saves either way.
+      #
+      # The key is unique per run with a prefix restore, because a cache entry
+      # cannot be overwritten in place. A miss re-notifies a level rather than
+      # skipping one.
       - name: Restore escalation state
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .escalation-state
           key: escalation-state-${{ github.run_id }}
@@ -123,3 +129,10 @@ jobs:
           HTTP_TIMEOUT_MS: ${{ vars.HTTP_TIMEOUT_MS }}
           HTTP_MAX_RETRIES: ${{ vars.HTTP_MAX_RETRIES }}
         run: npm run remind
+
+      - name: Save escalation state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .escalation-state
+          key: escalation-state-${{ github.run_id }}

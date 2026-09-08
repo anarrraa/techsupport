@@ -265,7 +265,7 @@ be messaged, whatever the escalation directory says. Set it in **both** places
 reach people a scheduled run would not:
 
 ```sh
-TEAMS_BOT_RECIPIENT_ALLOWLIST=anar@zerotech.mn,tergel@zerotech.mn
+TEAMS_BOT_RECIPIENT_ALLOWLIST=first.pilot@your-org.com,second.pilot@your-org.com
 ```
 
 Entries match the directory by email, directory handle, or object id. The

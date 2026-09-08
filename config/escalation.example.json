@@ -3,29 +3,29 @@
 	"people": {
 		"dev-batbayar": {
 			"name": "Batbayar",
-			"email": "batbayar@zerotech.mn",
+			"email": "batbayar@your-org.com",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000",
 			"jiraAccountId": "5f8a1b2c3d4e5f6a7b8c9d0e"
 		},
 		"lead-oyunaa": {
 			"name": "Oyunaa",
-			"email": "oyunaa@zerotech.mn",
+			"email": "oyunaa@your-org.com",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000",
 			"jiraAccountId": "6a9b2c3d4e5f6a7b8c9d0e1f"
 		},
 		"cto": {
 			"name": "CTO",
-			"email": "cto@zerotech.mn",
+			"email": "cto@your-org.com",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000"
 		},
 		"ceo": {
 			"name": "CEO",
-			"email": "ceo@zerotech.mn",
+			"email": "ceo@your-org.com",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000"
 		},
 		"noc-oncall": {
 			"name": "NOC On-call",
-			"email": "noc@zerotech.mn",
+			"email": "noc@your-org.com",
 			"entraObjectId": "00000000-0000-0000-0000-000000000000"
 		}
 	},

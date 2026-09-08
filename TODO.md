@@ -85,7 +85,7 @@ reading order and non-negotiable invariants before touching any of this.
       `Direct message delivered`. Recorded in the evidence snapshot.
 - [ ] Stage the first live run to two people only: set the
       `TEAMS_BOT_RECIPIENT_ALLOWLIST` repository variable to
-      `anar@zerotech.mn,tergel@zerotech.mn`. Widen it once the messages read the
+      the two pilot recipients. Widen it once the messages read the
       way they should.
 - [ ] Seed the escalation state before the first live run
       (`ESCALATION_SEED_ONLY=true`, `REMINDER_DRY_RUN` unset). The 2026-09-07
