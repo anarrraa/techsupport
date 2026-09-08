@@ -45,6 +45,21 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
+      # The escalation directory names real people — emails, Jira account ids and
+      # Entra object ids — and this repository is public, so the file is
+      # gitignored and carried as a secret instead. Locally it is just a file.
+      - name: Write the escalation directory
+        env:
+          ESCALATION_DIRECTORY_JSON: ${{ secrets.ESCALATION_DIRECTORY_JSON }}
+        run: |
+          if [ -n "$ESCALATION_DIRECTORY_JSON" ]; then
+            mkdir -p config
+            printf '%s' "$ESCALATION_DIRECTORY_JSON" > config/escalation.json
+            echo "Escalation directory written from the repository secret."
+          else
+            echo "No ESCALATION_DIRECTORY_JSON secret set; the run will fail if the bot is configured."
+          fi
+
       # Carries "highest escalation level notified per ticket" between runs. The
       # key is unique per run and the prefix restores the newest entry, because a
       # cache entry cannot be overwritten in place. A miss re-notifies a level

@@ -3,7 +3,6 @@
 	"manifestVersion": "1.23",
 	"version": "1.0.0",
 	"id": "${TEAMS_BOT_APP_ID}",
-	"packageName": "mn.zerotech.techsupport.slareminder",
 	"developer": {
 		"name": "Zerotech",
 		"websiteUrl": "https://zerotech.mn",
