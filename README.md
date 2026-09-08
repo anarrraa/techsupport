@@ -159,9 +159,17 @@ Prerequisites, in order:
 6. A GitHub OIDC federated credential on the app registration, so no client
    secret is stored. Subject `repo:<owner>/<repo>:ref:refs/heads/main`, audience
    `api://AzureADTokenExchange`.
-7. `config/escalation.json`, copied from the example. Fill in each person's
-   `email` and `jiraAccountId`, then let the object ids be looked up rather than
-   pasted:
+7. `config/escalation.json`, copied from the example. **It is gitignored**: it
+   names real people, and this repository is public. GitHub Actions reads it from
+   the `ESCALATION_DIRECTORY_JSON` secret instead, which the workflow writes to
+   that path before the run:
+
+   ```sh
+   gh secret set ESCALATION_DIRECTORY_JSON < config/escalation.json
+   ```
+
+   Re-run that whenever the directory changes. Fill in each person's `email` and
+   `jiraAccountId`, then let the object ids be looked up rather than pasted:
 
    ```sh
    npm run resolve:ids

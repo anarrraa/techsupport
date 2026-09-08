@@ -51,9 +51,11 @@ reading order and non-negotiable invariants before touching any of this.
       `repo:<owner>/<repo>:ref:refs/heads/main`. The code path exists and is
       unit tested; only the credential is missing.
 - [ ] Fill in `config/escalation.json`: it already carries both pilot
-      recipients' emails and real Jira account ids, so
-      `npm run resolve:ids` fills the rest. Commit it — GitHub Actions reads it
-      from the repository.
+      recipients' emails and real Jira account ids, so `npm run resolve:ids`
+      fills the rest — or read the two object ids straight from the Azure portal.
+      Then `gh secret set ESCALATION_DIRECTORY_JSON < config/escalation.json`.
+      **Do not commit it.** This repository is public and the file names real
+      people; it is gitignored for that reason.
 - [ ] Prove the transport from this codebase:
       `npm run verify:bot -- <entra-object-id>`. Record the outcome in the
       evidence snapshot in `docs/mvp-roadmap.md`.
