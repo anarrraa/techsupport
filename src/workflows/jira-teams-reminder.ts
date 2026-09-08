@@ -236,7 +236,7 @@ async function runBotDelivery(
 	const observed = {
 		recipients: plan.messages.length,
 		messages: totalMessages,
-		unmappedAssignees: plan.unmappedAssignees,
+		unmappedRecipients: plan.unmappedRecipients,
 		missingOnCall: plan.missingOnCall,
 		suppressedByAllowlist: plan.suppressedByAllowlist,
 	};

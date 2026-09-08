@@ -30,6 +30,47 @@ test('reminds the assignee directly with the contractual response window', () =>
 	assert.match(text, /гэрээний хугацаа 30 мин/);
 });
 
+test('reminds the participants, never the assignee', () => {
+	// The assignee is the support team that triages a request; the participants
+	// are who is expected to act on it.
+	const plan = planDirectMessages({
+		due: [
+			ticket({
+				key: 'DC-1',
+				assignee: 'Support Triage',
+				assigneeAccountId: 'jira-triage',
+				participants: [{ accountId: 'jira-dev', displayName: 'Developer' }],
+			}),
+		],
+		escalations: [],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+	});
+
+	assert.deepEqual(plan.messages.map((message) => message.entraObjectId), [DEV]);
+	assert.equal(plan.unmappedRecipients, 0);
+});
+
+test('reminds every vendor participant on the request', () => {
+	const plan = planDirectMessages({
+		due: [
+			ticket({
+				key: 'DC-1',
+				participants: [
+					{ accountId: 'jira-dev', displayName: 'Developer' },
+					{ accountId: 'jira-lead', displayName: 'Team Lead' },
+				],
+			}),
+		],
+		escalations: [],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+	});
+	assert.deepEqual(plan.messages.map((message) => message.entraObjectId).sort(), [DEV, LEAD].sort());
+});
+
 test('groups every breached request for one person into one direct message', () => {
 	const plan = planDirectMessages({
 		due: [ticket({ key: 'DC-1' }), ticket({ key: 'DC-2' })],
@@ -44,16 +85,16 @@ test('groups every breached request for one person into one direct message', () 
 	assert.match(text, /DC-2/);
 });
 
-test('counts a breach whose assignee is absent from the directory', () => {
+test('counts a breach with no participant the directory knows', () => {
 	const plan = planDirectMessages({
-		due: [ticket({ assigneeAccountId: 'jira-newcomer' })],
+		due: [ticket({ participants: [{ accountId: 'jira-newcomer', displayName: 'Newcomer' }] })],
 		escalations: [],
 		config: directory(),
 		now: NOW,
 		maxChars: 12_000,
 	});
 	assert.deepEqual(plan.messages, []);
-	assert.equal(plan.unmappedAssignees, 1);
+	assert.equal(plan.unmappedRecipients, 1);
 });
 
 test('escalates to the configured contact and records the level to persist', () => {
@@ -207,6 +248,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		assigneeAccountId: 'jira-dev',
 		url: 'https://jira.invalid/browse/DC-1',
 		firstResponseSla: cycle(),
+		participants: [{ accountId: 'jira-dev', displayName: 'Developer' }],
 		resolutionSla: cycle(),
 		...overrides,
 	};

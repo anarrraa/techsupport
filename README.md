@@ -202,6 +202,24 @@ Each failure names its own fix, because they need different people to act:
 `install-forbidden` needs Graph consent, `writes-blocked` is a tenant policy,
 and `not-installed` means Graph installed the app but Teams still had no chat.
 
+## Who gets the first-response reminder
+
+The **request participants**, not the assignee. On this service desk the
+assignee is the support team that triages a request; the participants are the
+people expected to act on it. The field is
+`JIRA_PARTICIPANTS_FIELD`, `customfield_10065` by default.
+
+That field mixes vendor staff with the client's own portal users, and the client
+must never be told they owe a response. `src/lib/jira.ts` keeps only
+`accountType: 'atlassian'` when it builds `JiraTicket.participants`, so the
+filter happens once at the boundary rather than in every caller — a client
+contact cannot reach routing at all. Two tests hold that line, one at the
+adapter and one at the router.
+
+A request whose participants are all absent from the directory is counted as
+`unmappedRecipients` and warned about. It is not an error: one person missing
+must not stop everyone else's reminders.
+
 ## Escalation
 
 `docs/sla-matrix.md` sections 2 and 3 are implemented in `src/lib/escalation.ts`:

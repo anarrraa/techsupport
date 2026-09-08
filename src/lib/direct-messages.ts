@@ -31,8 +31,13 @@ export interface PlannedDirectMessage {
 
 export interface DirectMessagePlan {
 	messages: PlannedDirectMessage[];
-	/** Breaches whose assignee has no Entra object id in the directory. */
-	unmappedAssignees: number;
+	/**
+	 * Breach-and-participant pairs the directory could not resolve, and breaches
+	 * with no vendor participant at all. Counted rather than raised: one person
+	 * missing from the directory must not stop everyone else's reminders, and
+	 * the channel post still covers them.
+	 */
+	unmappedRecipients: number;
 	/** Off-hours Critical/High escalations with no on-call contact configured. */
 	missingOnCall: number;
 	/** Recipients the policy selected but the staged-rollout gate withheld. */
@@ -63,16 +68,26 @@ export function planDirectMessages(input: {
 	const { due, escalations, config, now, maxChars } = input;
 	const allowlist = normalizeAllowlist(input.allowlist, config);
 	const recipients = new Map<string, Recipient>();
-	let unmappedAssignees = 0;
+	let unmappedRecipients = 0;
 	let missingOnCall = 0;
 
+	// The first-response reminder goes to the request's participants, not its
+	// assignee. The assignee is the support team that triages; the participants
+	// are the people expected to act. `JiraTicket.participants` is already
+	// filtered to vendor staff, so a client contact can never appear here.
 	for (const ticket of due) {
-		const person = personForJiraAccount(config, ticket.assigneeAccountId);
-		if (!person) {
-			unmappedAssignees += 1;
+		if (ticket.participants.length === 0) {
+			unmappedRecipients += 1;
 			continue;
 		}
-		add(recipients, person, 1, ticket, null, null);
+		let reached = 0;
+		for (const participant of ticket.participants) {
+			const person = personForJiraAccount(config, participant.accountId);
+			if (!person) continue;
+			add(recipients, person, 1, ticket, null, null);
+			reached += 1;
+		}
+		if (reached === 0) unmappedRecipients += 1;
 	}
 
 	for (const candidate of escalations) {
@@ -88,7 +103,7 @@ export function planDirectMessages(input: {
 					: contactFor(config, projectKeyOf(candidate.ticket.key), level);
 			if (!person) {
 				// The assignee leg of an off-hours parallel notification only.
-				unmappedAssignees += 1;
+				unmappedRecipients += 1;
 				continue;
 			}
 			add(recipients, person, level, candidate.ticket, candidate.level, onCallName);
@@ -118,7 +133,7 @@ export function planDirectMessages(input: {
 			}),
 		});
 	}
-	return { messages, unmappedAssignees, missingOnCall, suppressedByAllowlist };
+	return { messages, unmappedRecipients, missingOnCall, suppressedByAllowlist };
 }
 
 /**

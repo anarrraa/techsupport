@@ -227,6 +227,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 			breachTimeEpochMillis: NOW.getTime() - 90 * 60_000,
 			elapsedMinutes: 90,
 		},
+		participants: [],
 		resolutionSla: null,
 		...overrides,
 	};

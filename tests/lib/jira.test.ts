@@ -261,6 +261,52 @@ test('reports a missing resolution metric without failing the first-response pat
 	assert.equal(result.tickets[0]?.resolutionSla, null);
 });
 
+test('keeps client portal users out of the participant list', async () => {
+	// The field mixes vendor staff with the client's own people. Telling the
+	// client they owe a response is the one delivery this project must never
+	// make, so the filter is asserted at the boundary that produces the list.
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			const issueWithParticipants = {
+				...issue('SUP-1'),
+				fields: {
+					...issue('SUP-1').fields,
+					customfield_10065: [
+						{ accountId: 'agent-1', displayName: 'Vendor Dev', accountType: 'atlassian' },
+						{ accountId: 'qm:tenant:client-1', displayName: 'Client Manager', accountType: 'customer' },
+						{ accountId: 'agent-2', displayName: 'Vendor Lead', accountType: 'atlassian' },
+						{ displayName: 'No account id', accountType: 'atlassian' },
+					],
+				},
+			};
+			return Response.json({ issues: [issueWithParticipants], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.deepEqual(result.tickets[0]?.participants, [
+		{ accountId: 'agent-1', displayName: 'Vendor Dev' },
+		{ accountId: 'agent-2', displayName: 'Vendor Lead' },
+	]);
+});
+
+test('treats an absent or malformed participants field as nobody', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({
+				issues: [{ ...issue('SUP-1'), fields: { ...issue('SUP-1').fields, customfield_10065: null } }],
+				isLast: true,
+			});
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.deepEqual(result.tickets[0]?.participants, []);
+});
+
 function config(): JiraConfig {
 	return {
 		baseUrl: 'https://example.atlassian.net',
@@ -275,6 +321,7 @@ function config(): JiraConfig {
 		slaConcurrency: 2,
 		firstResponseSlaName: 'First response',
 		resolutionSlaName: 'Time to resolution',
+		participantsField: 'customfield_10065',
 		http: { timeoutMs: 1_000, maxRetries: 0 },
 	};
 }

@@ -8,6 +8,12 @@ reading order and non-negotiable invariants before touching any of this.
 
 ## Now — blocking, in order
 
+- [ ] Check how Teams renders an escaped `>` in a bot message. `DC-863`'s summary
+      contains `EZ Store > Орлого`, and the sanitiser turns that into `&gt;`,
+      which is correct for the channel webhook but may show literally in a
+      direct message. Look at that line in the next real delivery before
+      deciding whether the bot needs its own escape target.
+
 - [x] Configure the GitHub secrets and variables. Done 2026-09-08; the
       repository previously had none of either. Dispatch run `34185580185`
       proves Jira resolves in CI.

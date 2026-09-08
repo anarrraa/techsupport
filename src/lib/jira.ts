@@ -11,6 +11,12 @@ export interface SlaCycle {
 	elapsedMinutes: number | null;
 }
 
+/** A Jira account that belongs to the vendor, never to the client. */
+export interface JiraAgent {
+	accountId: string;
+	displayName: string;
+}
+
 export interface JiraTicket {
 	key: string;
 	summary: string;
@@ -19,6 +25,15 @@ export interface JiraTicket {
 	assignee: string;
 	/** Needed to resolve the assignee's Entra object id; absent when unassigned. */
 	assigneeAccountId: string | null;
+	/**
+	 * Request participants, filtered to `accountType: 'atlassian'`.
+	 *
+	 * The field mixes vendor staff with the client's own portal users, and the
+	 * client must never be told they owe a response. `accountType` is Jira's own
+	 * answer to which is which, so the filter happens here, at the boundary,
+	 * rather than being left for every caller to remember.
+	 */
+	participants: JiraAgent[];
 	url: string;
 	firstResponseSla: SlaCycle | null;
 	/** The escalation clock of `docs/sla-matrix.md` section 2. */
@@ -52,6 +67,7 @@ export async function fetchTickets(
 		priority: issue.fields.priority?.name ?? 'None',
 		assignee: issue.fields.assignee?.displayName ?? 'Unassigned',
 		assigneeAccountId: issue.fields.assignee?.accountId ?? null,
+		participants: agentParticipants(issue, config.participantsField),
 		url: buildTicketUrl(ticketBaseUrl, issue.key),
 		firstResponseSla: slas[index]?.firstResponse ?? null,
 		resolutionSla: slas[index]?.resolution ?? null,
@@ -70,6 +86,17 @@ export async function fetchTickets(
 		withoutResolutionSla: tickets.filter((ticket) => ticket.resolutionSla === null).length,
 		truncated: issues.truncated,
 	};
+}
+
+function agentParticipants(issue: JiraIssue, field: string): JiraAgent[] {
+	const raw = (issue.fields as Record<string, unknown>)[field];
+	if (!Array.isArray(raw)) return [];
+	const agents: JiraAgent[] = [];
+	for (const value of raw as JiraUser[]) {
+		if (value?.accountType !== 'atlassian' || !value.accountId) continue;
+		agents.push({ accountId: value.accountId, displayName: value.displayName ?? 'Unknown' });
+	}
+	return agents;
 }
 
 function canonicalTicketBaseUrl(value: string): URL {
@@ -116,7 +143,7 @@ async function fetchIssuePages(
 				body: JSON.stringify({
 					jql: config.jql,
 					maxResults,
-					fields: ['summary', 'status', 'priority', 'assignee'],
+					fields: ['summary', 'status', 'priority', 'assignee', config.participantsField],
 					...(nextPageToken ? { nextPageToken } : {}),
 				}),
 			},
@@ -254,6 +281,13 @@ async function mapConcurrent<T, R>(
 	return results;
 }
 
+interface JiraUser {
+	accountId?: string;
+	displayName?: string;
+	/** `atlassian` for vendor staff, `customer` for the client's portal users. */
+	accountType?: string;
+}
+
 interface JiraIssue {
 	key: string;
 	fields: {
@@ -261,6 +295,7 @@ interface JiraIssue {
 		status?: { name?: string };
 		priority?: { name?: string };
 		assignee?: { displayName?: string; accountId?: string };
+		[customField: string]: unknown;
 	};
 }
 

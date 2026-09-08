@@ -17,6 +17,11 @@ export interface JiraConfig {
 	firstResponseSlaName: string;
 	/** The JSM metric that drives the escalation clock in `docs/sla-matrix.md`. */
 	resolutionSlaName: string;
+	/**
+	 * Custom field holding Request participants. The id differs per Jira
+	 * instance, so it is configuration rather than a constant.
+	 */
+	participantsField: string;
 	http: HttpConfig;
 }
 
@@ -146,6 +151,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			firstResponseSlaName:
 				env.JIRA_FIRST_RESPONSE_SLA_NAME?.trim() || 'Time To First Response',
 			resolutionSlaName: env.JIRA_RESOLUTION_SLA_NAME?.trim() || 'Time to resolution',
+			participantsField: env.JIRA_PARTICIPANTS_FIELD?.trim() || 'customfield_10065',
 			http,
 		},
 		teamsWebhookUrl,
