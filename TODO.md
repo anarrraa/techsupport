@@ -8,6 +8,14 @@ reading order and non-negotiable invariants before touching any of this.
 
 ## Now — blocking, in order
 
+- [ ] **Trigger the run from something that keeps time.** GitHub's cron is two
+      hours late at the median and has been eight hours late, and on 2026-09-09
+      it did not fire at all — measured in `docs/mvp-roadmap.md`. A requirement
+      stated as "once between 09:00 and 12:00" cannot be met by it. Dispatch the
+      workflow from Supabase (already in this tenant for goOrange) or any
+      punctual scheduler, then delete the `schedule:` block so the two triggers
+      cannot double-deliver.
+
 - [x] Deploy. PR #2 and #3 merged 2026-09-08; escalation state seeded in the
       Actions cache (run `34203911077`, 0 messages sent); a dry-run on `main`
       confirms 2 recipients through the gate and 11 withheld, with no identity

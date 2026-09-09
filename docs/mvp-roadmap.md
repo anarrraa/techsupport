@@ -70,6 +70,7 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Teams app published to the organisation catalog | Not attempted | administrator action; per-person custom upload only proved the path on 2026-08-20 |
 | GitHub OIDC federated credential on the Entra app | Not attempted | code path implemented and unit tested; the credential itself is not configured |
 | `config/escalation.json` populated | Not attempted | Jira account ids for the two pilot recipients resolved 2026-09-07; object ids still needed, via `npm run resolve:ids` |
+| **GitHub's cron cannot meet the time-window requirement** | Blocking, measured 2026-09-09 | The 02:00 UTC run on 2026-09-09 never fired at all. Measuring every past `schedule` event against its cron time gives delays of 45, 46, 128, 130, 131, 135, 135, 154, 160, 168, 295, 357 and 489 minutes — a median around two hours and a tail past eight. A 10:23 Ulaanbaatar slot therefore lands at 12:23 typically and 18:23 at worst, outside the 09:00-12:00 window the team asked for. Moving the cron off the hour (`:00` to `:23`) did not help. `workflow_dispatch` is unaffected: every manual dispatch in this project started within seconds. The fix is an external trigger calling the dispatch API, not more cron tuning |
 | Schedule set to the team's working rhythm | Changed 2026-09-08 | Twice a working day: `0 2 * * 1-5` and `0 7 * * 1-5`, which are 10:00 and 15:00 in Ulaanbaatar (UTC+8, no daylight saving since 2016). `REMINDER_DELIVERY_WINDOW_MINUTES` was raised to equal `REMINDER_REPEAT_MINUTES` in the same change: the gaps between these runs are 300 and 1140 minutes, both whole multiples of 60, so a 15-minute window would have reached only 25% of breaches and always the same 25% |
 | Answered requests stop being reminded | Pass | Verified against live Jira 2026-09-08: 9 of 26 open DC requests have a completed first-response cycle and are excluded by `selectReminderTickets` before any window logic. Replying inside or outside the SLA both end the reminders; only an `ongoing` cycle is eligible |
 | Schedule matches the delivery-window design | Superseded 2026-09-08 | The schedule was `0 0 * * *`. A daily run advances elapsed-since-breach by 1440 minutes and `1440 % 60 == 0`, so `isReminderWindow` returned the same verdict for a given ticket on every run: breaches whose age mod 60 fell outside the 15-minute window were **never** reminded, permanently, not occasionally. Reproduced against `src/lib/sla.ts`: offsets 20 and 47 answered `no` on seven consecutive days; at `*/15 * * * *` every offset is reminded once an hour |
@@ -382,6 +383,39 @@ This was adopted on 2026-09-08. It changes two things previously recorded here:
 `https://smba.trafficmanager.net/teams` is confirmed as the Bot Connector
 endpoint for this tenant, and the tenant id is
 `376a710f-b223-451f-ba55-efc974d8716c`, both read from goOrange's configuration.
+
+### Trigger the run from something that keeps time
+
+GitHub's scheduler is not a clock. The measurement above rules it out for a
+requirement stated as "once between 09:00 and 12:00", and no cron expression
+fixes a two-hour median queueing delay.
+
+`workflow_dispatch` is immediate, so the schedule moves outside GitHub:
+
+```sh
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  https://api.github.com/repos/anarrraa/techsupport/actions/workflows/jira-teams-reminder.yml/dispatches \
+  -d '{"ref":"main","inputs":{"dry_run":"false","seed_only":"false"}}'
+```
+
+No code change: the workflow already accepts that call with those inputs.
+
+- [ ] Choose what holds the clock. Supabase is the obvious candidate — this
+      tenant already runs goOrange's bot on it, so pg_cron plus pg_net, or a
+      scheduled Edge Function, adds no new infrastructure and no new bill.
+      Anything always-on and punctual works.
+- [ ] Issue a fine-grained token scoped to this repository with `actions: write`
+      and nothing else, and store it wherever the trigger runs.
+- [ ] Schedule 02:00 and 07:00 UTC (10:00 and 15:00 Ulaanbaatar).
+- [ ] **Then remove the `schedule:` block from the workflow.** Leaving both
+      would double-deliver: `REMINDER_DELIVERY_WINDOW_MINUTES` equals
+      `REMINDER_REPEAT_MINUTES`, so every run re-sends every eligible breach,
+      and a late `schedule` run arriving after a punctual dispatch sends the
+      same reminders twice. Escalations are protected by the state file; the
+      first-response reminders are not.
+- [ ] Record a week of dispatch times here, so "it runs on time" is measured
+      rather than assumed.
 
 ### V2 milestone 2: verify the bot in production
 
