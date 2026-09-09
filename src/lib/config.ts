@@ -1,3 +1,5 @@
+import { parseWindows, type DeliveryWindow } from './delivery-windows.ts';
+
 export interface HttpConfig {
 	timeoutMs: number;
 	maxRetries: number;
@@ -71,6 +73,10 @@ export interface EscalationConfigPaths {
 }
 
 export interface ReminderConfig {
+	/** Hours of the working day a reminder may arrive in. */
+	windows: DeliveryWindow[];
+	/** IANA zone the windows are expressed in. */
+	timeZone: string;
 	repeatMinutes: number;
 	deliveryWindowMinutes: number;
 	useLlmIntro: boolean;
@@ -179,6 +185,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			deliveryWindowMinutes,
 			useLlmIntro: boolean(env, 'REMINDER_USE_LLM_INTRO', false),
 			introTimeoutMs: integer(env, 'REMINDER_INTRO_TIMEOUT_MS', 10_000, 1_000, 120_000),
+			windows: parseWindows(env.REMINDER_WINDOWS?.trim() || '09:00-12:00,14:00-18:00'),
+			timeZone: env.REMINDER_TIMEZONE?.trim() || 'Asia/Ulaanbaatar',
 			dryRun,
 			maxMessageChars: integer(env, 'TEAMS_MAX_MESSAGE_CHARS', 12_000, 1_000, 25_000),
 			escalationSeedOnly: boolean(env, 'ESCALATION_SEED_ONLY', false),

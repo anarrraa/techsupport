@@ -3,6 +3,7 @@ import * as v from 'valibot';
 import reminderWriter from '../agents/reminder-writer.ts';
 import { generateReminderIntro } from '../lib/reminder-intro.ts';
 import { loadConfig, type AppConfig } from '../lib/config.ts';
+import { windowDecision } from '../lib/delivery-windows.ts';
 import { planDirectMessages } from '../lib/direct-messages.ts';
 import { dueLevel, selectEscalations, severityFor } from '../lib/escalation.ts';
 import { loadEscalationConfig } from '../lib/escalation-config.ts';
@@ -116,6 +117,15 @@ export async function runJiraTeamsReminder(
 		waitingForNextWindow: selection.waitingForNextWindow,
 	});
 
+	// A run that GitHub started at three in the morning must not wake anyone.
+	// The schedule decides when a run happens; this decides whether it delivers,
+	// which is the only half of it GitHub cannot make late.
+	const window = windowDecision(now, {
+		windows: config.reminder.windows,
+		timeZone: config.reminder.timeZone,
+	});
+	journal.window(window);
+
 	if (jira.scanned === 0 && !config.reminder.dryRun) {
 		throw new Error(
 			'Jira search returned 0 issues — check JIRA_JQL configuration',
@@ -124,8 +134,12 @@ export async function runJiraTeamsReminder(
 
 	// The channel post needs a webhook; without one the bot transport carries the
 	// run on its own and the aggregate-only model intro is never requested.
+	// Dry-run still reports, at any hour, so the trace and a manual check work
+	// outside working time.
+	const mayDeliver = window.deliver || config.reminder.dryRun;
+
 	let messages: string[] = [];
-	if (selection.due.length > 0 && config.teamsWebhookUrl) {
+	if (mayDeliver && selection.due.length > 0 && config.teamsWebhookUrl) {
 		const intro = await generateReminderIntro({
 			ticketCount: selection.due.length,
 			developerCount,
@@ -159,16 +173,18 @@ export async function runJiraTeamsReminder(
 		}
 	}
 
-	const bot = await runBotDelivery({
-		config,
-		dependencies,
-		journal,
-		tickets: jira.tickets,
-		withoutResolutionSla: jira.withoutResolutionSla,
-		withoutParticipants: jira.withoutParticipants,
-		due: selection.due,
-		now,
-	});
+	const bot = mayDeliver
+		? await runBotDelivery({
+			config,
+			dependencies,
+			journal,
+			tickets: jira.tickets,
+			withoutResolutionSla: jira.withoutResolutionSla,
+			withoutParticipants: jira.withoutParticipants,
+			due: selection.due,
+			now,
+		})
+		: { directMessageCount: 0, escalationCount: 0 };
 
 	return {
 		scanned: jira.scanned,

@@ -384,38 +384,36 @@ This was adopted on 2026-09-08. It changes two things previously recorded here:
 endpoint for this tenant, and the tenant id is
 `376a710f-b223-451f-ba55-efc974d8716c`, both read from goOrange's configuration.
 
-### Trigger the run from something that keeps time
+### The code decides when a reminder may arrive
 
-GitHub's scheduler is not a clock. The measurement above rules it out for a
-requirement stated as "once between 09:00 and 12:00", and no cron expression
-fixes a two-hour median queueing delay.
+GitHub's scheduler is not a clock — measured delays of 45 to 489 minutes, a
+median near two hours, and on 2026-09-09 a run that never fired. No cron
+expression fixes that.
 
-`workflow_dispatch` is immediate, so the schedule moves outside GitHub:
+Rather than move the clock outside GitHub, which would mean standing up a
+scheduler the project does not otherwise need, the decision moves into the code.
+`REMINDER_WINDOWS` names the hours a message may be delivered in, and the run
+checks the local clock before sending. The cron only decides when to *try*.
 
-```sh
-curl -X POST -H "Authorization: Bearer $TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/anarrraa/techsupport/actions/workflows/jira-teams-reminder.yml/dispatches \
-  -d '{"ref":"main","inputs":{"dry_run":"false","seed_only":"false"}}'
-```
+That inverts the reliability problem:
 
-No code change: the workflow already accepts that call with those inputs.
+- a late run inside the window still delivers;
+- a run delayed into the night delivers nothing, rather than waking someone;
+- the cron sits at the **start** of each window, so the usual two-hour delay
+  still lands inside it — three hours of room in the morning, four in the
+  afternoon;
+- one cron per window means at most one run can deliver in each, so "once per
+  window" needs no persisted state.
 
-- [ ] Choose what holds the clock. Supabase is the obvious candidate — this
-      tenant already runs goOrange's bot on it, so pg_cron plus pg_net, or a
-      scheduled Edge Function, adds no new infrastructure and no new bill.
-      Anything always-on and punctual works.
-- [ ] Issue a fine-grained token scoped to this repository with `actions: write`
-      and nothing else, and store it wherever the trigger runs.
-- [ ] Schedule 02:00 and 07:00 UTC (10:00 and 15:00 Ulaanbaatar).
-- [ ] **Then remove the `schedule:` block from the workflow.** Leaving both
-      would double-deliver: `REMINDER_DELIVERY_WINDOW_MINUTES` equals
-      `REMINDER_REPEAT_MINUTES`, so every run re-sends every eligible breach,
-      and a late `schedule` run arriving after a punctual dispatch sends the
-      same reminders twice. Escalations are protected by the state file; the
-      first-response reminders are not.
-- [ ] Record a week of dispatch times here, so "it runs on time" is measured
-      rather than assumed.
+What it does not fix: a delay longer than the window's width misses that window
+entirely. On the measured distribution that is 2 of 15 occurrences, and the
+consequence is one skipped reminder about requests that are already hours
+overdue — worth accepting rather than adding infrastructure for.
+
+- [ ] Record a fortnight of run times and how many windows were missed. If the
+      tail turns out worse than measured, the next step is an external trigger
+      calling `workflow_dispatch`, which is immediate; the code-side window
+      check stays useful either way.
 
 ### V2 milestone 2: verify the bot in production
 

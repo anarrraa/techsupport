@@ -82,9 +82,18 @@ Management. The application does not duplicate Jira's calendar math. It reads th
 metric named by `JIRA_FIRST_RESPONSE_SLA_NAME` and only selects an ongoing cycle
 when it is breached, not paused, and currently inside its JSM calendar.
 
-The workflow runs **twice a working day**, at 10:00 and 15:00 Ulaanbaatar time,
-inside the two windows the team asked for. Mongolia is UTC+8 all year, so the
-cron entries need no seasonal adjustment.
+The workflow is scheduled twice a working day, at the **start** of each window
+the team asked for — 09:00 and 14:00 Ulaanbaatar. Mongolia is UTC+8 all year, so
+the cron entries need no seasonal adjustment.
+
+The schedule is not trusted to be punctual, because GitHub's is not: measured
+against their cron times, past runs of this workflow started 45 to 489 minutes
+late, a median near two hours, and one never fired at all. So the cron decides
+only when to *try*, and `REMINDER_WINDOWS` decides whether a run may deliver. A
+late run inside the window still delivers; a run delayed into the night delivers
+nothing rather than waking someone; and weekends never deliver. Starting at each
+window's opening leaves three hours of room in the morning and four in the
+afternoon.
 
 The schedule is the cadence: `REMINDER_DELIVERY_WINDOW_MINUTES` equals
 `REMINDER_REPEAT_MINUTES`, so every eligible breach is reminded on every run.

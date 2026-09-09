@@ -61,6 +61,8 @@ export interface JournalSink {
 }
 
 export interface RunJournal {
+	/** Whether the local clock allows delivery. A time of day names nobody. */
+	window(event: { deliver: boolean; localTime: string; reason: string }): void;
 	selection(event: SelectionObserved): void;
 	intro(event: IntroObserved): void;
 	delivery(event: DeliveryObserved): void;
@@ -79,6 +81,17 @@ const EXPECTED_INTRO_REASONS: Record<IntroReason, boolean> = {
 
 export function createRunJournal(sink: JournalSink): RunJournal {
 	return {
+		window(event) {
+			if (event.deliver) {
+				sink.info(`Local time ${event.localTime}: inside a delivery window`, { ...event });
+				return;
+			}
+			sink.info(
+				`Local time ${event.localTime}: ${event.reason.replace('-', ' ')}, sending nothing`,
+				{ ...event },
+			);
+		},
+
 		selection(event) {
 			sink.info(
 				`Scanned ${event.scanned}; ${event.due} due, ${event.ineligible} not breached, `

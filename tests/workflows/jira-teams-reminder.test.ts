@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { AppConfig } from '../../src/lib/config.ts';
+import { parseWindows } from '../../src/lib/delivery-windows.ts';
 import type { EscalationConfig } from '../../src/lib/escalation-config.ts';
 import type { EscalationState } from '../../src/lib/escalation-state.ts';
 import type { JiraFetchResult, JiraTicket, SlaCycle } from '../../src/lib/jira.ts';
@@ -8,6 +9,34 @@ import { TeamsDeliveryError, type DirectMessage } from '../../src/lib/teams-bot.
 import { runJiraTeamsReminder } from '../../src/workflows/jira-teams-reminder.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
+
+test('a run GitHub delayed into the night delivers nothing', async () => {
+	// The schedule cannot be trusted to be punctual — past runs were 45 to 489
+	// minutes late — so the run happening is not the same as the run delivering.
+	const posts: string[] = [];
+	const result = await run({
+		config: config({ bot: true }),
+		now: new Date('2026-09-08T19:00:00Z'), // 03:00 Wednesday in Ulaanbaatar
+		post: async (message) => {
+			posts.push(message);
+		},
+	});
+
+	assert.deepEqual(posts, []);
+	assert.deepEqual(result.sent, []);
+	assert.equal(result.output.notified, false);
+	assert.match(result.logs.join('\n'), /Local time 03:00: outside window, sending nothing/);
+});
+
+test('a dry run still reports outside working hours', async () => {
+	// Otherwise npm run trace and a manual check only work between 09:00 and 18:00.
+	const result = await run({
+		config: config({ bot: true, dryRun: true }),
+		now: new Date('2026-09-08T19:00:00Z'),
+	});
+	assert.ok(result.output.scanned > 0);
+	assert.deepEqual(result.sent, []);
+});
 
 test('does not post to Teams when no ticket is due', async () => {
 	const posts: string[] = [];
@@ -331,6 +360,7 @@ test('refuses to seed state during a dry run', async () => {
 interface RunOptions {
 	tickets?: JiraTicket[];
 	config?: AppConfig;
+	now?: Date;
 	generateIntro?: (input: string, signal: AbortSignal) => Promise<string>;
 	buildMessages?: () => string[];
 	post?: (message: string) => Promise<void>;
@@ -349,7 +379,7 @@ async function run(options: RunOptions = {}) {
 	const tickets = options.tickets ?? [ticket()];
 	const output = await runJiraTeamsReminder({
 		config: options.config ?? config(),
-		now: NOW,
+		now: options.now ?? NOW,
 		generateIntro: options.generateIntro,
 		log: {
 			info: (message, attrs) => {
@@ -466,6 +496,9 @@ function config(
 			stateFile: 'tests/fixtures/state.json',
 		},
 		reminder: {
+			// The test clock is 11:00 Monday in Ulaanbaatar, inside the morning window.
+			windows: parseWindows('09:00-12:00,14:00-18:00'),
+			timeZone: 'Asia/Ulaanbaatar',
 			repeatMinutes: 60,
 			deliveryWindowMinutes: 15,
 			useLlmIntro: overrides.useLlmIntro ?? false,
