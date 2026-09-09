@@ -93,7 +93,9 @@ only when to *try*, and `REMINDER_WINDOWS` decides whether a run may deliver. A
 late run inside the window still delivers; a run delayed into the night delivers
 nothing rather than waking someone; and weekends never deliver. Starting at each
 window's opening leaves three hours of room in the morning and four in the
-afternoon.
+afternoon, which covers 10 of the 13 delays measured — so about a quarter of
+attempts miss their window, and both attempts miss on roughly one working day
+in twenty.
 
 The schedule is the cadence: `REMINDER_DELIVERY_WINDOW_MINUTES` equals
 `REMINDER_REPEAT_MINUTES`, so every eligible breach is reminded on every run.

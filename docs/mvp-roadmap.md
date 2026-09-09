@@ -406,9 +406,12 @@ That inverts the reliability problem:
   window" needs no persisted state.
 
 What it does not fix: a delay longer than the window's width misses that window
-entirely. On the measured distribution that is 2 of 15 occurrences, and the
-consequence is one skipped reminder about requests that are already hours
-overdue — worth accepting rather than adding infrastructure for.
+entirely. Against the 13 measured delays, 3 exceed the morning window's three
+hours and the same 3 exceed the afternoon's four — so **roughly a quarter of
+attempts miss**, and both attempts missing on the same day works out at about
+one day in twenty. The cost of a miss is one skipped reminder about requests
+already hours overdue, which is worth accepting rather than standing up
+infrastructure for.
 
 - [ ] Record a fortnight of run times and how many windows were missed. If the
       tail turns out worse than measured, the next step is an external trigger
