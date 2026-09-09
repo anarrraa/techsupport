@@ -13,8 +13,12 @@ on:
     # are 300 and 1140 minutes, both whole multiples of 60, so `elapsed % 60`
     # never changes for a given request and whoever starts outside the window
     # stays outside it forever.
-    - cron: '0 2 * * 1-5'
-    - cron: '0 7 * * 1-5'
+    # Offset from the hour on purpose. GitHub queues scheduled runs at low
+    # priority and drops them under load, and the top of the hour is the most
+    # contended minute — the 02:00 run on 2026-09-09 never fired at all, four
+    # and a half hours later. :23 is still inside both windows.
+    - cron: '23 2 * * 1-5'
+    - cron: '23 7 * * 1-5'
   workflow_dispatch:
     inputs:
       dry_run:
