@@ -518,6 +518,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		priority: 'High',
 		assignee: 'Synthetic Developer',
 		assigneeAccountId: 'synthetic-account',
+		comments: [],
 		url: 'https://jira.invalid/browse/SYNTHETIC-1',
 		firstResponseSla: {
 			name: 'First response',

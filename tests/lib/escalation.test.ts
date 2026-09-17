@@ -130,6 +130,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		priority: 'Medium',
 		assignee: 'Developer',
 		assigneeAccountId: 'account-1',
+		comments: [],
 		url: 'https://jira.invalid/browse/DC-1',
 		firstResponseSla: null,
 		participants: [],

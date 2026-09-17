@@ -314,6 +314,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		priority: 'Medium',
 		assignee: 'Developer',
 		assigneeAccountId: 'jira-dev',
+		comments: [],
 		url: 'https://jira.invalid/browse/DC-1',
 		firstResponseSla: cycle(),
 		participants: [{ accountId: 'jira-dev', displayName: 'Developer' }],

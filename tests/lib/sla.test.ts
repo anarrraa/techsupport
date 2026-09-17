@@ -155,6 +155,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		priority: 'Medium',
 		assignee: 'Developer',
 		assigneeAccountId: 'account-1',
+		comments: [],
 		url: 'https://example.atlassian.net/browse/SUP-1',
 		firstResponseSla: sla(),
 		participants: [],

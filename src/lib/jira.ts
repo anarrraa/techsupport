@@ -30,6 +30,23 @@ export interface JiraAgent {
 	displayName: string;
 }
 
+/**
+ * One Jira comment, flattened to plain text at the boundary.
+ *
+ * The body arrives as an Atlassian Document Format tree; nothing downstream
+ * should have to know that, so the flattening happens here alongside the
+ * `accountType` filter. `authorAccountId` is what maps the author onto the
+ * escalation directory, which is the only way this code decides whether a
+ * comment came from us or from the client.
+ */
+export interface JiraComment {
+	authorAccountId: string | null;
+	authorDisplayName: string;
+	createdEpochMillis: number;
+	/** Plain text, already length-bounded. Still untrusted, client-authored content. */
+	body: string;
+}
+
 export interface JiraTicket {
 	key: string;
 	summary: string;
@@ -47,6 +64,11 @@ export interface JiraTicket {
 	 * rather than being left for every caller to remember.
 	 */
 	participants: JiraAgent[];
+	/**
+	 * Newest-last, bounded to the most recent few. Empty when the search did not
+	 * ask for them, which every consumer must degrade to rather than fail on.
+	 */
+	comments: JiraComment[];
 	url: string;
 	firstResponseSla: SlaCycle | null;
 	/** The escalation clock of `docs/sla-matrix.md` section 2. */
@@ -83,6 +105,7 @@ export async function fetchTickets(
 		assignee: issue.fields.assignee?.displayName ?? 'Unassigned',
 		assigneeAccountId: issue.fields.assignee?.accountId ?? null,
 		participants: agentParticipants(issue, config.participantsField),
+		comments: [],
 		url: buildTicketUrl(ticketBaseUrl, issue.key),
 		firstResponseSla: slas[index]?.firstResponse ?? null,
 		resolutionSla: slas[index]?.resolution ?? null,
