@@ -475,6 +475,8 @@ function config(
 			firstResponseSlaName: 'First response',
 			resolutionSlaName: 'Time to resolution',
 			participantsField: 'customfield_10065',
+			commentLimit: 6,
+			commentChars: 600,
 			http,
 		},
 		teamsWebhookUrl: overrides.webhook === false ? null : 'https://teams.invalid/webhook',

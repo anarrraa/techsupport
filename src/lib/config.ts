@@ -24,6 +24,10 @@ export interface JiraConfig {
 	 * instance, so it is configuration rather than a constant.
 	 */
 	participantsField: string;
+	/** Most recent comments kept per ticket. */
+	commentLimit: number;
+	/** Per-comment character cap after the ADF body is flattened. */
+	commentChars: number;
 	http: HttpConfig;
 }
 
@@ -172,6 +176,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 				env.JIRA_FIRST_RESPONSE_SLA_NAME?.trim() || 'Time To First Response',
 			resolutionSlaName: env.JIRA_RESOLUTION_SLA_NAME?.trim() || 'Time to resolution',
 			participantsField: env.JIRA_PARTICIPANTS_FIELD?.trim() || 'customfield_10065',
+			commentLimit: integer(env, 'JIRA_COMMENT_LIMIT', 6, 0, 50),
+			commentChars: integer(env, 'JIRA_COMMENT_CHARS', 600, 50, 5_000),
 			http,
 		},
 		teamsWebhookUrl,
