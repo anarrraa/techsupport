@@ -335,3 +335,23 @@ function cycle(): SlaCycle {
 		remainingMinutes: null,
 	};
 }
+
+test('carries the digest into the direct message', () => {
+	const plan = planDirectMessages({
+		due: [ticket({ key: 'DC-1' })],
+		escalations: [],
+		config: directory(),
+		now: NOW,
+		maxChars: 12_000,
+		digests: new Map([['DC-1', {
+			text: 'Сүүлд лог хүссэн.',
+			source: 'fallback' as const,
+			handle: 'dev',
+			name: 'Developer',
+			awaitingClient: false,
+			lastCommentAgeMinutes: 90,
+		}]]),
+	});
+
+	assert.match(plan.messages[0]?.messages.join('\n') ?? '', /↳ Сүүлд лог хүссэн\. · Одоо: Developer/);
+});

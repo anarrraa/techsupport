@@ -8,7 +8,7 @@ import {
 } from './escalation-config.ts';
 import type { ContactLevel, EscalationCandidate, EscalationLevel } from './escalation.ts';
 import type { JiraTicket } from './jira.ts';
-import { buildDirectMessages } from './reminder-message.ts';
+import { buildDirectMessages, type TicketDigests } from './reminder-message.ts';
 
 /**
  * Who gets a direct message on this run, and what it says. Pure: it renders and
@@ -79,8 +79,10 @@ export function planDirectMessages(input: {
 	 * means everyone.
 	 */
 	allowlist?: string[] | null;
+	/** Per-request digests, built once for the whole run. Keyed by ticket key. */
+	digests?: TicketDigests;
 }): DirectMessagePlan {
-	const { due, escalations, config, now, maxChars } = input;
+	const { due, escalations, config, now, maxChars, digests } = input;
 	const allowlist = normalizeAllowlist(input.allowlist, config);
 	const recipients = new Map<string, Recipient>();
 	const incompleteEscalations = new Set<string>();
@@ -159,6 +161,7 @@ export function planDirectMessages(input: {
 				now,
 				maxChars,
 				onCallName: recipient.onCallName,
+				digests,
 			}),
 		});
 	}

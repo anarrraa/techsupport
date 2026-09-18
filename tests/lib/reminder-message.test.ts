@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { JiraTicket } from '../../src/lib/jira.ts';
+import type { TicketDigest } from '../../src/lib/ticket-digest.ts';
 import { buildDirectMessages, buildReminderMessages, cleanIntro } from '../../src/lib/reminder-message.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
@@ -244,4 +245,105 @@ function escapeRegExp(value: string): string {
 
 function markdownTargets(message: string): string[] {
 	return Array.from(message.matchAll(/\[[^\]\n]+\]\(([^)\s]+)\)/g), (match) => match[1] as string);
+}
+
+test('renders the digest as an indented second line, sanitized like any Jira field', () => {
+	// The digest is model prose written over client-authored comments, so it is
+	// exactly as untrusted as a summary and must not be able to inject markdown,
+	// HTML, or a clickable link of its own.
+	const [message] = buildReminderMessages(
+		[ticket({ key: 'DC-926' })],
+		NOW,
+		2_000,
+		'Please respond',
+		new Map([['DC-926', digest({
+			text: 'Client asked for **bold** logs at https://evil.example/digest > see there',
+			name: 'Batbayar',
+		})]]),
+	);
+
+	assert.match(message ?? '', /\n {2}↳ /);
+	assert.match(message ?? '', /\\\*\\\*bold\\\*\\\*/);
+	assert.doesNotMatch(message ?? '', /https:\/\/evil\.example/);
+	assert.match(message ?? '', /https\\\[:\\\]\/\/evil\\\[\.\\\]example/);
+	assert.doesNotMatch(message ?? '', /[<>]/);
+	assert.match(message ?? '', /&gt; see there/);
+	assert.match(message ?? '', /· Одоо: Batbayar$/m);
+	// The link is still the only markdown target in the message.
+	assert.deepEqual(markdownTargets(message ?? ''), ['https://example.atlassian.net/browse/SUP-1']);
+});
+
+test('names the client instead of inventing an owner when the ball is on their side', () => {
+	const [message] = buildReminderMessages(
+		[ticket({ key: 'DC-926' })],
+		NOW,
+		2_000,
+		'Please respond',
+		new Map([['DC-926', digest({
+			text: 'Сүүлд үйлчлүүлэгч бичсэн.',
+			name: 'Batbayar',
+			awaitingClient: true,
+		})]]),
+	);
+
+	assert.match(message ?? '', /· Үйлчлүүлэгчийн хариу хүлээж байна$/m);
+	assert.doesNotMatch(message ?? '', /Одоо:/);
+	assert.doesNotMatch(message ?? '', /Batbayar/);
+});
+
+test('a ticket with no digest in the map renders exactly as it does today', () => {
+	const tickets = [ticket({ key: 'DC-1' }), ticket({ key: 'DC-2' })];
+	const withDigests = buildReminderMessages(
+		tickets,
+		NOW,
+		2_000,
+		'Please respond',
+		new Map([['DC-1', digest({ text: 'Сүүлд хариу өгсөн.' })]]),
+	);
+	const without = buildReminderMessages(tickets, NOW, 2_000, 'Please respond');
+
+	const undigested = (withDigests.join('\n').match(/^- \[DC-2\].*$/m) ?? [])[0];
+	assert.equal(undigested, (without.join('\n').match(/^- \[DC-2\].*$/m) ?? [])[0]);
+	assert.equal(withDigests.join('\n').match(/ {2}↳ /g)?.length, 1);
+});
+
+test('drops the digest line before compacting the ticket row', () => {
+	const digested = new Map([['SUP-1', digest({ text: 'x'.repeat(200), name: 'Batbayar' })]]);
+	const full = buildReminderMessages([ticket()], NOW, 2_000, 'Please respond', digested);
+	const plain = buildReminderMessages([ticket()], NOW, 2_000, 'Please respond');
+	// One character short of fitting the digest line, and nothing else.
+	const tight = (full[0] as string).length - 1;
+
+	const squeezed = buildReminderMessages([ticket()], NOW, tight, 'Please respond', digested);
+	assert.equal(squeezed.length, 1);
+	assert.doesNotMatch(squeezed[0] as string, /↳/);
+	// The full row survived: the digest went first, the summary and status stayed.
+	assert.equal(squeezed[0], plain[0]);
+	assert.match(squeezed[0] as string, /Customer cannot log in/);
+	assert.match(squeezed[0] as string, /\(https:\/\/example\.atlassian\.net\/browse\/SUP-1\)/);
+});
+
+test('the link survives even when the digest and the row both have to go', () => {
+	const message = buildReminderMessages(
+		[ticket({ summary: 'y'.repeat(300) })],
+		NOW,
+		260,
+		'Please respond',
+		new Map([['SUP-1', digest({ text: 'z'.repeat(200) })]]),
+	).at(-1) as string;
+
+	assert.doesNotMatch(message, /↳/);
+	assert.deepEqual(markdownTargets(message), ['https://example.atlassian.net/browse/SUP-1']);
+});
+
+function digest(overrides: Partial<TicketDigest> = {}): TicketDigest {
+	return {
+		text: 'Сүүлд манай талаас хариу алга.',
+		source: 'fallback',
+		handle: null,
+		name: null,
+		awaitingClient: false,
+		lastCommentAgeMinutes: 30,
+		...overrides,
+	};
 }
