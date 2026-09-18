@@ -11,14 +11,14 @@ import {
 const OWNER: TicketOwner = {
 	handle: 'dev-batbayar',
 	name: 'Батбаяр',
-	awaitingClient: false,
+	clientSpokeLast: false,
 	lastCommentAgeMinutes: 95,
 };
 
 const AWAITING: TicketOwner = {
 	handle: 'dev-batbayar',
 	name: 'Батбаяр',
-	awaitingClient: true,
+	clientSpokeLast: true,
 	lastCommentAgeMinutes: 420,
 };
 
@@ -82,7 +82,7 @@ test('a missing key falls back with reason missing', async () => {
 	const missing = digests.get('TS-2');
 	assert.equal(missing?.source, 'fallback');
 	assert.equal(missing?.reason, 'missing');
-	assert.match(missing?.text ?? '', /үйлчлүүлэгч талаас/);
+	assert.match(missing?.text ?? '', /үйлчлүүлэгч бичсэн/);
 });
 
 test('an empty or non-string value falls back with reason empty', async () => {

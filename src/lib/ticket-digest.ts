@@ -30,8 +30,13 @@ export interface TicketOwner {
 	handle: string | null;
 	/** Display name from the directory, never from the Jira comment author. */
 	name: string | null;
-	/** The newest comment came from someone outside the directory: the ball is on their side. */
-	awaitingClient: boolean;
+	/**
+	 * The newest comment came from outside the directory, so the client spoke
+	 * last and **we** owe the reply. Named for what was observed rather than for
+	 * who is waiting: the first version read `awaitingClient` and the renderer
+	 * duly told the team to wait for a client who was already waiting on them.
+	 */
+	clientSpokeLast: boolean;
 	/** Age of the newest comment in whole minutes, or null when there are none. */
 	lastCommentAgeMinutes: number | null;
 }
@@ -93,7 +98,7 @@ export function resolveTicketOwner(
 	return {
 		handle,
 		name: person?.name ?? null,
-		awaitingClient: newest ? directoryEntryFor(config, newest.authorAccountId) === null : false,
+		clientSpokeLast: newest ? directoryEntryFor(config, newest.authorAccountId) === null : false,
 		lastCommentAgeMinutes,
 	};
 }
@@ -137,9 +142,12 @@ export function fallbackDigestText(view: DigestTicketView, owner: TicketOwner): 
 		return `${view.status} төлөвт, одоог хүртэл ямар ч тайлбар бичигдээгүй.`;
 	}
 	const age = formatAge(owner.lastCommentAgeMinutes ?? 0);
-	const side = owner.awaitingClient ? 'үйлчлүүлэгч талаас' : 'манай талаас';
+	if (owner.clientSpokeLast) {
+		const ours = owner.name ? `манай талаас сүүлд ${owner.name} хариулсан` : 'манай талаас хариу алга';
+		return `${age} өмнө үйлчлүүлэгч бичсэн, түүнээс хойш ${ours}. Төлөв: ${view.status}.`;
+	}
 	const who = owner.name ? `Сүүлд ${owner.name} хариулсан` : 'Сүүлд манай талаас хариу алга';
-	return `${who}; хамгийн сүүлийн бичлэг ${age} өмнө ${side}. Төлөв: ${view.status}.`;
+	return `${who} — ${age} өмнө, үйлчлүүлэгчийн хариу хүлээгдэж байна. Төлөв: ${view.status}.`;
 }
 
 function directoryEntryFor(
@@ -240,7 +248,7 @@ export interface TicketDigestOptions {
 const EMPTY_OWNER: TicketOwner = {
 	handle: null,
 	name: null,
-	awaitingClient: false,
+	clientSpokeLast: false,
 	lastCommentAgeMinutes: null,
 };
 

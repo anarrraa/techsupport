@@ -273,7 +273,7 @@ test('renders the digest as an indented second line, sanitized like any Jira fie
 	assert.deepEqual(markdownTargets(message ?? ''), ['https://example.atlassian.net/browse/SUP-1']);
 });
 
-test('names the client instead of inventing an owner when the ball is on their side', () => {
+test('calls for our reply, and still names the owner, when the client spoke last', () => {
 	const [message] = buildReminderMessages(
 		[ticket({ key: 'DC-926' })],
 		NOW,
@@ -282,13 +282,17 @@ test('names the client instead of inventing an owner when the ball is on their s
 		new Map([['DC-926', digest({
 			text: 'Сүүлд үйлчлүүлэгч бичсэн.',
 			name: 'Batbayar',
-			awaitingClient: true,
+			clientSpokeLast: true,
 		})]]),
 	);
 
-	assert.match(message ?? '', /· Үйлчлүүлэгчийн хариу хүлээж байна$/m);
-	assert.doesNotMatch(message ?? '', /Одоо:/);
-	assert.doesNotMatch(message ?? '', /Batbayar/);
+	// The client speaking last puts the ball on our side. The earlier wording
+	// read "waiting for the client", which told the team to sit on the one
+	// request they owed an answer on.
+	assert.match(message ?? '', /⏳ Манай хариу хүлээгдэж байна/);
+	assert.doesNotMatch(message ?? '', /Үйлчлүүлэгчийн хариу хүлээж байна/);
+	// Who last answered is still who the team asks about it.
+	assert.match(message ?? '', /· Одоо: Batbayar$/m);
 });
 
 test('a ticket with no digest in the map renders exactly as it does today', () => {
@@ -342,7 +346,7 @@ function digest(overrides: Partial<TicketDigest> = {}): TicketDigest {
 		source: 'fallback',
 		handle: null,
 		name: null,
-		awaitingClient: false,
+		clientSpokeLast: false,
 		lastCommentAgeMinutes: 30,
 		...overrides,
 	};

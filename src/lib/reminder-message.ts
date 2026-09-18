@@ -192,8 +192,12 @@ function renderTicketRow(ticket: JiraTicket, now: Date, clock: Clock): string {
 function renderDigestLine(digest?: TicketDigest): string | null {
 	const text = digest ? cleanField(digest.text, DIGEST_CHARS) : '';
 	if (!text) return null;
-	if (digest?.awaitingClient) return `  ↳ ${text} · Үйлчлүүлэгчийн хариу хүлээж байна`;
-	return digest?.name ? `  ↳ ${text} · Одоо: ${cleanField(digest.name, 100)}` : `  ↳ ${text}`;
+	const owner = digest?.name ? ` · Одоо: ${cleanField(digest.name, 100)}` : '';
+	// `clientSpokeLast` means the ball is on our side, so it is a call to act,
+	// not a reason to wait. It does not replace the owner: the person who last
+	// answered is still who the team asks about the request.
+	if (digest?.clientSpokeLast) return `  ↳ ${text} · ⏳ Манай хариу хүлээгдэж байна${owner}`;
+	return `  ↳ ${text}${owner}`;
 }
 
 function fitTicketLine(

@@ -348,7 +348,7 @@ test('carries the digest into the direct message', () => {
 			source: 'fallback' as const,
 			handle: 'dev',
 			name: 'Developer',
-			awaitingClient: false,
+			clientSpokeLast: false,
 			lastCommentAgeMinutes: 90,
 		}]]),
 	});
