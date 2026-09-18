@@ -453,12 +453,7 @@ async function buildDigests(input: {
 		tickets.map((ticket) => [ticket.key, resolveTicketOwner(ticket, escalationConfig, now)]),
 	);
 	const views = tickets.map((ticket) =>
-		toDigestView(
-			ticket,
-			escalationConfig,
-			now,
-			elapsedSinceRaisedMinutes(ticket.resolutionSla),
-		),
+		toDigestView(ticket, now, elapsedSinceRaisedMinutes(ticket.resolutionSla)),
 	);
 	const digests = await dependencies.buildTicketDigests(views, owners, {
 		enabled: config.reminder.useLlmDigest,

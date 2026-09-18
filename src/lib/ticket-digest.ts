@@ -70,6 +70,11 @@ export interface DigestTicketView {
  * Newest comment first: the last vendor voice on the thread is who the team
  * actually asks about it, which is a better answer than the assignee field,
  * and the only one that survives a ticket being passed around informally.
+ *
+ * Who counts as vendor is Jira's `accountType`, carried on the comment. The
+ * directory is consulted only to put its own spelling on the name, because
+ * most of the people working a request are not escalation contacts and never
+ * appear in it.
  */
 export function resolveTicketOwner(
 	ticket: JiraTicket,
@@ -84,34 +89,28 @@ export function resolveTicketOwner(
 		? Math.max(0, Math.floor((now.getTime() - newest.createdEpochMillis) / 60_000))
 		: null;
 
-	let handle: string | null = null;
-	let person: Person | null = null;
-	for (const comment of ordered) {
-		const found = directoryEntryFor(config, comment.authorAccountId);
-		if (found) {
-			handle = found[0];
-			person = found[1];
-			break;
-		}
-	}
+	const lastVendor = ordered.find((comment) => comment.authorIsVendor);
+	const entry = lastVendor ? directoryEntryFor(config, lastVendor.authorAccountId) : null;
 
 	return {
-		handle,
-		name: person?.name ?? null,
-		clientSpokeLast: newest ? directoryEntryFor(config, newest.authorAccountId) === null : false,
+		handle: entry?.[0] ?? null,
+		// The directory's spelling when we have it, otherwise Jira's. Both are
+		// recorded data, not a guess — the rule a model must not break is that it
+		// never picks the name, and it does not pick either of these.
+		name: entry?.[1].name ?? lastVendor?.authorDisplayName ?? null,
+		clientSpokeLast: newest ? !newest.authorIsVendor : false,
 		lastCommentAgeMinutes,
 	};
 }
 
-/** True when this comment's author is in the escalation directory, i.e. one of ours. */
-export function isVendorComment(config: EscalationConfig, comment: JiraComment): boolean {
-	return directoryEntryFor(config, comment.authorAccountId) !== null;
+/** True when the comment came from our side, by Jira's `accountType`. */
+export function isVendorComment(comment: JiraComment): boolean {
+	return comment.authorIsVendor;
 }
 
 /** The identity-free view of a ticket, ready to be serialized into the prompt. */
 export function toDigestView(
 	ticket: JiraTicket,
-	config: EscalationConfig,
 	now: Date,
 	unresolvedMinutes: number,
 ): DigestTicketView {
@@ -125,7 +124,7 @@ export function toDigestView(
 		summary: clip(ticket.summary, 200),
 		unresolvedMinutes,
 		comments: recent.map((comment) => ({
-			side: isVendorComment(config, comment) ? 'vendor' : 'client',
+			side: isVendorComment(comment) ? 'vendor' : 'client',
 			agoMinutes: Math.max(0, Math.floor((now.getTime() - comment.createdEpochMillis) / 60_000)),
 			text: clip(comment.body, DIGEST_COMMENT_CHARS),
 		})),

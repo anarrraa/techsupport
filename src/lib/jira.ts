@@ -42,6 +42,14 @@ export interface JiraAgent {
 export interface JiraComment {
 	authorAccountId: string | null;
 	authorDisplayName: string;
+	/**
+	 * Whether the author is vendor staff, by Jira's own `accountType`, the same
+	 * answer `agentParticipants` trusts. Do not infer this from the escalation
+	 * directory: that file holds escalation contacts, not everyone who works a
+	 * request, and reading absence from it as "the client wrote this" put the
+	 * three busiest engineers on the customer's side of every digest.
+	 */
+	authorIsVendor: boolean;
 	createdEpochMillis: number;
 	/** Plain text, already length-bounded. Still untrusted, client-authored content. */
 	body: string;
@@ -159,6 +167,7 @@ function ticketComments(issue: JiraIssue, config: JiraConfig): JiraComment[] {
 			// that the ball is on their side.
 			authorAccountId: value.author?.accountId ?? null,
 			authorDisplayName: value.author?.displayName ?? 'Unknown',
+			authorIsVendor: value.author?.accountType === 'atlassian',
 			createdEpochMillis,
 			body: truncate(flattenAdf(value.body), config.commentChars),
 		});

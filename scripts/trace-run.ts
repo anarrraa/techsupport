@@ -20,6 +20,7 @@ import { loadEscalationConfig, personForJiraAccount } from '../src/lib/escalatio
 import { readEscalationState, highestNotified } from '../src/lib/escalation-state.ts';
 import { fetchTickets } from '../src/lib/jira.ts';
 import { elapsedSinceRaisedMinutes, overdueMinutesOf, selectReminderTickets } from '../src/lib/sla.ts';
+import { buildTicketDigests, resolveTicketOwner, toDigestView } from '../src/lib/ticket-digest.ts';
 
 const applyAllowlist = process.argv.includes('--allowlist');
 const config = loadConfig({ ...process.env, REMINDER_DRY_RUN: 'true' });
@@ -136,7 +137,25 @@ for (const t of selection.due) {
 	console.log(`  ${t.key}: ${resolved.join(' | ') || 'no vendor participant'}`);
 }
 
-stage(5, 'Recipients and the exact messages');
+// Built the same way and in the same place the workflow builds them, so the
+// messages printed below are the messages that would be sent. The model half
+// stays off here: `npm run trace` must not spend a model call, and the
+// deterministic line is what a run with REMINDER_USE_LLM_DIGEST unset renders.
+stage(5, 'Where each request stopped');
+const digestTickets = [...new Map(
+	[...selection.due, ...escalations.map((e) => e.ticket)].map((t) => [t.key, t]),
+).values()];
+const owners = new Map(digestTickets.map((t) => [t.key, resolveTicketOwner(t, directory, now)]));
+const digests = await buildTicketDigests(
+	digestTickets.map((t) => toDigestView(t, now, elapsedSinceRaisedMinutes(t.resolutionSla))),
+	owners,
+	{ enabled: false, timeoutMs: config.reminder.digestTimeoutMs },
+);
+console.log(`comments read: ${digestTickets.reduce((n, t) => n + t.comments.length, 0)} across ${digestTickets.length} requests`);
+console.log(`requests whose newest comment is the client's: ${[...owners.values()].filter((o) => o.clientSpokeLast).length}`);
+console.log(`requests no one in the directory has commented on: ${[...owners.values()].filter((o) => o.name === null).length}`);
+
+stage(6, 'Recipients and the exact messages');
 const plan = planDirectMessages({
 	due: selection.due,
 	escalations,
@@ -144,6 +163,7 @@ const plan = planDirectMessages({
 	now,
 	maxChars: config.reminder.maxMessageChars,
 	allowlist: applyAllowlist ? config.bot?.recipientAllowlist ?? null : null,
+	digests,
 });
 console.log(`recipients: ${plan.messages.length}`);
 console.log(`requests with no resolvable participant: ${plan.unmappedRecipients}`);
@@ -156,7 +176,7 @@ for (const m of plan.messages) {
 	for (const text of m.messages) console.log(text);
 }
 
-stage(6, 'What a live run would do');
+stage(7, 'What a live run would do');
 console.log(`channel post : ${config.teamsWebhookUrl ? 'yes' : 'no webhook configured, skipped'}`);
 console.log(`direct messages sent : ${plan.messages.reduce((n, m) => n + m.messages.length, 0)}`);
 console.log(`levels recorded afterwards : ${plan.messages.flatMap((m) => m.records).map((r) => `${r.ticketKey}=L${r.level}`).join(' ') || 'none'}`);

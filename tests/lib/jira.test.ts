@@ -454,21 +454,34 @@ test('truncates a long comment rather than dropping it', async () => {
 	assert.equal(result.tickets[0]?.comments[0]?.body, `${'x'.repeat(9)}…`);
 });
 
-test('keeps a client comment author raw, unlike participants', async () => {
+test('keeps a client comment author raw, and marks which side wrote it', async () => {
 	const result = await fetchTicketsWithComments([
 		comment({ body: paragraph('any update?'), accountType: 'customer', accountId: 'client-1' }),
-		comment({ body: paragraph('no author'), accountId: undefined }),
+		comment({ body: paragraph('looking into it'), accountType: 'atlassian', accountId: 'agent-1' }),
+		comment({ body: paragraph('no author'), accountId: undefined, accountType: null }),
 	]);
+	// Unlike `agentParticipants`, a customer is kept rather than filtered out:
+	// the client having written last is exactly the signal the digest needs.
 	assert.deepEqual(result.tickets[0]?.comments, [
 		{
 			authorAccountId: 'client-1',
 			authorDisplayName: 'Commenter',
+			authorIsVendor: false,
 			createdEpochMillis: Date.parse('2026-09-01T09:00:00.000+0000'),
 			body: 'any update?',
 		},
 		{
+			authorAccountId: 'agent-1',
+			authorDisplayName: 'Commenter',
+			authorIsVendor: true,
+			createdEpochMillis: Date.parse('2026-09-01T09:00:00.000+0000'),
+			body: 'looking into it',
+		},
+		{
 			authorAccountId: null,
 			authorDisplayName: 'Commenter',
+			// An author Jira did not type is not assumed to be one of ours.
+			authorIsVendor: false,
 			createdEpochMillis: Date.parse('2026-09-01T09:00:00.000+0000'),
 			body: 'no author',
 		},
@@ -520,13 +533,14 @@ function comment(options: {
 	body: unknown;
 	created?: string;
 	accountId?: string;
-	accountType?: string;
+	/** `null` omits the field, the way Jira does when it reports no type at all. */
+	accountType?: string | null;
 }) {
 	return {
 		author: {
 			accountId: options.accountId === undefined ? undefined : options.accountId,
 			displayName: 'Commenter',
-			accountType: options.accountType ?? 'atlassian',
+			accountType: options.accountType === null ? undefined : options.accountType ?? 'atlassian',
 		},
 		created: options.created ?? '2026-09-01T09:00:00.000+0000',
 		body: options.body,
