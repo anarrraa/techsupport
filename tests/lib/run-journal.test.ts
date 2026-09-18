@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { DirectMessagesObserved, EscalationObserved } from '../../src/lib/run-journal.ts';
+import type {
+	DigestsObserved,
+	DirectMessagesObserved,
+	EscalationObserved,
+} from '../../src/lib/run-journal.ts';
 import { createRunJournal, type JournalSink } from '../../src/lib/run-journal.ts';
 
 interface Emitted {
@@ -81,4 +85,30 @@ test('warns on partial delivery and stays quiet on complete delivery', () => {
 	assert.deepEqual(emitted.map((entry) => entry.level), ['info', 'warn', 'info']);
 	assert.match(emitted[1]?.message ?? '', /Delivered 1 of 3/);
 	assert.match(emitted[2]?.message ?? '', /Dry run: skipped 3/);
+});
+
+test('reports digest provenance as counts, never prose or a request key', () => {
+	const { emitted, sink: target } = sink();
+	createRunJournal(target).digests({
+		tickets: 4,
+		model: 3,
+		fallback: 1,
+		reasons: { timeout: 1 },
+	});
+
+	assert.equal(emitted.length, 1);
+	assert.equal(emitted[0]?.level, 'warn');
+	assert.match(emitted[0]?.message ?? '', /Digested 4 request\(s\): 3 by the model, 1 deterministic \(timeout:1\)/);
+	assert.equal(emitted[0]?.attributes?.model, 3);
+
+	// @ts-expect-error a request key is not a digest reason
+	const leaked: DigestsObserved['reasons'] = { 'DC-885': 1 };
+	assert.ok(leaked, 'referenced so the assertion is not dead code');
+});
+
+test('the deterministic digest path is an ordinary run, not a degraded one', () => {
+	const { emitted, sink: target } = sink();
+	createRunJournal(target).digests({ tickets: 2, model: 0, fallback: 2, reasons: { disabled: 2 } });
+
+	assert.equal(emitted[0]?.level, 'info');
 });

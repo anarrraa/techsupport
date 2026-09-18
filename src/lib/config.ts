@@ -93,6 +93,13 @@ export interface ReminderConfig {
 	 * whole backlog at once.
 	 */
 	escalationSeedOnly: boolean;
+	/**
+	 * The per-request digest sentence. Ships dark: with it off the digest still
+	 * renders from the deterministic fallback, so turning it on only changes who
+	 * writes the prose.
+	 */
+	useLlmDigest: boolean;
+	digestTimeoutMs: number;
 }
 
 export interface AppConfig {
@@ -196,6 +203,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			dryRun,
 			maxMessageChars: integer(env, 'TEAMS_MAX_MESSAGE_CHARS', 12_000, 1_000, 25_000),
 			escalationSeedOnly: boolean(env, 'ESCALATION_SEED_ONLY', false),
+			useLlmDigest: boolean(env, 'REMINDER_USE_LLM_DIGEST', false),
+			digestTimeoutMs: integer(env, 'REMINDER_DIGEST_TIMEOUT_MS', 20_000, 1_000, 120_000),
 		},
 	};
 }

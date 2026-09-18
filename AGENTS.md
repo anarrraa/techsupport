@@ -31,8 +31,17 @@ the priority.
 - Jira Service Management owns SLA goals, working calendars, pauses, holidays,
   and breach state. Do not recreate SLA age or calendar math from issue timestamps.
 - Only an ongoing, breached, unpaused cycle inside calendar hours is eligible.
-- Jira-controlled content must not be sent to an LLM. Optional model input is
-  aggregate counts only.
+- Jira text reaches a model only through the identity-free `DigestTicketView`:
+  a request's key, status, priority, summary, and its last few comments. Names,
+  account ids, and URLs never do. The reminder intro still receives aggregate
+  counts only.
+- A model never decides who a request belongs to. Ownership is resolved from the
+  escalation directory's `jiraAccountId` values, because a guessed name is a
+  wrong person being paged.
+- Model output is untrusted text. It is sanitized and length-bounded like any
+  Jira field before it is rendered, and it is off by default
+  (`REMINDER_USE_LLM_DIGEST`); the digest line renders deterministically without
+  it.
 - Dry-run mode must not post to Teams or expose ticket content or identities in
   logs or workflow output.
 - External requests, pagination, concurrency, retries, and retry waits must be

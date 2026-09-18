@@ -6,7 +6,19 @@ import type { EscalationConfig } from '../../src/lib/escalation-config.ts';
 import type { EscalationState } from '../../src/lib/escalation-state.ts';
 import type { JiraFetchResult, JiraTicket, SlaCycle } from '../../src/lib/jira.ts';
 import { TeamsDeliveryError, type DirectMessage } from '../../src/lib/teams-bot.ts';
+import type {
+	DigestTicketView,
+	TicketDigest,
+	TicketOwner,
+} from '../../src/lib/ticket-digest.ts';
 import { runJiraTeamsReminder } from '../../src/workflows/jira-teams-reminder.ts';
+
+/** Worker-2's seam, stubbed: the workflow owns the wiring, not the prose. */
+type BuildTicketDigestsStub = (
+	views: DigestTicketView[],
+	owners: Map<string, TicketOwner>,
+	options: { enabled: boolean; timeoutMs: number },
+) => Promise<Map<string, TicketDigest>>;
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
 
@@ -357,12 +369,86 @@ test('refuses to seed state during a dry run', async () => {
 	);
 });
 
+test('builds the digests once over everything either transport will render', async () => {
+	// The channel post covers the first-response breach; the escalation covers a
+	// second request. One call, both requests, and the same prose in both places.
+	const calls: DigestTicketView[][] = [];
+	const posts: string[] = [];
+	const result = await run({
+		config: config({ bot: true }),
+		tickets: [
+			ticket(),
+			ticket({
+				key: 'SYNTHETIC-2',
+				url: 'https://jira.invalid/browse/SYNTHETIC-2',
+				firstResponseSla: { ...ticket().firstResponseSla!, breached: false },
+				resolutionSla: resolutionCycle({ elapsedMinutes: 8 * 60 }),
+			}),
+		],
+		post: async (message) => {
+			posts.push(message);
+		},
+		buildTicketDigests: async (views, owners, options) => {
+			calls.push(views);
+			assert.equal(options.enabled, false);
+			assert.equal(options.timeoutMs, 1_000);
+			return new Map(views.map((view) => [view.key, {
+				...(owners.get(view.key) as TicketOwner),
+				text: `digest for ${view.key}`,
+				source: 'fallback' as const,
+			}]));
+		},
+	});
+
+	assert.equal(calls.length, 1, 'one build per run, not one per transport');
+	assert.deepEqual(calls[0]?.map((view) => view.key).sort(), ['SYNTHETIC-1', 'SYNTHETIC-2']);
+	assert.match(posts.join('\n'), /↳ digest for SYNTHETIC-1/);
+	assert.match(
+		result.sent.map((message) => message.text).join('\n'),
+		/↳ digest for SYNTHETIC-2/,
+	);
+	assert.match(result.logs.join('\n'), /Digested 2 request\(s\): 0 by the model, 2 deterministic/);
+});
+
+test('the digest line renders with no model in the loop', async () => {
+	// The flag ships off. The deterministic sentence has to stand on its own, or
+	// the reminder is no better than it was.
+	const posts: string[] = [];
+	await run({
+		config: config({ bot: true }),
+		post: async (message) => {
+			posts.push(message);
+		},
+	});
+
+	assert.match(posts.join('\n'), /↳ .+тайлбар бичигдээгүй/);
+});
+
+test('the dry-run digest journal reports counts and no request content', async () => {
+	const result = await run({
+		config: config({ bot: true, dryRun: true }),
+		buildTicketDigests: async (views, owners) =>
+			new Map(views.map((view) => [view.key, {
+				...(owners.get(view.key) as TicketOwner),
+				text: 'Private digest prose about a private customer',
+				source: 'model' as const,
+			}])),
+	});
+
+	assert.match(result.logs.join('\n'), /Digested 1 request\(s\): 1 by the model, 0 deterministic/);
+	const observable = JSON.stringify({ logs: result.logs, attributes: result.attributes, output: result.output });
+	for (const secret of ['Private digest prose', 'SYNTHETIC-1', 'Synthetic summary', 'Synthetic Developer']) {
+		assert.ok(!observable.includes(secret), `dry-run output must not contain ${secret}`);
+	}
+});
+
 interface RunOptions {
 	tickets?: JiraTicket[];
 	config?: AppConfig;
 	now?: Date;
 	generateIntro?: (input: string, signal: AbortSignal) => Promise<string>;
 	buildMessages?: () => string[];
+	buildTicketDigests?: BuildTicketDigestsStub;
 	post?: (message: string) => Promise<void>;
 	escalationConfig?: EscalationConfig;
 	state?: EscalationState;
@@ -401,6 +487,7 @@ async function run(options: RunOptions = {}) {
 				truncated: false,
 			}),
 			...(options.buildMessages ? { buildReminderMessages: options.buildMessages } : {}),
+			...(options.buildTicketDigests ? { buildTicketDigests: options.buildTicketDigests } : {}),
 			postToChannel: async (message) => options.post?.(message),
 			loadEscalationConfig: async () => options.escalationConfig ?? directory(),
 			readEscalationState: async () => options.state ?? {},
@@ -456,6 +543,7 @@ function config(
 		webhook?: boolean;
 		seedOnly?: boolean;
 		allowlist?: string[] | null;
+		useLlmDigest?: boolean;
 	} = {},
 ): AppConfig {
 	const http = { timeoutMs: overrides.timeoutMs ?? 1_000, maxRetries: 0 };
@@ -508,6 +596,8 @@ function config(
 			dryRun: overrides.dryRun ?? false,
 			maxMessageChars: 12_000,
 			escalationSeedOnly: overrides.seedOnly ?? false,
+			useLlmDigest: overrides.useLlmDigest ?? false,
+			digestTimeoutMs: overrides.timeoutMs ?? 1_000,
 		},
 	};
 }

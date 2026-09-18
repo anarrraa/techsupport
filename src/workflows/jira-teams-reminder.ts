@@ -5,18 +5,34 @@ import { generateReminderIntro } from '../lib/reminder-intro.ts';
 import { loadConfig, type AppConfig } from '../lib/config.ts';
 import { windowDecision } from '../lib/delivery-windows.ts';
 import { planDirectMessages } from '../lib/direct-messages.ts';
-import { dueLevel, selectEscalations, severityFor } from '../lib/escalation.ts';
-import { loadEscalationConfig } from '../lib/escalation-config.ts';
+import {
+	dueLevel,
+	selectEscalations,
+	severityFor,
+	type EscalationCandidate,
+} from '../lib/escalation.ts';
+import { loadEscalationConfig, type EscalationConfig } from '../lib/escalation-config.ts';
 import {
 	highestNotified,
 	readEscalationState,
 	recordNotified,
 	writeEscalationState,
+	type EscalationState,
 } from '../lib/escalation-state.ts';
 import { fetchTickets, type JiraTicket } from '../lib/jira.ts';
-import { buildReminderMessages } from '../lib/reminder-message.ts';
+import { buildReminderMessages, type TicketDigests } from '../lib/reminder-message.ts';
+import {
+	buildTicketDigests,
+	resolveTicketOwner,
+	toDigestView,
+	type DigestReason,
+	type DigestTicketView,
+	type TicketDigest,
+	type TicketOwner,
+} from '../lib/ticket-digest.ts';
 import {
 	createRunJournal,
+	type DigestsObserved,
 	type DirectMessagesObserved,
 	type EscalationObserved,
 	type JournalSink,
@@ -38,8 +54,24 @@ export interface JiraTeamsReminderOutput {
 	escalationCount: number;
 }
 
+/**
+ * The digest seam (`src/lib/ticket-digest.ts`): deterministic owner resolution
+ * in, one or two sentences of prose out. The model half lives behind it, so the
+ * workflow neither prompts nor parses.
+ */
+type BuildTicketDigests = (
+	views: DigestTicketView[],
+	owners: Map<string, TicketOwner>,
+	options: {
+		enabled: boolean;
+		timeoutMs: number;
+		generate?: (input: string, signal: AbortSignal) => Promise<string>;
+	},
+) => Promise<Map<string, TicketDigest>>;
+
 interface WorkflowDependencies {
 	fetchTickets: typeof fetchTickets;
+	buildTicketDigests: BuildTicketDigests;
 	buildReminderMessages: typeof buildReminderMessages;
 	postToChannel: typeof postToChannel;
 	loadEscalationConfig: typeof loadEscalationConfig;
@@ -53,11 +85,13 @@ interface RunJiraTeamsReminderOptions {
 	log: JournalSink;
 	now?: Date;
 	generateIntro?: (input: string, signal: AbortSignal) => Promise<string>;
+	generateDigest?: (input: string, signal: AbortSignal) => Promise<string>;
 	dependencies?: Partial<WorkflowDependencies>;
 }
 
 const defaultDependencies: WorkflowDependencies = {
 	fetchTickets,
+	buildTicketDigests,
 	buildReminderMessages,
 	postToChannel,
 	loadEscalationConfig,
@@ -86,6 +120,12 @@ export default defineWorkflow({
 				const response = await (await harness.session()).prompt(input, { signal });
 				return response.text;
 			},
+			// The prompt itself belongs to the digest seam, not here; this only
+			// hands it a way to reach the model.
+			generateDigest: async (input, signal) => {
+				const response = await (await harness.session()).prompt(input, { signal });
+				return response.text;
+			},
 		});
 	},
 });
@@ -93,7 +133,7 @@ export default defineWorkflow({
 export async function runJiraTeamsReminder(
 	options: RunJiraTeamsReminderOptions,
 ): Promise<JiraTeamsReminderOutput> {
-	const { config, log, generateIntro } = options;
+	const { config, log, generateIntro, generateDigest } = options;
 	const dependencies = { ...defaultDependencies, ...options.dependencies };
 	const jira = await dependencies.fetchTickets(config.jira);
 	const now = options.now ?? new Date();
@@ -138,6 +178,24 @@ export async function runJiraTeamsReminder(
 	// outside working time.
 	const mayDeliver = window.deliver || config.reminder.dryRun;
 
+	// Resolved before either transport renders, because the escalation candidates
+	// are half of what the digests cover.
+	const bot = mayDeliver ? await prepareBotDelivery({ config, dependencies, journal, jira }) : null;
+	// One digest per request for the whole run, over the union of what the channel
+	// post and the direct messages will render: a request in both is described
+	// the same way in both, and costs one model call rather than two.
+	const digests = mayDeliver
+		? await buildDigests({
+			config,
+			dependencies,
+			journal,
+			now,
+			generate: generateDigest,
+			escalationConfig: bot?.escalationConfig ?? null,
+			tickets: unique([...selection.due, ...(bot?.escalations ?? []).map((c) => c.ticket)]),
+		})
+		: new Map<string, TicketDigest>();
+
 	let messages: string[] = [];
 	if (mayDeliver && selection.due.length > 0 && config.teamsWebhookUrl) {
 		const intro = await generateReminderIntro({
@@ -156,6 +214,7 @@ export async function runJiraTeamsReminder(
 			now,
 			config.reminder.maxMessageChars,
 			intro.text,
+			digests,
 		);
 		if (!config.reminder.dryRun) {
 			let delivered = 0;
@@ -173,16 +232,15 @@ export async function runJiraTeamsReminder(
 		}
 	}
 
-	const bot = mayDeliver
+	const delivery = bot
 		? await runBotDelivery({
 			config,
 			dependencies,
 			journal,
-			tickets: jira.tickets,
-			withoutResolutionSla: jira.withoutResolutionSla,
-			withoutParticipants: jira.withoutParticipants,
+			context: bot,
 			due: selection.due,
 			now,
+			digests,
 		})
 		: { directMessageCount: 0, escalationCount: 0 };
 
@@ -191,36 +249,35 @@ export async function runJiraTeamsReminder(
 		ticketCount: selection.due.length,
 		messageCount: messages.length,
 		notified:
-			!config.reminder.dryRun && (messages.length > 0 || bot.directMessageCount > 0),
+			!config.reminder.dryRun && (messages.length > 0 || delivery.directMessageCount > 0),
 		developerCount,
-		directMessageCount: bot.directMessageCount,
-		escalationCount: bot.escalationCount,
+		directMessageCount: delivery.directMessageCount,
+		escalationCount: delivery.escalationCount,
 	};
 }
 
-interface BotDeliveryInput {
-	config: AppConfig;
-	dependencies: WorkflowDependencies;
-	journal: RunJournal;
+/** Everything the escalation half of the run needs, resolved once. */
+interface BotContext {
+	escalationConfig: EscalationConfig;
+	state: EscalationState;
+	escalations: EscalationCandidate[];
 	tickets: JiraTicket[];
-	withoutResolutionSla: number;
-	withoutParticipants: number;
-	due: JiraTicket[];
-	now: Date;
 }
 
 /**
- * The personal-bot transport: a first-response reminder to each breaching
- * assignee, plus the contract's L2-L5 escalation for requests that stay
- * unresolved. Skipped entirely when the bot is not configured, so the channel
- * reminder keeps working on its own.
+ * The escalation clock, read before anything is rendered. Skipped entirely when
+ * the bot is not configured, so the channel reminder keeps working on its own.
  */
-async function runBotDelivery(
-	input: BotDeliveryInput,
-): Promise<{ directMessageCount: number; escalationCount: number }> {
-	const { config, dependencies, journal, tickets, due, now } = input;
-	if (!config.bot) return { directMessageCount: 0, escalationCount: 0 };
-	if (tickets.length > 0 && input.withoutResolutionSla === tickets.length) {
+async function prepareBotDelivery(input: {
+	config: AppConfig;
+	dependencies: WorkflowDependencies;
+	journal: RunJournal;
+	jira: { tickets: JiraTicket[]; withoutResolutionSla: number; withoutParticipants: number };
+}): Promise<BotContext | null> {
+	const { config, dependencies, journal, jira } = input;
+	const tickets = jira.tickets;
+	if (!config.bot) return null;
+	if (tickets.length > 0 && jira.withoutResolutionSla === tickets.length) {
 		throw new Error(
 			`JSM SLA metric "${config.jira.resolutionSlaName}" drives the escalation clock but `
 				+ `was not found on any of ${tickets.length} Jira tickets`,
@@ -230,7 +287,7 @@ async function runBotDelivery(
 	// now carries the same weight for delivery as the SLA metric does, and gets
 	// the same fail-visibly treatment (`AGENTS.md`). A renamed custom field
 	// would otherwise report "Delivered 0 direct message(s)" and exit 0.
-	if (tickets.length > 0 && input.withoutParticipants === tickets.length) {
+	if (tickets.length > 0 && jira.withoutParticipants === tickets.length) {
 		throw new Error(
 			`No Jira ticket carries a vendor participant in field "${config.jira.participantsField}" `
 				+ `across all ${tickets.length} scanned tickets — check JIRA_PARTICIPANTS_FIELD`,
@@ -248,6 +305,30 @@ async function runBotDelivery(
 		byLevel[key] = (byLevel[key] ?? 0) + 1;
 	}
 	journal.escalation({ candidates: escalations.length, byLevel });
+	return { escalationConfig, state, escalations, tickets };
+}
+
+interface BotDeliveryInput {
+	config: AppConfig;
+	dependencies: WorkflowDependencies;
+	journal: RunJournal;
+	context: BotContext;
+	due: JiraTicket[];
+	now: Date;
+	digests: TicketDigests;
+}
+
+/**
+ * The personal-bot transport: a first-response reminder to each breaching
+ * participant, plus the contract's L2-L5 escalation for requests that stay
+ * unresolved.
+ */
+async function runBotDelivery(
+	input: BotDeliveryInput,
+): Promise<{ directMessageCount: number; escalationCount: number }> {
+	const { config, dependencies, journal, due, now, digests } = input;
+	const { escalationConfig, state, escalations, tickets } = input.context;
+	if (!config.bot) return { directMessageCount: 0, escalationCount: 0 };
 
 	if (config.reminder.escalationSeedOnly) {
 		if (config.reminder.dryRun) {
@@ -276,6 +357,7 @@ async function runBotDelivery(
 		now,
 		maxChars: config.reminder.maxMessageChars,
 		allowlist: config.bot.recipientAllowlist,
+		digests,
 	});
 	const totalMessages = plan.messages.reduce((total, planned) => total + planned.messages.length, 0);
 	const observed = {
@@ -337,6 +419,72 @@ async function runBotDelivery(
 		});
 	}
 	return { directMessageCount: delivered, escalationCount: escalations.length };
+}
+
+/**
+ * Build one digest per request, then report counts. Never throws and never
+ * blocks the reminder: the seam degrades to its deterministic sentence, and a
+ * run with no escalation directory renders the plain rows it renders today.
+ */
+async function buildDigests(input: {
+	config: AppConfig;
+	dependencies: WorkflowDependencies;
+	journal: RunJournal;
+	now: Date;
+	generate?: (input: string, signal: AbortSignal) => Promise<string>;
+	escalationConfig: EscalationConfig | null;
+	tickets: JiraTicket[];
+}): Promise<TicketDigests> {
+	const { config, dependencies, journal, now, escalationConfig, tickets } = input;
+	if (tickets.length === 0) return new Map();
+	// Owner resolution reads the directory's `jiraAccountId` values, so without a
+	// directory there is nobody to name and no digest to render.
+	if (!escalationConfig) {
+		journal.digests({
+			tickets: tickets.length,
+			model: 0,
+			fallback: 0,
+			reasons: { missing: tickets.length },
+		});
+		return new Map();
+	}
+
+	const owners = new Map(
+		tickets.map((ticket) => [ticket.key, resolveTicketOwner(ticket, escalationConfig, now)]),
+	);
+	const views = tickets.map((ticket) =>
+		toDigestView(
+			ticket,
+			escalationConfig,
+			now,
+			elapsedSinceRaisedMinutes(ticket.resolutionSla),
+		),
+	);
+	const digests = await dependencies.buildTicketDigests(views, owners, {
+		enabled: config.reminder.useLlmDigest,
+		timeoutMs: config.reminder.digestTimeoutMs,
+		generate: input.generate,
+	});
+
+	const reasons: DigestsObserved['reasons'] = {};
+	let model = 0;
+	for (const digest of digests.values()) {
+		if (digest.source === 'model') model += 1;
+		if (digest.reason) reasons[digest.reason] = (reasons[digest.reason] ?? 0) + 1;
+	}
+	const missing = tickets.length - digests.size;
+	if (missing > 0) reasons.missing = (reasons.missing ?? 0) + missing;
+	journal.digests({
+		tickets: tickets.length,
+		model,
+		fallback: digests.size - model,
+		reasons,
+	});
+	return digests;
+}
+
+function unique(tickets: JiraTicket[]): JiraTicket[] {
+	return [...new Map(tickets.map((ticket) => [ticket.key, ticket])).values()];
 }
 
 function countBy(values: string[]): Record<string, number> {
