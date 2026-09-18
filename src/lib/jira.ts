@@ -105,7 +105,7 @@ export async function fetchTickets(
 		assignee: issue.fields.assignee?.displayName ?? 'Unassigned',
 		assigneeAccountId: issue.fields.assignee?.accountId ?? null,
 		participants: agentParticipants(issue, config.participantsField),
-		comments: [],
+		comments: ticketComments(issue, config),
 		url: buildTicketUrl(ticketBaseUrl, issue.key),
 		firstResponseSla: slas[index]?.firstResponse ?? null,
 		resolutionSla: slas[index]?.resolution ?? null,
@@ -136,6 +136,70 @@ function agentParticipants(issue: JiraIssue, field: string): JiraAgent[] {
 		agents.push({ accountId: value.accountId, displayName: value.displayName ?? 'Unknown' });
 	}
 	return agents;
+}
+
+/**
+ * Newest-last and bounded. Ordering is asserted here rather than trusted from
+ * the search response, so `comments.at(-1)` is the latest comment whatever
+ * order Jira hands the field back in.
+ */
+function ticketComments(issue: JiraIssue, config: JiraConfig): JiraComment[] {
+	const raw = issue.fields.comment?.comments;
+	if (!Array.isArray(raw)) return [];
+	const comments: JiraComment[] = [];
+	for (const value of raw) {
+		const createdEpochMillis = Date.parse(value?.created ?? '');
+		// A comment we cannot place in time is dropped: defaulting it to now
+		// would make the client look like they just replied.
+		if (!Number.isFinite(createdEpochMillis)) continue;
+		comments.push({
+			// Raw on purpose: no `accountType` filter here, unlike
+			// `agentParticipants`. The digest maps this against the escalation
+			// directory, and a client-authored comment is exactly the signal
+			// that the ball is on their side.
+			authorAccountId: value.author?.accountId ?? null,
+			authorDisplayName: value.author?.displayName ?? 'Unknown',
+			createdEpochMillis,
+			body: truncate(flattenAdf(value.body), config.commentChars),
+		});
+	}
+	comments.sort((a, b) => a.createdEpochMillis - b.createdEpochMillis);
+	return config.commentLimit > 0 ? comments.slice(-config.commentLimit) : [];
+}
+
+/** Node types that read as their own line, so their text must not run together. */
+const ADF_BLOCK_TYPES = new Set(['paragraph', 'heading', 'listItem']);
+/** Attachments carry no text worth reading and nest unpredictably. */
+const ADF_SKIPPED_TYPES = new Set(['mediaSingle', 'mediaGroup']);
+
+/**
+ * Atlassian Document Format to plain text: concatenate the `text` leaves and
+ * separate the block boundaries. An unknown node type is walked for its
+ * children rather than rejected, so a document Jira grows a new node for
+ * degrades to slightly worse text instead of failing the run.
+ */
+function flattenAdf(node: unknown): string {
+	const parts: string[] = [];
+	walkAdf(node, parts);
+	return parts.join('').replace(/\s+/gu, ' ').trim();
+}
+
+function walkAdf(node: unknown, parts: string[]): void {
+	if (!node || typeof node !== 'object') return;
+	if (Array.isArray(node)) {
+		for (const child of node) walkAdf(child, parts);
+		return;
+	}
+	const { type, text, content } = node as { type?: unknown; text?: unknown; content?: unknown };
+	if (typeof type === 'string' && ADF_SKIPPED_TYPES.has(type)) return;
+	if (typeof text === 'string') parts.push(text);
+	if (typeof type === 'string' && ADF_BLOCK_TYPES.has(type)) parts.push(' ');
+	walkAdf(content, parts);
+	if (typeof type === 'string' && ADF_BLOCK_TYPES.has(type)) parts.push(' ');
+}
+
+function truncate(value: string, max: number): string {
+	return value.length > max ? `${value.slice(0, max - 1)}\u2026` : value;
 }
 
 function canonicalTicketBaseUrl(value: string): URL {
@@ -182,7 +246,14 @@ async function fetchIssuePages(
 				body: JSON.stringify({
 					jql: config.jql,
 					maxResults,
-					fields: ['summary', 'status', 'priority', 'assignee', config.participantsField],
+					fields: [
+						'summary',
+						'status',
+						'priority',
+						'assignee',
+						'comment',
+						config.participantsField,
+					],
 					...(nextPageToken ? { nextPageToken } : {}),
 				}),
 			},
@@ -334,6 +405,13 @@ interface JiraUser {
 	accountType?: string;
 }
 
+interface JiraRawComment {
+	author?: JiraUser;
+	created?: string;
+	/** An Atlassian Document Format tree; see `flattenAdf`. */
+	body?: unknown;
+}
+
 interface JiraIssue {
 	key: string;
 	fields: {
@@ -341,6 +419,7 @@ interface JiraIssue {
 		status?: { name?: string };
 		priority?: { name?: string };
 		assignee?: { displayName?: string; accountId?: string };
+		comment?: { comments?: JiraRawComment[] };
 		[customField: string]: unknown;
 	};
 }
