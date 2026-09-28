@@ -9,3 +9,4 @@ gcp-sa.json
 packages/*.zip
 # Staff directory: emails and Entra object ids. This repo is public.
 config/escalation.json
+.github/*
