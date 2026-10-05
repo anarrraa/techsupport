@@ -1,5 +1,6 @@
 import type { DeliveryFailureReason } from './teams-bot.ts';
 import type { IntroReason, IntroResult } from './reminder-intro.ts';
+import type { DigestReason } from './ticket-digest.ts';
 
 /**
  * What one scheduled run observed and decided.
@@ -54,6 +55,18 @@ export interface DirectMessagesObserved {
 	failures: Partial<Record<DeliveryFailureReason, number>>;
 }
 
+/**
+ * Per-request digests, counted. Never the prose, which is written over
+ * client-authored comments, and never a key, which would name a request.
+ */
+export interface DigestsObserved {
+	tickets: number;
+	model: number;
+	fallback: number;
+	/** Keyed by cause, so it cannot hold a request key. */
+	reasons: Partial<Record<DigestReason, number>>;
+}
+
 /** The subset of the runtime logger this module needs. Attributes are structured. */
 export interface JournalSink {
 	info(message: string, attributes?: Record<string, unknown>): void;
@@ -65,6 +78,7 @@ export interface RunJournal {
 	window(event: { deliver: boolean; localTime: string; reason: string }): void;
 	selection(event: SelectionObserved): void;
 	intro(event: IntroObserved): void;
+	digests(event: DigestsObserved): void;
 	delivery(event: DeliveryObserved): void;
 	escalation(event: EscalationObserved): void;
 	directMessages(event: DirectMessagesObserved): void;
@@ -112,6 +126,22 @@ export function createRunJournal(sink: JournalSink): RunJournal {
 				return;
 			}
 			sink.warn(`Reminder intro fell back to the deterministic opener: ${reason}`, attributes);
+		},
+
+		digests(event) {
+			const reasons = Object.entries(event.reasons)
+				.map(([reason, count]) => `${reason}:${count}`)
+				.join(' ');
+			const message =
+				`Digested ${event.tickets} request(s): ${event.model} by the model, `
+					+ `${event.fallback} deterministic${reasons ? ` (${reasons})` : ''}`;
+			// `disabled` and `missing` are how the feature runs with the flag off,
+			// so they are not a degraded run; the rest are.
+			const degraded = Object.keys(event.reasons).some(
+				(reason) => reason !== 'disabled' && reason !== 'missing',
+			);
+			if (degraded) sink.warn(message, { ...event });
+			else sink.info(message, { ...event });
 		},
 
 		escalation(event) {

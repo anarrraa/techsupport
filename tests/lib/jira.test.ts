@@ -322,6 +322,8 @@ function config(): JiraConfig {
 		firstResponseSlaName: 'First response',
 		resolutionSlaName: 'Time to resolution',
 		participantsField: 'customfield_10065',
+		commentLimit: 6,
+		commentChars: 600,
 		http: { timeoutMs: 1_000, maxRetries: 0 },
 	};
 }
@@ -364,4 +366,201 @@ async function fetchSingleTicket(baseUrl: string, key: string) {
 			: Response.json({ start: 0, limit: 1, isLastPage: true, values: [metric('First response')] });
 	};
 	return fetchTickets({ ...config(), baseUrl }, fetchImpl, async () => {});
+}
+
+test('flattens nested ADF lists and marks into readable text', async () => {
+	const body = {
+		type: 'doc',
+		version: 1,
+		content: [
+			{
+				type: 'paragraph',
+				content: [
+					{ type: 'text', text: 'We tried ' },
+					{ type: 'text', text: 'twice', marks: [{ type: 'strong' }] },
+					{ type: 'text', text: ':' },
+				],
+			},
+			{
+				type: 'bulletList',
+				content: [
+					{
+						type: 'listItem',
+						content: [{ type: 'paragraph', content: [{ type: 'text', text: 'restart' }] }],
+					},
+					{
+						type: 'listItem',
+						content: [
+							{ type: 'paragraph', content: [{ type: 'text', text: 'reinstall' }] },
+							{
+								type: 'bulletList',
+								content: [
+									{
+										type: 'listItem',
+										content: [
+											{ type: 'paragraph', content: [{ type: 'text', text: 'as admin' }] },
+										],
+									},
+								],
+							},
+						],
+					},
+				],
+			},
+			{ type: 'mediaSingle', content: [{ type: 'media', attrs: { id: 'secret-attachment' } }] },
+		],
+	};
+
+	const result = await fetchTicketsWithComments([comment({ body })]);
+	assert.equal(result.tickets[0]?.comments[0]?.body, 'We tried twice: restart reinstall as admin');
+});
+
+test('skips ADF node types it does not know instead of throwing', async () => {
+	const body = {
+		type: 'doc',
+		content: [
+			{ type: 'someFutureBlock', content: [{ type: 'text', text: 'still readable' }] },
+			{ type: 'paragraph', content: [{ type: 'text', text: 'after' }] },
+			null,
+			{ type: 'status', attrs: { text: 'ignored attr' } },
+		],
+	};
+
+	const result = await fetchTicketsWithComments([comment({ body })]);
+	assert.equal(result.tickets[0]?.comments[0]?.body, 'still readable after');
+});
+
+test('keeps the newest comments, not the first ones', async () => {
+	const comments = ['first', 'second', 'third', 'fourth'].map((text, index) =>
+		comment({
+			body: paragraph(text),
+			created: `2026-09-0${index + 1}T09:00:00.000+0000`,
+			accountId: `author-${index}`,
+		}),
+	);
+
+	const result = await fetchTicketsWithComments(comments, { commentLimit: 2 });
+	assert.deepEqual(
+		result.tickets[0]?.comments.map((value) => value.body),
+		['third', 'fourth'],
+	);
+	assert.equal(result.tickets[0]?.comments[1]?.authorAccountId, 'author-3');
+});
+
+test('truncates a long comment rather than dropping it', async () => {
+	const result = await fetchTicketsWithComments([comment({ body: paragraph('x'.repeat(50)) })], {
+		commentChars: 10,
+	});
+	assert.equal(result.tickets[0]?.comments[0]?.body, `${'x'.repeat(9)}…`);
+});
+
+test('keeps a client comment author raw, and marks which side wrote it', async () => {
+	const result = await fetchTicketsWithComments([
+		comment({ body: paragraph('any update?'), accountType: 'customer', accountId: 'client-1' }),
+		comment({ body: paragraph('looking into it'), accountType: 'atlassian', accountId: 'agent-1' }),
+		comment({ body: paragraph('no author'), accountId: undefined, accountType: null }),
+	]);
+	// Unlike `agentParticipants`, a customer is kept rather than filtered out:
+	// the client having written last is exactly the signal the digest needs.
+	assert.deepEqual(result.tickets[0]?.comments, [
+		{
+			authorAccountId: 'client-1',
+			authorDisplayName: 'Commenter',
+			authorIsVendor: false,
+			createdEpochMillis: Date.parse('2026-09-01T09:00:00.000+0000'),
+			body: 'any update?',
+		},
+		{
+			authorAccountId: 'agent-1',
+			authorDisplayName: 'Commenter',
+			authorIsVendor: true,
+			createdEpochMillis: Date.parse('2026-09-01T09:00:00.000+0000'),
+			body: 'looking into it',
+		},
+		{
+			authorAccountId: null,
+			authorDisplayName: 'Commenter',
+			// An author Jira did not type is not assumed to be one of ours.
+			authorIsVendor: false,
+			createdEpochMillis: Date.parse('2026-09-01T09:00:00.000+0000'),
+			body: 'no author',
+		},
+	]);
+});
+
+test('yields no comments when the search response carries no comment field', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.deepEqual(result.tickets[0]?.comments, []);
+});
+
+test('drops a comment whose created timestamp does not parse', async () => {
+	const result = await fetchTicketsWithComments([
+		comment({ body: paragraph('undateable'), created: 'not a date' }),
+		comment({ body: paragraph('dateable') }),
+	]);
+	assert.deepEqual(
+		result.tickets[0]?.comments.map((value) => value.body),
+		['dateable'],
+	);
+});
+
+test('asks Jira for the comment field in the same search request', async () => {
+	let requestedFields: string[] | undefined;
+	const fetchImpl: typeof fetch = async (input, init) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			requestedFields = (JSON.parse(String(init?.body)) as { fields: string[] }).fields;
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+	await fetchTickets(config(), fetchImpl, async () => {});
+	assert.ok(requestedFields?.includes('comment'));
+});
+
+function paragraph(text: string) {
+	return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+function comment(options: {
+	body: unknown;
+	created?: string;
+	accountId?: string;
+	/** `null` omits the field, the way Jira does when it reports no type at all. */
+	accountType?: string | null;
+}) {
+	return {
+		author: {
+			accountId: options.accountId === undefined ? undefined : options.accountId,
+			displayName: 'Commenter',
+			accountType: options.accountType === null ? undefined : options.accountType ?? 'atlassian',
+		},
+		created: options.created ?? '2026-09-01T09:00:00.000+0000',
+		body: options.body,
+	};
+}
+
+async function fetchTicketsWithComments(
+	comments: Array<ReturnType<typeof comment>>,
+	overrides: Partial<JiraConfig> = {},
+) {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			const base = issue('SUP-1');
+			return Response.json({
+				issues: [{ ...base, fields: { ...base.fields, comment: { comments } } }],
+				isLast: true,
+			});
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+	return fetchTickets({ ...config(), ...overrides }, fetchImpl, async () => {});
 }

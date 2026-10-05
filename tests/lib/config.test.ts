@@ -14,6 +14,8 @@ test('loads validated defaults', () => {
 	// quarter of breaches on the current one.
 	assert.equal(config.reminder.deliveryWindowMinutes, 60);
 	assert.equal(config.reminder.useLlmIntro, false);
+	assert.equal(config.jira.commentLimit, 6);
+	assert.equal(config.jira.commentChars, 600);
 });
 
 test('allows dry-run mode without a Teams webhook', () => {
@@ -36,6 +38,8 @@ test('requires an explicit Jira scope for non-dry runs', () => {
 test('rejects unsafe URLs and malformed values', () => {
 	assert.throws(() => loadConfig({ ...baseEnv(), JIRA_BASE_URL: 'http://jira.local' }), /HTTPS/);
 	assert.throws(() => loadConfig({ ...baseEnv(), JIRA_PAGE_SIZE: '0' }), /between 1 and 100/);
+	assert.throws(() => loadConfig({ ...baseEnv(), JIRA_COMMENT_LIMIT: '51' }), /between 0 and 50/);
+	assert.throws(() => loadConfig({ ...baseEnv(), JIRA_COMMENT_CHARS: '10' }), /between 50 and 5000/);
 	assert.throws(
 		() =>
 			loadConfig({

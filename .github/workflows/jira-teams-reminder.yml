@@ -87,7 +87,10 @@ jobs:
           restore-keys: escalation-state-
 
       - name: Authenticate to Google Cloud
-        if: vars.REMINDER_USE_LLM_INTRO == 'true'
+        # Either model-written line needs Vertex AI. Digest is off by default
+        # and its flag lives here, so a turn-on on the digest alone still
+        # authenticates instead of failing at the first request.
+        if: vars.REMINDER_USE_LLM_INTRO == 'true' || vars.REMINDER_USE_LLM_DIGEST == 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -115,6 +118,13 @@ jobs:
           REMINDER_WINDOWS: ${{ vars.REMINDER_WINDOWS }}
           REMINDER_TIMEZONE: ${{ vars.REMINDER_TIMEZONE }}
           REMINDER_USE_LLM_INTRO: ${{ vars.REMINDER_USE_LLM_INTRO }}
+          # Per-request digest line. Unset here means unset for the process, so
+          # the code's own default (off) is what runs — the deterministic
+          # sentence still renders either way.
+          REMINDER_USE_LLM_DIGEST: ${{ vars.REMINDER_USE_LLM_DIGEST }}
+          REMINDER_DIGEST_TIMEOUT_MS: ${{ vars.REMINDER_DIGEST_TIMEOUT_MS }}
+          JIRA_COMMENT_LIMIT: ${{ vars.JIRA_COMMENT_LIMIT }}
+          JIRA_COMMENT_CHARS: ${{ vars.JIRA_COMMENT_CHARS }}
           REMINDER_DRY_RUN: ${{ inputs.dry_run || 'false' }}
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
           TEAMS_BOT_APP_ID: ${{ vars.TEAMS_BOT_APP_ID }}

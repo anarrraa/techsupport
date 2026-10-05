@@ -1,6 +1,7 @@
 import { firstResponseMinutes, severityFor, type EscalationLevel } from './escalation.ts';
 import type { JiraTicket } from './jira.ts';
 import { elapsedSinceRaisedMinutes, overdueMinutes } from './sla.ts';
+import type { TicketDigest } from './ticket-digest.ts';
 
 const DEFAULT_INTRO = 'Манай туршлагатай, хариуцлагатай багийнхан аа, дараах тикетүүдийн SLA хугацаа хэтэрсэн тул шалгаж хариу өгнө үү.';
 const CHANNEL_TITLE = '🔔 **First response SLA сануулга**';
@@ -12,13 +13,23 @@ const DOMAIN_CANDIDATE_PATTERN = new RegExp(DOMAIN_PATTERN, 'gu');
 const DANGEROUS_FORMAT_CONTROLS = /[\u00ad\u061c\u180e\u200b\u200e\u200f\u202a-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb]|\u{e0001}|[\u{e0020}-\u{e007f}]/gu;
 const C0_C1_CONTROLS = /[\u0000-\u001f\u007f-\u009f]/g;
 
+export type TicketDigests = ReadonlyMap<string, TicketDigest>;
+
 export function buildReminderMessages(
 	tickets: JiraTicket[],
 	now: Date,
 	maxChars: number,
 	intro = DEFAULT_INTRO,
+	digests?: TicketDigests,
 ): string[] {
-	return buildMessages(tickets, now, maxChars, [CHANNEL_TITLE, cleanIntro(intro)], 'firstResponse');
+	return buildMessages(
+		tickets,
+		now,
+		maxChars,
+		[CHANNEL_TITLE, cleanIntro(intro)],
+		'firstResponse',
+		digests,
+	);
 }
 
 /**
@@ -42,8 +53,10 @@ export function buildDirectMessages(options: {
 	maxChars: number;
 	/** Off-hours Critical/High only: named so a human can place the call. */
 	onCallName?: string | null;
+	/** Per-request digest, by ticket key. Missing keys render the plain row. */
+	digests?: TicketDigests;
 }): string[] {
-	const { recipientName, kind, level, tickets, now, maxChars, onCallName } = options;
+	const { recipientName, kind, level, tickets, now, maxChars, onCallName, digests } = options;
 	const greeting = `Сайн байна уу, ${cleanField(recipientName, 100)}.`;
 	const header =
 		kind === 'first-response'
@@ -60,7 +73,14 @@ export function buildDirectMessages(options: {
 			`⚠️ Ажлын бус цагийн Critical/High: дуудлагын инженер ${cleanField(onCallName, 100)}-тай утсаар холбогдоно уу.`,
 		);
 	}
-	return buildMessages(tickets, now, maxChars, header, kind === 'first-response' ? 'firstResponse' : 'resolution');
+	return buildMessages(
+		tickets,
+		now,
+		maxChars,
+		header,
+		kind === 'first-response' ? 'firstResponse' : 'resolution',
+		digests,
+	);
 }
 
 function buildMessages(
@@ -69,6 +89,7 @@ function buildMessages(
 	maxChars: number,
 	header: string[],
 	clock: Clock,
+	digests?: TicketDigests,
 ): string[] {
 	if (tickets.length === 0) return [];
 	// The on-call line is the one action the off-hours branch exists to trigger,
@@ -84,7 +105,7 @@ function buildMessages(
 		const heading = `**${cleanField(assignee, 100)}**`;
 		let headingAdded = false;
 		for (const ticket of assignedTickets) {
-			let ticketLine = renderTicket(ticket, now, clock);
+			let ticketLine = renderTicket(ticket, now, clock, digests?.get(ticket.key));
 			const additions = headingAdded ? [ticketLine] : ['', heading, ticketLine];
 			if ([...lines, ...additions].join('\n').length > maxChars && ticketCount > 0) {
 				messages.push(lines.join('\n'));
@@ -129,7 +150,21 @@ function groupByAssignee(tickets: JiraTicket[]): Map<string, JiraTicket[]> {
  */
 type Clock = 'firstResponse' | 'resolution';
 
-function renderTicket(ticket: JiraTicket, now: Date, clock: Clock): string {
+/** Character budget for the digest sentence, the same treatment a summary gets. */
+const DIGEST_CHARS = 300;
+
+function renderTicket(
+	ticket: JiraTicket,
+	now: Date,
+	clock: Clock,
+	digest?: TicketDigest,
+): string {
+	const row = renderTicketRow(ticket, now, clock);
+	const digestLine = renderDigestLine(digest);
+	return digestLine ? `${row}\n${digestLine}` : row;
+}
+
+function renderTicketRow(ticket: JiraTicket, now: Date, clock: Clock): string {
 	const summary = cleanField(ticket.summary, 180);
 	const priority = cleanField(ticket.priority, 30);
 	const status = cleanField(ticket.status, 80);
@@ -146,6 +181,25 @@ function renderTicket(ticket: JiraTicket, now: Date, clock: Clock): string {
 		: line;
 }
 
+/**
+ * The indented second line: where the request stopped, and who it sits on.
+ *
+ * The digest text is model output written over client-authored comments, so it
+ * is exactly as untrusted as a Jira summary and goes through the same
+ * `cleanField`. The owner name comes from the escalation directory rather than
+ * the model, and is sanitized too — an operator edits that file by hand.
+ */
+function renderDigestLine(digest?: TicketDigest): string | null {
+	const text = digest ? cleanField(digest.text, DIGEST_CHARS) : '';
+	if (!text) return null;
+	const owner = digest?.name ? ` · Одоо: ${cleanField(digest.name, 100)}` : '';
+	// `clientSpokeLast` means the ball is on our side, so it is a call to act,
+	// not a reason to wait. It does not replace the owner: the person who last
+	// answered is still who the team asks about the request.
+	if (digest?.clientSpokeLast) return `  ↳ ${text} · ⏳ Манай хариу хүлээгдэж байна${owner}`;
+	return `  ↳ ${text}${owner}`;
+}
+
 function fitTicketLine(
 	line: string,
 	ticket: JiraTicket,
@@ -154,6 +208,11 @@ function fitTicketLine(
 	clock: Clock,
 ): string {
 	if (line.length <= available) return line;
+	// The digest goes first. The link and the key are what the reminder owes the
+	// reader; the prose is the nicety, so it is dropped whole before the row is
+	// compacted into something harder to act on.
+	const row = renderTicketRow(ticket, now, clock);
+	if (row.length <= available) return row;
 	const linkedKey = `[${cleanField(ticket.key, 50)}](${ticket.url})`;
 	const elapsed =
 		clock === 'resolution'

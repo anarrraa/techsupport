@@ -24,6 +24,10 @@ export interface JiraConfig {
 	 * instance, so it is configuration rather than a constant.
 	 */
 	participantsField: string;
+	/** Most recent comments kept per ticket. */
+	commentLimit: number;
+	/** Per-comment character cap after the ADF body is flattened. */
+	commentChars: number;
 	http: HttpConfig;
 }
 
@@ -89,6 +93,13 @@ export interface ReminderConfig {
 	 * whole backlog at once.
 	 */
 	escalationSeedOnly: boolean;
+	/**
+	 * The per-request digest sentence. Ships dark: with it off the digest still
+	 * renders from the deterministic fallback, so turning it on only changes who
+	 * writes the prose.
+	 */
+	useLlmDigest: boolean;
+	digestTimeoutMs: number;
 }
 
 export interface AppConfig {
@@ -172,6 +183,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 				env.JIRA_FIRST_RESPONSE_SLA_NAME?.trim() || 'Time To First Response',
 			resolutionSlaName: env.JIRA_RESOLUTION_SLA_NAME?.trim() || 'Time to resolution',
 			participantsField: env.JIRA_PARTICIPANTS_FIELD?.trim() || 'customfield_10065',
+			commentLimit: integer(env, 'JIRA_COMMENT_LIMIT', 6, 0, 50),
+			commentChars: integer(env, 'JIRA_COMMENT_CHARS', 600, 50, 5_000),
 			http,
 		},
 		teamsWebhookUrl,
@@ -190,6 +203,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 			dryRun,
 			maxMessageChars: integer(env, 'TEAMS_MAX_MESSAGE_CHARS', 12_000, 1_000, 25_000),
 			escalationSeedOnly: boolean(env, 'ESCALATION_SEED_ONLY', false),
+			useLlmDigest: boolean(env, 'REMINDER_USE_LLM_DIGEST', false),
+			digestTimeoutMs: integer(env, 'REMINDER_DIGEST_TIMEOUT_MS', 20_000, 1_000, 120_000),
 		},
 	};
 }
