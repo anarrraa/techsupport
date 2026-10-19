@@ -14,10 +14,13 @@ export const formatDate = (isoDate: string, locale: Locale) =>
     ? isoDate.slice(0, 10).replaceAll("-", ".") // design system: YYYY.MM.DD
     : new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(isoDate));
 
+// Browsers ship no Mongolian month names in Intl, so Mongolian is spelled out by hand.
 export const formatMonth = (yearMonth: string, locale: Locale) =>
-  new Intl.DateTimeFormat(tag(locale), { year: "numeric", month: "long", timeZone: "UTC" }).format(
-    new Date(`${yearMonth}-01T00:00:00Z`),
-  );
+  locale === "mn"
+    ? `${yearMonth.slice(0, 4)} оны ${Number(yearMonth.slice(5, 7))}-р сар`
+    : new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", timeZone: "UTC" }).format(
+        new Date(`${yearMonth}-01T00:00:00Z`),
+      );
 
 /** 95 → "1h 35m" / "1ц 35м". */
 export function formatDuration(minutes: number, locale: Locale) {
