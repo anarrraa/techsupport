@@ -4,6 +4,9 @@ import type { MonthlyReport } from "@/types/report";
 
 // ponytail: mock-backed. Swap each body for a fetch to VITE_API_URL when the backend lands;
 // hooks and pages keep the same signatures.
+// ponytail: single mock month; becomes a month picker when the API serves more.
+export const CURRENT_MONTH = septemberReport.month;
+
 const delay = <T,>(value: T, ms = 200) => new Promise<T>((r) => setTimeout(() => r(value), ms));
 
 export const api = {
