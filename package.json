@@ -1,17 +1,22 @@
 {
-	"name": "techsupport-jira-teams-reminder",
-	"version": "0.1.0",
-	"private": true,
-	"packageManager": "npm@10.9.3",
+  "name": "techsupport-jira-teams-reminder",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.3",
   "dependencies": {
     "@flue/runtime": "^1.0.0-beta.9",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "express": "5.3.0",
     "valibot": "^1.4.2"
   },
   "devDependencies": {
     "@flue/cli": "^1.0.0-beta.9",
-		"@standard-schema/spec": "1.1.0",
-		"@types/json-schema": "7.0.15",
+    "@standard-schema/spec": "1.1.0",
+    "@types/express": "5.0.6",
+    "@types/json-schema": "7.0.15",
     "@types/node": "^26.1.2",
+    "prisma": "7.10.1",
     "typescript": "^7.0.2"
   },
   "scripts": {
@@ -23,7 +28,11 @@
     "resolve:ids": "node --env-file-if-exists=.env scripts/resolve-entra-ids.mjs",
     "trace": "node --env-file-if-exists=.env scripts/trace-run.ts",
     "typecheck": "tsc --noEmit",
-		"test": "node --test tests/lib/*.test.ts tests/workflows/*.test.ts"
+    "test": "node --test tests/lib/*.test.ts tests/lib/queries/*.test.ts tests/workflows/*.test.ts",
+    "dev:backend": "node --env-file-if-exists=.env --watch src/backend/server.ts",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "postinstall": "prisma generate"
   },
   "type": "module"
 }

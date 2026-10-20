@@ -46,6 +46,7 @@ interface WorkflowDependencies {
 	readEscalationState: typeof readEscalationState;
 	writeEscalationState: typeof writeEscalationState;
 	createBotSender: typeof createBotSender;
+	captureSnapshot: (tickets: JiraTicket[], capturedAt: Date) => Promise<unknown>;
 }
 
 interface RunJiraTeamsReminderOptions {
@@ -64,6 +65,17 @@ const defaultDependencies: WorkflowDependencies = {
 	readEscalationState,
 	writeEscalationState,
 	createBotSender,
+	// Opt-in by DATABASE_URL, and loaded lazily so a run without a database never
+	// touches Prisma (docs/prd-monthly-dashboard.md).
+	captureSnapshot: async (tickets, capturedAt) => {
+		if (!process.env.DATABASE_URL) return;
+		const { captureSnapshot, disconnect } = await import('../backend/db.ts');
+		try {
+			await captureSnapshot(tickets, capturedAt);
+		} finally {
+			await disconnect();
+		}
+	},
 };
 
 export default defineWorkflow({
@@ -125,6 +137,14 @@ export async function runJiraTeamsReminder(
 		timeZone: config.reminder.timeZone,
 	});
 	journal.window(window);
+
+	// Additive: a dashboard outage must not cost anyone a reminder. Only the
+	// error's class is logged, never its message, which could echo row data.
+	try {
+		await dependencies.captureSnapshot(jira.tickets, now);
+	} catch (error) {
+		log.warn(`Snapshot capture failed (${error instanceof Error ? error.name : 'unknown'}); reminders unaffected`);
+	}
 
 	if (jira.scanned === 0 && !config.reminder.dryRun) {
 		throw new Error(

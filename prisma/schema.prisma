@@ -1,0 +1,55 @@
+// Monthly dashboard store: docs/prd-monthly-dashboard.md.
+// Holds what JSM reported, never free text: no summary, comment, or person.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/backend/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// One ticket as one reminder run saw it. JSM's figures, copied, not derived.
+model SLASnapshot {
+  id         BigInt   @id @default(autoincrement())
+  capturedAt DateTime
+  ticketKey  String
+  priority   String
+  status     String
+
+  firstResponseState     String? // 'ongoing' | 'completed'; null when the metric is absent
+  firstResponseBreached  Boolean?
+  firstResponsePaused    Boolean?
+  firstResponseElapsed   Int? // working minutes, JSM elapsedTime
+  firstResponseRemaining Int? // working minutes, JSM remainingTime
+
+  resolutionState     String?
+  resolutionBreached  Boolean?
+  resolutionPaused    Boolean?
+  resolutionElapsed   Int?
+  resolutionRemaining Int?
+
+  @@unique([ticketKey, capturedAt])
+  @@index([capturedAt])
+}
+
+/// A frozen month's aggregate, so a closed month stops moving.
+model MonthlyReport {
+  month       String   @id // YYYY-MM, UTC
+  metrics     Json
+  generatedAt DateTime @default(now())
+}
+
+/// Delivery metadata only. Message text never lands here.
+model ChatMessage {
+  id        BigInt   @id @default(autoincrement())
+  ticketKey String
+  kind      String // 'reminder' | 'escalation'
+  level     Int? // escalation level 2-5; null for a first-response reminder
+  sentAt    DateTime
+
+  @@index([sentAt])
+}
