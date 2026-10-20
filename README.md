@@ -307,6 +307,21 @@ npm run verify:bot -- <entra-object-id>
 Set `REMINDER_DRY_RUN=true` to execute Jira/SLA selection without posting to
 Teams. Dry-run logs counts only and does not log ticket content.
 
+## Monthly dashboard backend
+
+`docs/prd-monthly-dashboard.md`. With `DATABASE_URL` set, every run (dry-run
+included) stores one `SLASnapshot` row per scanned ticket: JSM's figures only,
+no summary, comment, or person. A capture failure is a warning, never a failed
+run. The API has no auth yet and binds to `127.0.0.1`.
+
+```sh
+docker run -d --name dashboard-pg -p 127.0.0.1:5433:5432 \
+  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=dashboard postgres:16-alpine
+export DATABASE_URL=postgres://postgres@localhost:5433/dashboard
+npm run db:push        # schema-first: prisma/schema.prisma
+npm run dev:backend    # :3001, GET /health, GET /api/reports/YYYY-MM
+```
+
 ## GitHub Actions
 
 `ci.yml` runs tests, type checking, and a build on pushes and pull requests.

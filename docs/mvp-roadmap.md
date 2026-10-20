@@ -35,9 +35,9 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 93 passed, 0 failed on 2026-09-07 |
-| Type checking | Pass | `npm run typecheck` exit 0 on 2026-09-07 |
-| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-09-07 |
+| Unit tests | Pass | `npm test`: 141 passed, 0 failed on 2026-10-19 |
+| Type checking | Pass | `npm run typecheck` exit 0 on 2026-10-19 |
+| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-10-19 |
 | GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
 | **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
@@ -450,6 +450,24 @@ infrastructure for.
 - [ ] Confirm the escalation state cache survives between scheduled runs and that
       no level is notified twice.
 - [ ] Confirm the Low L5 threshold question with the client.
+
+### V2 milestone 3: monthly dashboard backend
+
+Requirements: `docs/prd-monthly-dashboard.md`. Approved 2026-10-19 by the user
+ahead of the open MVP milestones 3 and 4, which stay open.
+
+- [x] Prisma schema (`SLASnapshot`, `MonthlyReport`, `ChatMessage`) applies with
+      `npx prisma db push` against a local Postgres. Done 2026-10-19 against
+      `postgres:16-alpine` in Docker; all three tables created.
+- [x] Reminder runs capture snapshots when `DATABASE_URL` is set, without
+      changing reminder behavior. Done 2026-10-19 locally: synthetic dry runs
+      through `runJiraTeamsReminder` wrote 4 rows, a repeated run instant added
+      none, and an unreachable database logged one warning and exited 0.
+      Unit tests cover the failure path.
+- [x] `GET /api/reports/:month` returns aggregated metrics from snapshots.
+      Done 2026-10-19 locally: `/api/reports/2026-10` returned 3 tickets from 4
+      snapshots, `2026-13` returned 400, `/health` 200 (503 with database down).
+- [ ] Capture verified against a real scheduled run's database (external).
 
 ## Post-MVP direction
 

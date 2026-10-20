@@ -10,3 +10,5 @@ packages/*.zip
 # Staff directory: emails and Entra object ids. This repo is public.
 config/escalation.json
 .github/*
+# Generated Prisma client (npm run db:generate)
+src/backend/generated/

@@ -10,6 +10,32 @@ import { runJiraTeamsReminder } from '../../src/workflows/jira-teams-reminder.ts
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');
 
+test('every scanned ticket is offered to snapshot capture at the run instant', async () => {
+	const captured: { keys: string[]; at: Date }[] = [];
+	await run({
+		tickets: [ticket(), ticket({ key: 'SYNTHETIC-2' })],
+		capture: async (tickets, at) => {
+			captured.push({ keys: tickets.map((value) => value.key), at });
+		},
+	});
+	assert.deepEqual(captured, [{ keys: ['SYNTHETIC-1', 'SYNTHETIC-2'], at: NOW }]);
+});
+
+test('a failing snapshot capture changes nothing about the reminder run', async () => {
+	const baseline = await run({ config: config({ bot: true }) });
+	const failed = await run({
+		config: config({ bot: true }),
+		capture: async () => {
+			throw new Error('row SYNTHETIC-1 Synthetic summary');
+		},
+	});
+	assert.deepEqual(failed.output, baseline.output);
+	assert.deepEqual(failed.sent, baseline.sent);
+	const logs = failed.logs.join('\n');
+	assert.match(logs, /Snapshot capture failed \(Error\); reminders unaffected/);
+	assert.doesNotMatch(logs, /Synthetic summary/);
+});
+
 test('a run GitHub delayed into the night delivers nothing', async () => {
 	// The schedule cannot be trusted to be punctual — past runs were 45 to 489
 	// minutes late — so the run happening is not the same as the run delivering.
@@ -369,6 +395,7 @@ interface RunOptions {
 	failSend?: (message: DirectMessage) => Error | null;
 	/** Receives the persisted state even when the run throws. */
 	savedOut?: { value: EscalationState | null };
+	capture?: (tickets: JiraTicket[], capturedAt: Date) => Promise<unknown>;
 }
 
 async function run(options: RunOptions = {}) {
@@ -408,6 +435,8 @@ async function run(options: RunOptions = {}) {
 				saved = { ...value };
 				if (options.savedOut) options.savedOut.value = { ...value };
 			},
+			// Never the real one: a developer's exported DATABASE_URL must not see test rows.
+			captureSnapshot: options.capture ?? (async () => {}),
 			createBotSender: async () => ({
 				send: async (message) => {
 					const failure = options.failSend?.(message);
