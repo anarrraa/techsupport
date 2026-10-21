@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatDate, formatDuration, formatMonth } from "../src/utils/format.ts";
+import { formatDate, formatDuration, formatMonth, shiftMonth } from "../src/utils/format.ts";
 
 test("formatDuration splits hours and minutes per locale", () => {
   assert.equal(formatDuration(45, "en"), "45m");
@@ -17,4 +17,10 @@ test("formatDate uses YYYY.MM.DD for Mongolian and never shifts the day", () => 
 test("formatMonth spells out Mongolian months", () => {
   assert.equal(formatMonth("2026-09", "mn"), "2026 оны 9-р сар");
   assert.equal(formatMonth("2026-09", "en"), "September 2026");
+});
+
+test("shiftMonth crosses year boundaries", () => {
+  assert.equal(shiftMonth("2026-01", -1), "2025-12");
+  assert.equal(shiftMonth("2026-12", 1), "2027-01");
+  assert.equal(shiftMonth("2026-10", -5), "2026-05");
 });

@@ -13,30 +13,34 @@ interface Props {
 }
 
 export function MetricCard({ label, metric, format, lowerIsBetter = false }: Props) {
-  const { t } = useI18n();
-  const { value, previous } = metric;
-  const delta = value !== null && previous !== null ? value - previous : null;
-  const good = delta !== null && (lowerIsBetter ? delta < 0 : delta > 0);
-  const Icon = delta === 0 ? Minus : delta !== null && delta > 0 ? ArrowUpRight : ArrowDownRight;
   return (
     <Card className="gap-2 py-4">
       <CardHeader className="px-4">
         <CardTitle className="text-sm font-normal text-muted-foreground">{label}</CardTitle>
       </CardHeader>
       <CardContent className="px-4">
-        <p className="text-3xl font-semibold tabular-nums">{value === null ? "—" : format(value)}</p>
-        {delta !== null && (
-          <p
-            className={cn(
-              "mt-1 flex items-center gap-1 text-xs",
-              delta === 0 ? "text-muted-foreground" : good ? "text-healthy" : "text-breached",
-            )}
-          >
-            <Icon className="size-4" aria-hidden />
-            {format(Math.abs(delta))} {t("metric.vsLastMonth")}
-          </p>
+        <p className="text-3xl font-semibold tabular-nums">{format(metric.value)}</p>
+        {metric.previous !== undefined && (
+          <Delta delta={metric.value - metric.previous} format={format} lowerIsBetter={lowerIsBetter} />
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function Delta({ delta, format, lowerIsBetter }: { delta: number; format: Props["format"]; lowerIsBetter: boolean }) {
+  const { t } = useI18n();
+  const good = lowerIsBetter ? delta < 0 : delta > 0;
+  const Icon = delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
+  return (
+    <p
+      className={cn(
+        "mt-1 flex items-center gap-1 text-xs",
+        delta === 0 ? "text-muted-foreground" : good ? "text-healthy" : "text-breached",
+      )}
+    >
+      <Icon className="size-4" aria-hidden />
+      {format(Math.abs(delta))} {t("metric.vsLastMonth")}
+    </p>
   );
 }
