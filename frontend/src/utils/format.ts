@@ -31,3 +31,10 @@ export function formatDuration(minutes: number, locale: Locale) {
   if (hours === 0) return `${rest}${m}`;
   return rest === 0 ? `${hours}${h}` : `${hours}${h} ${rest}${m}`;
 }
+
+/** "2026-01", -1 → "2025-12". */
+export function shiftMonth(yearMonth: string, by: number) {
+  const d = new Date(`${yearMonth}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + by);
+  return d.toISOString().slice(0, 7);
+}
