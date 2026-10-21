@@ -11,6 +11,12 @@
     "test": "node --test tests/*.test.ts"
   },
   "dependencies": {
+    "@syncfusion/ej2-base": "^35.1.37",
+    "@syncfusion/ej2-buttons": "^35.1.41",
+    "@syncfusion/ej2-dropdowns": "^35.1.41",
+    "@syncfusion/ej2-inputs": "^35.1.41",
+    "@syncfusion/ej2-popups": "^35.1.39",
+    "@syncfusion/ej2-react-spreadsheet": "^35.1.41",
     "@tanstack/react-query": "^5.104.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

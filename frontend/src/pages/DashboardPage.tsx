@@ -2,6 +2,7 @@ import { QueryState } from "@/components/common/QueryState";
 import { MetricCard } from "@/components/metrics/MetricCard";
 import { PriorityBreakdownCard } from "@/components/metrics/PriorityBreakdownCard";
 import { PriorityChart } from "@/components/metrics/PriorityChart";
+import { ReportSpreadsheet } from "@/components/ReportSpreadsheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { useI18n } from "@/i18n";
@@ -52,6 +53,10 @@ export function DashboardPage() {
               <PriorityChart byPriority={report.byPriority} />
             </div>
             <PriorityBreakdownCard byPriority={report.byPriority} />
+          </div>
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold mb-4">Report Data</h2>
+            <ReportSpreadsheet report={report} month={report.month} />
           </div>
         </>
       )}
