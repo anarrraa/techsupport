@@ -22,10 +22,12 @@ export function PriorityBreakdownCard({ rows }: { rows: PriorityBreakdown[] }) {
                 <span className="tabular-nums">{formatPercent(compliance, locale)}</span>
               </div>
               <Progress value={compliance * 100} aria-label={t(`priority.${r.priority}`)} />
-              <p className="text-xs text-muted-foreground">
-                {formatDuration(r.avgFirstResponseMinutes, locale)} · {t("priority.goal")}{" "}
-                {formatDuration(r.goalMinutes, locale)}
-              </p>
+              {r.avgFirstResponseMinutes !== null && r.goalMinutes !== null && (
+                <p className="text-xs text-muted-foreground">
+                  {formatDuration(r.avgFirstResponseMinutes, locale)} · {t("priority.goal")}{" "}
+                  {formatDuration(r.goalMinutes, locale)}
+                </p>
+              )}
             </div>
           );
         })}

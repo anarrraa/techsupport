@@ -52,10 +52,10 @@ export function ReportsPage() {
                       <TableCell className="text-right tabular-nums">{formatNumber(r.tickets, locale)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatNumber(r.breaches, locale)}</TableCell>
                       <TableCell className="hidden text-right tabular-nums md:table-cell">
-                        {formatDuration(r.avgFirstResponseMinutes, locale)}
+                        {r.avgFirstResponseMinutes === null ? "—" : formatDuration(r.avgFirstResponseMinutes, locale)}
                       </TableCell>
                       <TableCell className="hidden text-right tabular-nums md:table-cell">
-                        {formatDuration(r.goalMinutes, locale)}
+                        {r.goalMinutes === null ? "—" : formatDuration(r.goalMinutes, locale)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatPercent(1 - r.breaches / r.tickets, locale)}
