@@ -1,17 +1,14 @@
-import { PrismaPg } from '@prisma/adapter-pg';
+import { createRequire } from 'module';
 import type { JiraTicket } from '../lib/jira.ts';
 import { toSnapshotRows, type SnapshotRow } from '../lib/queries/monthly-report.ts';
-import { PrismaClient } from './generated/prisma/client.ts';
 
-let client: PrismaClient | undefined;
+const require = createRequire(import.meta.url);
+const { PrismaClient } = require('@prisma/client');
 
-export function db(): PrismaClient {
-	const connectionString = process.env.DATABASE_URL;
-	if (!connectionString) throw new Error('DATABASE_URL is not set');
-	// ponytail: one process-wide client; the reminder run and the API each need one connection pool.
-	client ??= new PrismaClient({
-		adapter: new PrismaPg({ connectionString, connectionTimeoutMillis: 5_000, max: 5 }),
-	});
+let client: any | undefined;
+
+export function db() {
+	client ??= new PrismaClient();
 	return client;
 }
 

@@ -29,11 +29,11 @@ export function DashboardPage() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <MetricCard label={t("metric.tickets")} metric={report.summary.tickets} format={count0} />
+            <MetricCard label={t("metric.tickets")} metric={report.summary.tickets} format={count} />
             <MetricCard
               label={t("metric.breaches")}
               metric={report.summary.breaches}
-              format={count0}
+              format={count}
               lowerIsBetter
             />
             <MetricCard

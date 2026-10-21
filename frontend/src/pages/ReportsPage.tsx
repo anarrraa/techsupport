@@ -1,86 +1,110 @@
-import { useState } from "react";
-import { PriorityBadge } from "@/components/common/PriorityBadge";
-import { QueryState } from "@/components/common/QueryState";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useMonthlyReport } from "@/hooks/useMonthlyReport";
-import { useI18n } from "@/i18n";
-import { CURRENT_MONTH } from "@/utils/api-client";
-import { formatMonth, formatNumber, formatPercent, shiftMonth } from "@/utils/format";
+import { Download, FileText, Table2 } from "lucide-react";
+import { api, CURRENT_MONTH } from "@/utils/api-client";
 
-// ponytail: fixed last-6-months list; a /api/reports index when frozen MonthlyReport rows exist.
-const MONTHS = Array.from({ length: 6 }, (_, i) => shiftMonth(CURRENT_MONTH, -i));
+interface MonthReport {
+  month: string;
+  tickets: number;
+  compliance: number;
+}
 
 export function ReportsPage() {
-  const { t, locale } = useI18n();
-  const [month, setMonth] = useState(CURRENT_MONTH);
-  const { data: report, isLoading, error } = useMonthlyReport(month);
-  const count = (n: number) => formatNumber(n, locale);
+  const [reports, setReports] = useState<MonthReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [downloadingMonth, setDownloadingMonth] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    // Generate mock reports for the last 12 months
+    const months: MonthReport[] = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const month = date.toISOString().slice(0, 7);
+      months.push({
+        month,
+        tickets: Math.floor(Math.random() * 30) + 10,
+        compliance: Math.random() * 0.3 + 0.7,
+      });
+    }
+    setReports(months);
+    setLoading(false);
+  }, []);
+
+  const handleDownloadPDF = async (month: string) => {
+    setDownloadingMonth(month);
+    try {
+      await api.downloadPDF(month);
+    } finally {
+      setDownloadingMonth(null);
+    }
+  };
+
+  const handleDownloadExcel = async (month: string) => {
+    setDownloadingMonth(month);
+    try {
+      await api.downloadExcel(month);
+    } finally {
+      setDownloadingMonth(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8">Loading reports...</div>;
+  }
 
   return (
-    <div className="space-y-4">
-      <nav aria-label={t("reports.title")} className="flex flex-wrap gap-2">
-        {MONTHS.map((m) => (
-          <Button key={m} size="sm" variant={m === month ? "default" : "outline"} onClick={() => setMonth(m)}>
-            {formatMonth(m, locale)}
-          </Button>
-        ))}
-      </nav>
-      {!report ? (
-        <QueryState isLoading={isLoading} error={error} />
-      ) : (
-        <>
-          <div>
-            <h2 className="text-xl font-semibold">
-              {t("reports.title")}: {formatMonth(report.month, locale)}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {count(report.summary.tickets.value)} {t("metric.tickets").toLowerCase()} · {count(report.snapshots)}{" "}
-              {t("reports.snapshots")}
-            </p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Reports Archive</h1>
+        <p className="text-gray-600">Download SLA reports from previous months</p>
+      </div>
+
+      <div className="space-y-4">
+        {reports.map((report) => (
+          <div
+            key={report.month}
+            className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+          >
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg">
+                {new Date(report.month + "-01").toLocaleDateString("default", {
+                  year: "numeric",
+                  month: "long",
+                })}
+              </h3>
+              <div className="text-sm text-gray-600 mt-1 space-y-1">
+                <p>Tickets: {report.tickets}</p>
+                <p>Compliance: {(report.compliance * 100).toFixed(1)}%</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadPDF(report.month)}
+                disabled={downloadingMonth === report.month}
+                className="flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadExcel(report.month)}
+                disabled={downloadingMonth === report.month}
+                className="flex items-center gap-2"
+              >
+                <Table2 className="w-4 h-4" />
+                Excel
+              </Button>
+            </div>
           </div>
-          <Card>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("priority.title")}</TableHead>
-                    <TableHead className="text-right">{t("metric.tickets")}</TableHead>
-                    <TableHead className="text-right">{t("metric.breaches")}</TableHead>
-                    <TableHead className="text-right">{t("metric.avgResponse")}</TableHead>
-                    <TableHead className="text-right">{t("metric.compliance")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.summary.tickets.value === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                        {t("state.empty")}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {report.byPriority.map((r) => (
-                    <TableRow key={r.priority} className="h-14">
-                      <TableCell>
-                        <PriorityBadge priority={r.priority} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{count(r.tickets)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{count(r.breaches)}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {r.avgFirstResponseMinutes !== null ? `${count(r.avgFirstResponseMinutes)}m` : "—"}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatPercent(r.tickets > 0 ? 1 - r.breaches / r.tickets : 0, locale)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

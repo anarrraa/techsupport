@@ -7,7 +7,9 @@
     "@flue/runtime": "^1.0.0-beta.9",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "exceljs": "^4.4.0",
     "express": "5.3.0",
+    "pdfkit": "^0.20.2",
     "valibot": "^1.4.2"
   },
   "devDependencies": {
@@ -16,7 +18,9 @@
     "@types/express": "5.0.6",
     "@types/json-schema": "7.0.15",
     "@types/node": "^26.1.2",
+    "@types/pdfkit": "^0.17.6",
     "prisma": "7.10.1",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
   "scripts": {
@@ -29,7 +33,7 @@
     "trace": "node --env-file-if-exists=.env scripts/trace-run.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/lib/*.test.ts tests/lib/queries/*.test.ts tests/workflows/*.test.ts",
-    "dev:backend": "node --env-file-if-exists=.env --watch src/backend/server.ts",
+    "dev:backend": "tsx watch --env-file=.env src/backend/server.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "postinstall": "prisma generate"

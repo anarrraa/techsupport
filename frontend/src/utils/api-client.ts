@@ -1,5 +1,4 @@
 import type { Locale } from "@/utils/format";
-import { toMonthlyReport, type MonthlyMetrics } from "@/utils/monthly-metrics";
 import type { MonthlyReport } from "@/types/report";
 
 export const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
@@ -15,9 +14,35 @@ const delay = <T,>(value: T, ms = 200) => new Promise<T>((r) => setTimeout(() =>
 
 export const api = {
   getMonthlyReport: (month: string): Promise<MonthlyReport> =>
-    getJson<MonthlyMetrics>(`/api/reports/${encodeURIComponent(month)}`).then((m) =>
-      toMonthlyReport(m, new Date().toISOString()),
-    ),
+    getJson<MonthlyReport>(`/api/reports/${encodeURIComponent(month)}`),
+
+  downloadPDF: async (month: string) => {
+    const res = await fetch(`/api/reports/${encodeURIComponent(month)}/export?format=pdf`);
+    if (!res.ok) throw new Error(`PDF download failed: ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SLA-Report-${month}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  downloadExcel: async (month: string) => {
+    const res = await fetch(`/api/reports/${encodeURIComponent(month)}/export?format=excel`);
+    if (!res.ok) throw new Error(`Excel download failed: ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SLA-Report-${month}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 
   // Chat query engine is Phase 3; for now, return a canned stub. No ticket content, aggregate counts only.
   askChat: (question: string, locale: Locale): Promise<string> => {
