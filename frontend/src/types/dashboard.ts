@@ -4,3 +4,9 @@ export interface ChatMessage {
   content: string;
   at: string; // ISO timestamp
 }
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email?: string;
+}

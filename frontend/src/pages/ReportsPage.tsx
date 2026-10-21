@@ -36,7 +36,7 @@ export function ReportsPage() {
               {t("reports.title")}: {formatMonth(report.month, locale)}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {count(report.tickets)} {t("metric.tickets").toLowerCase()} · {count(report.snapshots)}{" "}
+              {count(report.summary.tickets.value)} {t("metric.tickets").toLowerCase()} · {count(report.snapshots)}{" "}
               {t("reports.snapshots")}
             </p>
           </div>
@@ -48,30 +48,30 @@ export function ReportsPage() {
                     <TableHead>{t("priority.title")}</TableHead>
                     <TableHead className="text-right">{t("metric.tickets")}</TableHead>
                     <TableHead className="text-right">{t("metric.breaches")}</TableHead>
-                    <TableHead className="hidden text-right md:table-cell">{t("metric.resolutionBreaches")}</TableHead>
+                    <TableHead className="text-right">{t("metric.avgResponse")}</TableHead>
                     <TableHead className="text-right">{t("metric.compliance")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {report.tickets === 0 && (
+                  {report.summary.tickets.value === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                         {t("state.empty")}
                       </TableCell>
                     </TableRow>
                   )}
-                  {Object.entries(report.byPriority).map(([priority, r]) => (
-                    <TableRow key={priority} className="h-14">
+                  {report.byPriority.map((r) => (
+                    <TableRow key={r.priority} className="h-14">
                       <TableCell>
-                        <PriorityBadge priority={priority} />
+                        <PriorityBadge priority={r.priority} />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{count(r.tickets)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{count(r.firstResponseBreached)}</TableCell>
-                      <TableCell className="hidden text-right tabular-nums md:table-cell">
-                        {count(r.resolutionBreached)}
+                      <TableCell className="text-right tabular-nums">{count(r.breaches)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {r.avgFirstResponseMinutes !== null ? `${count(r.avgFirstResponseMinutes)}m` : "—"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatPercent(1 - r.firstResponseBreached / r.tickets, locale)}
+                        {formatPercent(r.tickets > 0 ? 1 - r.breaches / r.tickets : 0, locale)}
                       </TableCell>
                     </TableRow>
                   ))}

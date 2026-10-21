@@ -9,46 +9,42 @@ import type { MonthlyReport } from "@/types/report";
 import { CURRENT_MONTH } from "@/utils/api-client";
 import { formatMonth, formatNumber, formatPercent, shiftMonth } from "@/utils/format";
 
-const compliance = (r: MonthlyReport) => 1 - (r.firstResponseBreachRate ?? 0);
-
 export function DashboardPage() {
   const { t, locale } = useI18n();
   const { data: report, isLoading, error } = useMonthlyReport(CURRENT_MONTH);
-  // Last month only drives the trend arrows; a month with no snapshots has nothing to compare.
   const { data: last } = useMonthlyReport(shiftMonth(CURRENT_MONTH, -1));
   if (!report) return <QueryState isLoading={isLoading} error={error} />;
 
-  const prev = last?.tickets ? last : undefined;
-  const count = (n: number) => formatNumber(n, locale);
+  const count = (n: number | null) => (n !== null ? formatNumber(n, locale) : "—");
+  const count0 = (n: number) => formatNumber(n, locale);
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        {formatMonth(report.month, locale)} · {count(report.snapshots)} {t("reports.snapshots")}
+        {formatMonth(report.month, locale)} · {count0(report.snapshots)} {t("reports.snapshots")}
       </p>
-      {report.tickets === 0 ? (
+      {report.summary.tickets.value === 0 ? (
         <Card>
           <CardContent className="text-muted-foreground">{t("state.empty")}</CardContent>
         </Card>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <MetricCard label={t("metric.tickets")} metric={{ value: report.tickets, previous: prev?.tickets }} format={count} />
+            <MetricCard label={t("metric.tickets")} metric={report.summary.tickets} format={count0} />
             <MetricCard
               label={t("metric.breaches")}
-              metric={{ value: report.firstResponseBreached, previous: prev?.firstResponseBreached }}
-              format={count}
+              metric={report.summary.breaches}
+              format={count0}
               lowerIsBetter
             />
             <MetricCard
               label={t("metric.compliance")}
-              metric={{ value: compliance(report), previous: prev && compliance(prev) }}
-              format={(n) => formatPercent(n, locale)}
+              metric={report.summary.compliance}
+              format={(n) => (n !== null ? formatPercent(n, locale) : "—")}
             />
             <MetricCard
-              label={t("metric.resolutionBreaches")}
-              metric={{ value: report.resolutionBreached, previous: prev?.resolutionBreached }}
-              format={count}
-              lowerIsBetter
+              label={t("metric.avgResponse")}
+              metric={report.summary.avgFirstResponseMinutes}
+              format={(n) => (n !== null ? `${formatNumber(n, locale)}m` : "—")}
             />
           </div>
           <div className="grid gap-4 lg:grid-cols-3">

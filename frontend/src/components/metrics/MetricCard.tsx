@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 interface Props {
   label: string;
   metric: Metric;
-  format: (n: number) => string;
+  format: (n: number | null) => string;
   /** True when a lower value is better (breaches, response time). */
   lowerIsBetter?: boolean;
 }
@@ -20,15 +20,15 @@ export function MetricCard({ label, metric, format, lowerIsBetter = false }: Pro
       </CardHeader>
       <CardContent className="px-4">
         <p className="text-3xl font-semibold tabular-nums">{format(metric.value)}</p>
-        {metric.previous !== undefined && (
-          <Delta delta={metric.value - metric.previous} format={format} lowerIsBetter={lowerIsBetter} />
+        {metric.previous !== undefined && metric.value !== null && metric.previous !== null && (
+          <Delta delta={metric.value - metric.previous} format={format as (n: number) => string} lowerIsBetter={lowerIsBetter} />
         )}
       </CardContent>
     </Card>
   );
 }
 
-function Delta({ delta, format, lowerIsBetter }: { delta: number; format: Props["format"]; lowerIsBetter: boolean }) {
+function Delta({ delta, format, lowerIsBetter }: { delta: number; format: (n: number) => string; lowerIsBetter: boolean }) {
   const { t } = useI18n();
   const good = lowerIsBetter ? delta < 0 : delta > 0;
   const Icon = delta === 0 ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;

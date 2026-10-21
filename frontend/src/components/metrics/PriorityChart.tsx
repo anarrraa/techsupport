@@ -1,11 +1,10 @@
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/i18n";
-import type { BreachCounts } from "@/types/report";
+import type { PriorityBreakdown } from "@/types/metrics";
 
-export function PriorityChart({ byPriority }: { byPriority: Record<string, BreachCounts> }) {
+export function PriorityChart({ byPriority }: { byPriority: PriorityBreakdown[] }) {
   const { t } = useI18n();
-  const data = Object.entries(byPriority).map(([priority, r]) => ({ priority, ...r }));
   const axis = { fontSize: 12, fill: "var(--muted-foreground)" };
   return (
     <Card>
@@ -14,7 +13,7 @@ export function PriorityChart({ byPriority }: { byPriority: Record<string, Breac
       </CardHeader>
       <CardContent className="h-72 px-2 md:px-6">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+          <BarChart data={byPriority} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" vertical={false} />
             <XAxis dataKey="priority" tick={axis} stroke="var(--border)" />
             <YAxis tick={axis} allowDecimals={false} stroke="var(--border)" />
@@ -29,8 +28,7 @@ export function PriorityChart({ byPriority }: { byPriority: Record<string, Breac
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="tickets" name={t("metric.tickets")} fill="var(--primary)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="firstResponseBreached" name={t("metric.breaches")} fill="var(--breached)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="resolutionBreached" name={t("metric.resolutionBreaches")} fill="var(--warning)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="breaches" name={t("metric.breaches")} fill="var(--breached)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
