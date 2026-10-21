@@ -8,7 +8,7 @@ export interface MonthlyReport {
     tickets: Metric;
     breaches: Metric;
     compliance: Metric; // 0..1
-    avgFirstResponseMinutes: Metric;
+    avgFirstResponseMinutes: Metric | null;
   };
   byPriority: PriorityBreakdown[];
   team: TeamMember[];

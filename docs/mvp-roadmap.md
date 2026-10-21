@@ -467,6 +467,12 @@ ahead of the open MVP milestones 3 and 4, which stay open.
 - [x] `GET /api/reports/:month` returns aggregated metrics from snapshots.
       Done 2026-10-19 locally: `/api/reports/2026-10` returned 3 tickets from 4
       snapshots, `2026-13` returned 400, `/health` 200 (503 with database down).
+- [x] Frontend dashboard reads `/api/reports/:month` through the Vite dev proxy
+      (`VITE_USE_MOCKS=1` keeps the synthetic report). Done 2026-10-21 locally:
+      `/dashboard` rendered 2026-10 counts (11 tickets, 4 first-response
+      breaches) from synthetic `DEMO-*` snapshots, fetch 200, no console errors.
+      Team, daily trend, prior month, and response times stay empty: the API
+      does not provide them.
 - [ ] Capture verified against a real scheduled run's database (external).
 
 ## Post-MVP direction

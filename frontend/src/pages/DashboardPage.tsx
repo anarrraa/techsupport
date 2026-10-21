@@ -33,17 +33,21 @@ export function DashboardPage() {
           metric={summary.compliance}
           format={(n) => formatPercent(n, locale)}
         />
-        <MetricCard
-          label={t("metric.avgResponse")}
-          metric={summary.avgFirstResponseMinutes}
-          format={(n) => formatDuration(n, locale)}
-          lowerIsBetter
-        />
+        {summary.avgFirstResponseMinutes && (
+          <MetricCard
+            label={t("metric.avgResponse")}
+            metric={summary.avgFirstResponseMinutes}
+            format={(n) => formatDuration(n, locale)}
+            lowerIsBetter
+          />
+        )}
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <TrendChart data={report.trend} />
-        </div>
+        {report.trend.length > 0 && (
+          <div className="lg:col-span-2">
+            <TrendChart data={report.trend} />
+          </div>
+        )}
         <PriorityBreakdownCard rows={report.byPriority} />
       </div>
       <Card>

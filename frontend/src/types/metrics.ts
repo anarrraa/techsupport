@@ -14,12 +14,12 @@ export interface PriorityBreakdown {
   priority: Priority;
   tickets: number;
   breaches: number;
-  avgFirstResponseMinutes: number;
-  goalMinutes: number;
+  avgFirstResponseMinutes: number | null; // null: backend has no response times yet
+  goalMinutes: number | null;
 }
 
-/** A headline number plus last month's value, for the trend arrow. */
+/** A headline number plus last month's value, for the trend arrow. null: not available. */
 export interface Metric {
-  value: number;
-  previous: number;
+  value: number | null;
+  previous: number | null;
 }
