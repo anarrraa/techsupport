@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { AppConfig } from '../../src/shared/config.ts';
-import { parseWindows } from '../../src/reminder/delivery-windows.ts';
+import { parseWindows } from '../../src/shared/delivery-windows.ts';
 import type { EscalationConfig } from '../../src/escalation/escalation-config.ts';
 import type { EscalationState } from '../../src/escalation/escalation-state.ts';
 import type { JiraFetchResult, JiraTicket, SlaCycle } from '../../src/shared/jira.ts';

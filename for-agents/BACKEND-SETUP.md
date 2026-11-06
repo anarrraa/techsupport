@@ -1,5 +1,10 @@
 # Backend Setup: Express.js + Prisma + PostgreSQL
 
+> Original setup plan. Code blocks below are the plan, not the shipped code.
+> Shipped equivalents: aggregation `src/monthly-report/monthly-report.ts` (`aggregateMonth`),
+> snapshot capture + Prisma client `src/backend/db.ts` (`captureSnapshot`), routes `src/backend/server.ts`.
+> Chat engine is not built yet (phase 3, `src/docs-chat/`).
+
 ## Quick Start (5 min)
 
 ```bash
@@ -100,7 +105,7 @@ app.listen(PORT, () => {
 });
 ```
 
-### 2. `src/lib/queries/monthly-metrics.ts` — Aggregate queries
+### 2. `src/monthly-report/monthly-report.ts` — Aggregate queries
 
 ```typescript
 import { PrismaClient } from '@prisma/client';
@@ -176,7 +181,7 @@ function minutesToHM(mins: number): string {
 
 ```typescript
 import { Router, Request, Response } from 'express';
-import { getMonthlyMetrics, getSLAByPriority } from '@/lib/queries/monthly-metrics';
+import { getMonthlyMetrics, getSLAByPriority } from '../monthly-report/monthly-report.ts';
 
 const router = Router();
 
@@ -245,7 +250,7 @@ router.get('/:month/export', async (req: Request, res: Response) => {
 export default router;
 ```
 
-### 4. `src/lib/snapshots.ts` — Snapshot capture (run during reminder workflow)
+### 4. `src/backend/db.ts` — Snapshot capture (run during reminder workflow)
 
 ```typescript
 import { PrismaClient } from '@prisma/client';
@@ -308,7 +313,7 @@ function extractSystem(ticketKey: string): string {
 
 ```typescript
 import { Router, Request, Response } from 'express';
-import { query } from '@/lib/queries/chat-engine';
+import { query } from '../docs-chat/chat-engine.ts'; // not built yet (phase 3)
 
 const router = Router();
 
@@ -354,7 +359,7 @@ Add snapshot capture to the existing reminder workflow:
 ```typescript
 // src/workflows/jira-teams-reminder.ts (MODIFIED)
 
-import { captureMonthlySnapshot } from '@/lib/snapshots';
+import { captureMonthlySnapshot } from '../backend/db.ts';
 
 export async function jiraTeamsReminderWorkflow() {
   // ... existing reminder logic ...

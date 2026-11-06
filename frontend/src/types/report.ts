@@ -1,6 +1,6 @@
 import type { TeamMember } from "./dashboard";
 import type { Metric, PriorityBreakdown, TrendPoint } from "./metrics";
-import type { CaptureCoverage } from "../../../src/monthly-report/monthly-report.ts";
+import type { CaptureCoverage } from "@backend/monthly-report/monthly-report.ts";
 
 export interface MonthlyReport {
   snapshots: number;

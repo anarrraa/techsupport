@@ -3,7 +3,7 @@ import * as v from 'valibot';
 import reminderWriter from '../agents/reminder-writer.ts';
 import { generateReminderIntro } from '../reminder/reminder-intro.ts';
 import { loadConfig, type AppConfig } from '../shared/config.ts';
-import { windowDecision } from '../reminder/delivery-windows.ts';
+import { windowDecision } from '../shared/delivery-windows.ts';
 import { planDirectMessages } from '../escalation/direct-messages.ts';
 import { dueLevel, selectEscalations, severityFor } from '../escalation/escalation.ts';
 import { loadEscalationConfig } from '../escalation/escalation-config.ts';

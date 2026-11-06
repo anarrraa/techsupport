@@ -1,9 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
 import { isResolved, ticketHours, type ClientConfig, type Party, type Period, type Row, type SectionKey, type SupportReport } from './support-report.ts';
 
 // Helvetica has no Cyrillic; Noto Sans (OFL, assets/fonts/OFL.txt) is embedded instead.
-const FONT = new URL('../../assets/fonts/NotoSans-Regular.ttf', import.meta.url).pathname;
-const BOLD = new URL('../../assets/fonts/NotoSans-Bold.ttf', import.meta.url).pathname;
+const FONT = fileURLToPath(new URL('../../assets/fonts/NotoSans-Regular.ttf', import.meta.url));
+const BOLD = fileURLToPath(new URL('../../assets/fonts/NotoSans-Bold.ttf', import.meta.url));
 const MARGIN = 50;
 const BAR = '#2563eb';
 const LINE = '#9ca3af';

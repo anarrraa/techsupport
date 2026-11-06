@@ -602,7 +602,7 @@ User explicitly prioritized this ahead of remaining MVP acceptance. Requirements
 
 User asked for a feature-folder restructure (backend and frontend) and a RAG chat
 over `documents/` (`for-agents/prd-docs-chat.md`). No DDD/Clean layers and no
-monorepo tooling: `src/lib` is already a framework-free core, and the repo is
+monorepo tooling: the old `src/lib/` was already a framework-free core (split into feature folders by 2.1), and the repo is
 already one git repo with two packages. Numbers match "End state and phases"
 above; each item is its own commit and ends
 with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
@@ -614,7 +614,7 @@ with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
       teams-webhook), `src/reminder/`, `src/escalation/`, `src/monthly-report/`,
       `src/support-report/`; `agents/` and `workflows/` stay (Flue discovery);
       `backend/server.ts` keeps routes only. `tests/` mirrors it; update the
-      `npm test` globs and every `src/lib/...` path in `AGENTS.md` and `for-agents/`.
+      `npm test` globs and every old `src/lib/...` path in `AGENTS.md` and `for-agents/`.
       Pure files stay framework-free; pdfkit/exceljs/express/Prisma only in
       `*-pdf`, `*-input`, `db`, `export`, `server`.
       Report: `plan/phase-2-restructure/reports/2026-11-06-2.1.md`.

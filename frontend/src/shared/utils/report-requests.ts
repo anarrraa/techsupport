@@ -1,5 +1,5 @@
 import type { MonthlyReport } from '../../types/report.ts';
-import type { Period } from '../../../../src/support-report/support-report.ts';
+import type { Period } from '@backend/support-report/support-report.ts';
 
 export class ReportRequestError extends Error {
   readonly status: number;

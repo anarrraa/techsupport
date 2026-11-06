@@ -31,8 +31,8 @@ No lint or formatter is configured (`package.json` has no such script).
 - `node:test` + `node:assert/strict`, no framework (`tests/reminder/sla.test.ts:1-2`).
 - Node runs `.ts` directly (type stripping); imports keep the `.ts` extension
   (`tsconfig.json:8` `allowImportingTsExtensions`).
-- `npm test` globs `tests/{backend,shared,reminder,escalation,monthly-report,support-report,workflows}/*.test.ts`
-  (`package.json` `scripts.test`). A test in any other folder is silently not run.
+- `npm test` runs `node --test "tests/**/*.test.ts"` (`package.json` `scripts.test`),
+  so any `*.test.ts` under `tests/` runs. The frontend uses the same glob under `frontend/tests/`.
 
 ## CI
 

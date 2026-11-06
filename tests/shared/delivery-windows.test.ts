@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseWindows, windowDecision } from '../../src/reminder/delivery-windows.ts';
+import { parseWindows, windowDecision } from '../../src/shared/delivery-windows.ts';
 
 const POLICY = {
 	windows: parseWindows('09:00-12:00,14:00-18:00'),

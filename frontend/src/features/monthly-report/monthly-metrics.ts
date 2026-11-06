@@ -1,6 +1,6 @@
 import type { Priority, PriorityBreakdown } from "@/types/metrics";
 import type { MonthlyReport } from "@/types/report";
-import type { MonthlyMetrics } from "../../../../src/monthly-report/monthly-report.ts";
+import type { MonthlyMetrics } from "@backend/monthly-report/monthly-report.ts";
 
 // Jira priority names per for-agents/sla-matrix.md (assumed mapping).
 // ponytail: Lowest folds into low; any other name is left out of the breakdown but still counts in totals.

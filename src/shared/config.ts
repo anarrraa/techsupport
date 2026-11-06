@@ -1,4 +1,4 @@
-import { parseWindows, type DeliveryWindow } from '../reminder/delivery-windows.ts';
+import { parseWindows, type DeliveryWindow } from './delivery-windows.ts';
 
 export interface HttpConfig {
 	timeoutMs: number;
