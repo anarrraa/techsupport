@@ -76,7 +76,7 @@ Open decisions (record answers here):
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 147 passed, 0 failed, 1 opt-in database check skipped on 2026-11-04 with Node 22.19.0/npm 10.9.3; the database check separately passed against disposable PostgreSQL 16 |
+| Unit tests | Pass | `npm test`: 172 tests, 171 passed, 0 failed, 1 opt-in database check skipped on 2026-11-06 after the phase 2 restructure; the database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
 | Type checking | Pass | `npm run typecheck` exit 0 on 2026-11-04 |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-04 |
 | GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
@@ -621,8 +621,9 @@ with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
 - [x] 2.2 Frontend `features/` (monthly-report, support-report, reports-archive,
       chat, teams) + `shared/`; `components/ui/` stays (shadcn).
       Report: `plan/phase-2-restructure/reports/2026-11-06-2.2.md`.
-- [ ] 2.3 Replace the frontend's copied report types with `import type` from
+- [x] 2.3 Replace the frontend's copied report types with `import type` from
       the backend's pure files; delete the copies.
+      Report: `plan/phase-2-restructure/reports/2026-11-06-2.3.md`; phase: `plan/phase-2-restructure/REPORT.md`.
 - [ ] 3.1 Enable pgvector and add `DocChunk` to `prisma/schema.prisma`. DB change, needs user approval.
 - [ ] 3.2 Pure Markdown chunker `src/docs-chat/chunk.ts` (TDD).
 - [ ] 3.3 Vertex adapter (embed + generate, bounded) and `npm run docs:index`

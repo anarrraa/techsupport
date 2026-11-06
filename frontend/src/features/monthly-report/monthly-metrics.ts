@@ -1,25 +1,6 @@
 import type { Priority, PriorityBreakdown } from "@/types/metrics";
 import type { MonthlyReport } from "@/types/report";
-
-interface BreachCounts {
-  tickets: number;
-  firstResponseBreached: number;
-  resolutionBreached: number;
-}
-
-/** `GET /api/reports/:month` body; mirrors `src/monthly-report/monthly-report.ts`. */
-export interface MonthlyMetrics extends BreachCounts {
-  coverage: MonthlyReport["coverage"];
-  firstResponseKnown: number;
-  firstResponseMissing: number;
-  resolutionKnown: number;
-  resolutionMissing: number;
-  month: string;
-  snapshots: number;
-  firstResponseBreachRate: number | null;
-  resolutionBreachRate: number | null;
-  byPriority: Record<string, BreachCounts>;
-}
+import type { MonthlyMetrics } from "../../../../src/monthly-report/monthly-report.ts";
 
 // Jira priority names per for-agents/sla-matrix.md (assumed mapping).
 // ponytail: Lowest folds into low; any other name is left out of the breakdown but still counts in totals.

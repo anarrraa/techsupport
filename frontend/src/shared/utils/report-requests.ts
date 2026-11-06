@@ -1,4 +1,5 @@
 import type { MonthlyReport } from '../../types/report.ts';
+import type { Period } from '../../../../src/support-report/support-report.ts';
 
 export class ReportRequestError extends Error {
   readonly status: number;
@@ -37,7 +38,6 @@ export async function loadArchive(read = fetchReport, now = new Date(), active =
 }
 
 export type SupportConfig = { id: string; client: string; groups: string[] };
-export type SupportPeriod = { from: string; to: string };
 
 // 4xx bodies are our own validation messages (shown to the uploader); 5xx bodies are never echoed.
 async function supportResponse(response: Response): Promise<Response> {
@@ -50,13 +50,13 @@ export async function fetchSupportConfigs(fetcher: typeof fetch = fetch): Promis
   return (await supportResponse(await fetcher('/api/support-reports/configs', { signal: AbortSignal.timeout(15_000) }))).json();
 }
 
-export async function fetchSupportPeriod(file: File, fetcher: typeof fetch = fetch): Promise<SupportPeriod> {
+export async function fetchSupportPeriod(file: File, fetcher: typeof fetch = fetch): Promise<Period> {
   const query = new URLSearchParams({ filename: file.name });
   const response = await fetcher(`/api/support-reports/period?${query}`, { method: 'POST', body: file, signal: AbortSignal.timeout(60_000) });
   return (await supportResponse(response)).json();
 }
 
-export async function fetchSupportReport(file: File, params: SupportPeriod & { config: string; group: number }, fetcher: typeof fetch = fetch): Promise<{ blob: Blob; filename: string }> {
+export async function fetchSupportReport(file: File, params: Period & { config: string; group: number }, fetcher: typeof fetch = fetch): Promise<{ blob: Blob; filename: string }> {
   const query = new URLSearchParams({ config: params.config, from: params.from, to: params.to, group: String(params.group), filename: file.name });
   const response = await supportResponse(await fetcher(`/api/support-reports?${query}`, { method: 'POST', body: file, signal: AbortSignal.timeout(60_000) }));
   const encoded = /filename\*=UTF-8''([^;]+)/.exec(response.headers.get('Content-Disposition') ?? '')?.[1];
