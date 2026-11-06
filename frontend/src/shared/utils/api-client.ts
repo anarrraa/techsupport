@@ -1,7 +1,6 @@
-import type { Locale } from "@/shared/utils/format";
 import type { MonthlyReport } from "@/types/report";
 
-import { fetchReport, fetchExport, fetchSupportReport } from './report-requests';
+import { askChat, fetchChatClients, fetchReport, fetchExport, fetchSupportReport } from './report-requests';
 
 export const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
 
@@ -23,8 +22,6 @@ function save(blob: Blob, filename: string) {
   }
 }
 
-const delay = <T,>(value: T, ms = 200) => new Promise<T>((r) => setTimeout(() => r(value), ms));
-
 export const api = {
   getMonthlyReport: (month: string): Promise<MonthlyReport> => fetchReport(month),
   downloadPDF: (month: string) => download(month, 'pdf'),
@@ -34,12 +31,6 @@ export const api = {
     const pdf = await fetchSupportReport(...args);
     save(pdf.blob, pdf.filename);
   },
-  // Chat query engine is Phase 3; for now, return a canned stub. No ticket content, aggregate counts only.
-  askChat: (question: string, locale: Locale): Promise<string> => {
-    const answer =
-      locale === "mn"
-        ? "Жишээ хариулт: чат backend-д холбогдоогүй."
-        : "Sample answer: chat is not connected to the backend yet.";
-    return delay(question.trim() ? answer : "", 400);
-  },
+  askChat,
+  getChatClients: () => fetchChatClients(),
 };

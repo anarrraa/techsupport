@@ -14,6 +14,16 @@ export function ChatBubble({ message }: { message: ChatMessage }) {
         )}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
+        {message.sources && message.sources.length > 0 && (
+          <ol className="mt-2 list-decimal space-y-0.5 border-t pt-2 pl-5 text-xs opacity-80">
+            {message.sources.map((s, i) => (
+              <li key={i} className="break-all">
+                {s.path}
+                {s.heading && ` › ${s.heading}`}
+              </li>
+            ))}
+          </ol>
+        )}
         <time dateTime={message.at} className="mt-1 block text-xs opacity-70">
           {new Intl.DateTimeFormat(locale === "mn" ? "mn-MN" : "en-US", { timeStyle: "short", hour12: false }).format(
             new Date(message.at),

@@ -15,6 +15,7 @@ Status column: **ran** = executed on 2026-10-13 with the result shown;
 | Run the workflow locally | `REMINDER_DRY_RUN=true npm run remind` | UNVERIFIED (needs Jira creds in `.env`) |
 | Live run | `npm run remind` | UNVERIFIED — **posts to Teams**; ask first |
 | Explain a run with names | `npm run trace` / `npm run trace -- --allowlist` | UNVERIFIED (live Jira; sends nothing, `scripts/trace-run.ts:2-11`) |
+| Index `documents/` for the docs chat | `npm run docs:index` (needs `DATABASE_URL` with pgvector, `GOOGLE_CLOUD_PROJECT`, ADC) | prints counts only; re-run embeds only changed chunks (`scripts/index-docs.ts`) |
 | Prove bot transport | `npm run verify:bot -- <entra-object-id>` | UNVERIFIED — **sends a real DM** |
 | Fill Entra ids in directory | `npm run resolve:ids` | UNVERIFIED (needs Graph `User.Read.All`) |
 | Build Teams app zip | `npm run package:teams` → `packages/*.zip` | UNVERIFIED |

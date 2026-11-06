@@ -1,7 +1,19 @@
 # Data and external APIs
 
-No database. Contract values (SLA minutes, levels) are defined in
+Contract values (SLA minutes, levels) are defined in
 `for-agents/sla-matrix.md`; code mirrors them in `src/escalation/escalation.ts:16-45`.
+
+## Postgres — `prisma/schema.prisma`
+
+Optional (`DATABASE_URL`); Prisma only in `src/backend/db.ts`. `SLASnapshot`,
+`MonthlyReport`, `ChatMessage` hold JSM figures and delivery metadata only.
+`DocChunk` holds chunks of `documents/**/*.md` for the docs chat
+(`for-agents/prd-docs-chat.md`), never Jira data: `client`, `system`, `path`,
+`heading`, `content`, `contentHash` (unique), `embedding
+vector(768)`. The schema enables the pgvector `vector` extension
+(`postgresqlExtensions` preview), so the database must ship pgvector
+(`pgvector/pgvector:pg16` locally). `embedding` is `Unsupported`: read and
+written with raw SQL only. No vector index yet (sequential scan).
 
 ## Jira Cloud / JSM (basic auth: `JIRA_EMAIL` + `JIRA_API_TOKEN`)
 

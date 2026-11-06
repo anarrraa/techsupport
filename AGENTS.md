@@ -61,11 +61,12 @@ the priority.
   privacy guarantees. Tests belong in `tests/`, mirroring `src/`; a `*.test.ts`
   inside `src/agents/` or `src/workflows/` breaks Flue's module discovery.
 - Feature-folder files (`src/shared/`, `src/reminder/`, `src/escalation/`,
-  `src/monthly-report/`, `src/support-report/`) stay framework-free so the unit
+  `src/monthly-report/`, `src/support-report/`, `src/docs-chat/`) stay framework-free so the unit
   suite stays fast, except these adapters: `@flue/runtime` only in `src/agents/`
   and `src/workflows/`; express only in `src/backend/server.ts`; pdfkit only in
   `src/monthly-report/export.ts` and `src/support-report/pdf.ts`; exceljs only in
-  `src/monthly-report/export.ts` and `src/support-report/input.ts`; Prisma only in
+  `src/monthly-report/export.ts` and `src/support-report/input.ts`; `@google/genai`
+  only in `src/docs-chat/vertex.ts`; Prisma only in
   `src/backend/db.ts`.
 - Do not claim an integration works without an executed external check.
 - Do not inspect or print `.env` or `gcp-sa.json`; use `.env.example` for variable

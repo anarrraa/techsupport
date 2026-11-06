@@ -76,9 +76,10 @@ Open decisions (record answers here):
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 172 tests, 171 passed, 0 failed, 1 opt-in database check skipped on 2026-11-06 after the phase 2 restructure; the database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
-| Type checking | Pass | `npm run typecheck` exit 0 on 2026-11-04 |
-| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-04 |
+| Unit tests | Pass | `npm test`: 190 tests, 189 passed, 0 failed, 1 opt-in database check skipped on 2026-11-06 after the phase 3 review fixes; frontend 14 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
+| Docs chat live (Vertex + pgvector) | Pass with one miss | 2026-11-06: real `documents/` indexed into a throwaway pgvector DB with the user's GCP project (gcloud default); 6/7 known questions answered and cited correctly; logs counts-only. Re-checked after the review fixes the same day: index 2762 new then 0, 2 answers cited, no-answer question returned empty sources. Not yet on a shared database |
+| Type checking | Pass | `npm run typecheck` exit 0 (root and frontend) on 2026-11-06 after the phase 3 review fixes |
+| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-06; frontend `npm run build` exit 0 the same day |
 | GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
 | **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
@@ -624,16 +625,24 @@ with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
 - [x] 2.3 Replace the frontend's copied report types with `import type` from
       the backend's pure files; delete the copies.
       Report: `plan/phase-2-restructure/reports/2026-11-06-2.3.md`; phase: `plan/phase-2-restructure/REPORT.md`.
-- [ ] 3.1 Enable pgvector and add `DocChunk` to `prisma/schema.prisma`. DB change, needs user approval.
-- [ ] 3.2 Pure Markdown chunker `src/docs-chat/chunk.ts` (TDD).
-- [ ] 3.3 Vertex adapter (embed + generate, bounded) and `npm run docs:index`
+- [x] 3.1 Enable pgvector and add `DocChunk` to `prisma/schema.prisma`. DB change, needs user approval.
+      Applied to a throwaway pgvector database only. Report: `plan/phase-3-docs-chat/reports/2026-11-06-3.1.md`.
+- [x] 3.2 Pure Markdown chunker `src/docs-chat/chunk.ts` (TDD).
+      Report: `plan/phase-3-docs-chat/reports/2026-11-06-3.2.md`.
+- [x] 3.3 Vertex adapter (embed + generate, bounded) and `npm run docs:index`
       with content-hash skip.
-- [ ] 3.4 `POST /api/chat` → embed question → top-k by cosine (optional
+      Report: `plan/phase-3-docs-chat/reports/2026-11-06-3.3.md`.
+- [x] 3.4 `POST /api/chat` → embed question → top-k by cosine (optional
       client filter) → grounded answer + sources; tests with a fake adapter.
-- [ ] 3.5 Wire `AdminChatPage` to the endpoint (replace the stub in
+      Report: `plan/phase-3-docs-chat/reports/2026-11-06-3.4.md`.
+- [x] 3.5 Wire `AdminChatPage` to the endpoint (replace the stub in
       `api-client.ts`), show sources and a client picker.
-- [ ] 3.6 Live check — index the real `documents/` with the user's GCP
+      Report: `plan/phase-3-docs-chat/reports/2026-11-06-3.5.md`.
+- [x] 3.6 Live check — index the real `documents/` with the user's GCP
       project, ask known questions, record results here. Not done until executed.
+      2026-11-06, user's GCP project (gcloud default), throwaway pgvector DB: 279 files → 2762 chunks
+      (289 s), second run `new 0`; 6 of 7 questions correct with correct citations, one cross-lingual
+      retrieval miss. Report: `plan/phase-3-docs-chat/reports/2026-11-06-3.6.md`; phase: `plan/phase-3-docs-chat/REPORT.md`.
 
 ## Post-MVP direction
 

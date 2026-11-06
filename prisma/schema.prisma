@@ -6,10 +6,12 @@ generator client {
   output              = "../src/backend/generated/prisma"
   moduleFormat        = "esm"
   importFileExtension = "ts"
+  previewFeatures     = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector] // pgvector: needs a Postgres with pgvector (e.g. the pgvector/pgvector image)
 }
 
 /// One ticket as one reminder run saw it. JSM's figures, copied, not derived.
@@ -52,4 +54,21 @@ model ChatMessage {
   sentAt    DateTime
 
   @@index([sentAt])
+}
+
+/// One chunk of a client system document (documents/<client>/<system>/*.md), for the docs chat.
+/// Never Jira data: for-agents/prd-docs-chat.md.
+model DocChunk {
+  id          BigInt                      @id @default(autoincrement())
+  client      String
+  system      String
+  path        String
+  heading     String
+  content     String
+  contentHash String                      @unique
+  // ponytail: no vector index; a few thousand chunks scan fast. Add HNSW (vector_cosine_ops) if latency matters.
+  embedding   Unsupported("vector(768)")?
+  updatedAt   DateTime                    @updatedAt
+
+  @@index([client])
 }

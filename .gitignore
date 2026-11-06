@@ -16,4 +16,4 @@ src/backend/generated/
 config/support-report/*.json
 
 # Client-confidential system documentation (docs-chat corpus). Never commit.
-documents/
+/documents

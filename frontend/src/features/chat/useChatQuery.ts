@@ -4,5 +4,6 @@ import type { Locale } from "@/shared/utils/format";
 
 export const useChatQuery = () =>
   useMutation({
-    mutationFn: ({ question, locale }: { question: string; locale: Locale }) => api.askChat(question, locale),
+    mutationFn: ({ question, locale, client }: { question: string; locale: Locale; client?: string }) =>
+      api.askChat(question, locale, client),
   });

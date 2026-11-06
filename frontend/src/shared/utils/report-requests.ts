@@ -1,5 +1,6 @@
 import type { MonthlyReport } from '../../types/report.ts';
 import type { Period } from '@backend/support-report/support-report.ts';
+import type { ChatAnswer, Locale } from '@backend/docs-chat/chat.ts';
 
 export class ReportRequestError extends Error {
   readonly status: number;
@@ -61,4 +62,19 @@ export async function fetchSupportReport(file: File, params: Period & { config: 
   const response = await supportResponse(await fetcher(`/api/support-reports?${query}`, { method: 'POST', body: file, signal: AbortSignal.timeout(60_000) }));
   const encoded = /filename\*=UTF-8''([^;]+)/.exec(response.headers.get('Content-Disposition') ?? '')?.[1];
   return { blob: await response.blob(), filename: encoded ? decodeURIComponent(encoded) : `support-report-${params.group}.pdf` };
+}
+
+export async function fetchChatClients(fetcher: typeof fetch = fetch): Promise<string[]> {
+  return (await supportResponse(await fetcher('/api/chat/clients', { signal: AbortSignal.timeout(15_000) }))).json();
+}
+
+/** No `client` means all clients. */
+export async function askChat(question: string, locale: Locale, client?: string, fetcher: typeof fetch = fetch): Promise<ChatAnswer> {
+  const response = await fetcher('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, locale, client }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  return (await supportResponse(response)).json();
 }

@@ -63,10 +63,12 @@ Not in CI → the code default applies in production.
 | `ESCALATION_STATE_FILE` | `.escalation-state/state.json` | — (Actions cache) | state |
 | `ESCALATION_SEED_ONLY` | false | input `seed_only` | record levels, notify nobody |
 
-## Google (only if an LLM flag is on)
+## Google (only if an LLM flag is on, or for the docs chat)
 
 CI secrets `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`,
 `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` (`yml:93-102`).
+The docs chat (`src/docs-chat/vertex.ts`) reads the same two locally, with ADC;
+`GOOGLE_CLOUD_LOCATION` defaults to `us-central1`.
 
 ## Not in `.env.example` (read by `config.ts`)
 

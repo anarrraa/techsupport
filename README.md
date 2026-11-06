@@ -322,11 +322,13 @@ no summary, comment, or person. A capture failure is a warning, never a failed
 run. The API has no auth yet and binds to `127.0.0.1`.
 
 ```sh
+# pgvector image: the schema enables the `vector` extension (docs chat), so plain postgres fails db push
 docker run -d --name dashboard-pg -p 127.0.0.1:5433:5432 \
-  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=dashboard postgres:16-alpine
+  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=dashboard pgvector/pgvector:pg16
 export DATABASE_URL=postgres://postgres@localhost:5433/dashboard
 npm run db:push        # schema-first: prisma/schema.prisma
-npm run dev:backend    # :3001, GET /health, GET /api/reports/YYYY-MM
+npm run dev:backend    # :3001, GET /health, GET /api/reports/YYYY-MM, POST /api/chat
+npm run docs:index     # docs chat: embed documents/ (GOOGLE_CLOUD_PROJECT + ADC), counts only
 ```
 
 Start the frontend in a second terminal after starting the backend:

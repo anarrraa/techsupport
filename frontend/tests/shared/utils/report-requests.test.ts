@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { archiveMonths, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError } from '../../../src/shared/utils/report-requests.ts';
+import { archiveMonths, askChat, fetchChatClients, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError } from '../../../src/shared/utils/report-requests.ts';
 import type { MonthlyReport } from '../../../src/types/report.ts';
 
 test('archive reads exactly 12 UTC months newest first across a year boundary', () => {
@@ -69,4 +69,27 @@ test('support report failures carry the server reason for 4xx and hide 5xx bodie
   await assert.rejects(fetchSupportPeriod(file, bad), e => e instanceof ReportRequestError && e.status === 400 && e.message === 'Missing required columns: System');
   const down = (async () => new Response('PRIVATE', { status: 500 })) as typeof fetch;
   await assert.rejects(fetchSupportReport(file, { config: 'd', from: '2026-09', to: '2026-09', group: 0 }, down), e => e instanceof ReportRequestError && e.status === 500 && !e.message.includes('PRIVATE'));
+});
+
+test('chat posts the question, locale and optional client as JSON with a timeout', async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fetcher = (async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify(String(url).endsWith('clients') ? ['acme'] : { answer: 'a', sources: [] }), { status: 200 });
+  }) as typeof fetch;
+  assert.deepEqual(await askChat('How?', 'mn', 'acme', fetcher), { answer: 'a', sources: [] });
+  await askChat('How?', 'en', undefined, fetcher);
+  assert.deepEqual(await fetchChatClients(fetcher), ['acme']);
+  assert.equal(calls[0].url, '/api/chat');
+  assert.equal(calls[0].init?.method, 'POST');
+  assert.deepEqual((calls[0].init?.headers as Record<string, string>)['Content-Type'], 'application/json');
+  assert.ok(calls[0].init?.signal instanceof AbortSignal);
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { question: 'How?', locale: 'mn', client: 'acme' });
+  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), { question: 'How?', locale: 'en' });
+  assert.equal(calls[2].url, '/api/chat/clients');
+});
+
+test('chat failures reject without echoing a server error body', async () => {
+  const fail = (async () => new Response('PRIVATE', { status: 500 })) as typeof fetch;
+  await assert.rejects(() => askChat('q', 'en', undefined, fail), error => error instanceof ReportRequestError && error.status === 500 && !error.message.includes('PRIVATE'));
 });

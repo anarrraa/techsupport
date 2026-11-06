@@ -2,7 +2,9 @@ import express from 'express';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generatePDF, generateExcel } from '../monthly-report/export.ts';
-import { db, monthSnapshots } from './db.ts';
+import { db, docClients, monthSnapshots, searchDocChunks } from './db.ts';
+import { answerQuestion, MAX_QUESTION_CHARS, type ChatDeps } from '../docs-chat/chat.ts';
+import { answer, embed } from '../docs-chat/vertex.ts';
 import { aggregateMonth, monthRange, MonthlyReportLimitError, type SnapshotRow } from '../monthly-report/monthly-report.ts';
 import { assertSupportRows, buildSupportReport, suggestPeriod, SupportInputError, type ClientConfig } from '../support-report/support-report.ts';
 import { readRows } from '../support-report/input.ts';
@@ -58,9 +60,36 @@ async function uploadedRows(req: express.Request) {
 export function createApp(store: ReportStore = {
 	check: () => db().$queryRaw`SELECT 1`,
 	read: monthSnapshots,
-}, supportConfigs: () => Promise<Record<string, ClientConfig>> = readSupportConfigs) {
+}, supportConfigs: () => Promise<Record<string, ClientConfig>> = readSupportConfigs, chat: ChatDeps & { clients(): Promise<string[]> } = {
+	embedQuery: async (question) => (await embed([question], 'query'))[0],
+	search: searchDocChunks,
+	answer,
+	clients: docClients,
+}) {
 	const app = express();
 	const upload = express.raw({ type: () => true, limit: '10mb' });
+
+	app.get('/api/chat/clients', async (_req, res, next) => {
+		try { res.json(await chat.clients()); } catch (error) { next(error); }
+	});
+
+	// Logs carry status, latency and counts only: never the question, the documents, or the answer (prd-docs-chat.md).
+	app.post('/api/chat', express.json({ limit: '16kb' }), async (req, res, next) => {
+		const started = Date.now();
+		try {
+			const { question, locale, client } = (req.body ?? {}) as Record<string, unknown>;
+			const text = typeof question === 'string' ? question.trim() : '';
+			if (!text || text.length > MAX_QUESTION_CHARS) throw new HttpError(400, `question must be 1-${MAX_QUESTION_CHARS} characters`);
+			if (locale !== 'mn' && locale !== 'en') throw new HttpError(400, 'locale must be "mn" or "en"');
+			if (client !== undefined && (typeof client !== 'string' || !client)) throw new HttpError(400, 'client must be a non-empty string');
+			const result = await answerQuestion(text, locale, client, chat);
+			console.log(`chat: 200 in ${Date.now() - started}ms, ${result.sources.length} sources`);
+			res.json(result);
+		} catch (error) {
+			console.error(`chat: failed in ${Date.now() - started}ms`);
+			next(error);
+		}
+	});
 
 	app.get('/api/support-reports/configs', async (_req, res, next) => {
 		try {
@@ -176,12 +205,13 @@ export function createApp(store: ReportStore = {
 	});
 	// JSON errors, logging the status only. Known input problems and body-parser 4xx (size, encoding) are the client's;
 	// anything else is a server fault whose details are never echoed.
-	app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+	app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
 		const parserStatus = Number((error as { status?: unknown } | null)?.status);
+		const chatBody = req.path === '/api/chat';
 		const [status, message] = error instanceof HttpError ? [error.status, error.message]
 			: error instanceof SupportInputError ? [400, error.message]
-			: parserStatus === 413 ? [413, 'The file is larger than 10 MB']
-			: parserStatus >= 400 && parserStatus < 500 ? [parserStatus, 'The upload could not be read']
+			: parserStatus === 413 ? [413, chatBody ? 'Request body too large' : 'The file is larger than 10 MB']
+			: parserStatus >= 400 && parserStatus < 500 ? [parserStatus, chatBody ? 'Invalid request body' : 'The upload could not be read']
 			: [500, 'Internal error'];
 		console.error(`request failed: ${status}`);
 		res.status(status).json({ error: message });
