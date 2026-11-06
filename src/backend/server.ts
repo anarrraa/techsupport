@@ -1,12 +1,12 @@
 import express from 'express';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { generatePDF, generateExcel } from './export.ts';
+import { generatePDF, generateExcel } from '../monthly-report/export.ts';
 import { db, monthSnapshots } from './db.ts';
-import { aggregateMonth, monthRange, MonthlyReportLimitError, type SnapshotRow } from '../lib/queries/monthly-report.ts';
-import { assertSupportRows, buildSupportReport, suggestPeriod, SupportInputError, type ClientConfig } from '../lib/support-report.ts';
-import { readRows } from './support-report-input.ts';
-import { renderSupportReportPdf } from './support-report-pdf.ts';
+import { aggregateMonth, monthRange, MonthlyReportLimitError, type SnapshotRow } from '../monthly-report/monthly-report.ts';
+import { assertSupportRows, buildSupportReport, suggestPeriod, SupportInputError, type ClientConfig } from '../support-report/support-report.ts';
+import { readRows } from '../support-report/input.ts';
+import { renderSupportReportPdf } from '../support-report/pdf.ts';
 
 interface ReportStore {
 	check(): Promise<unknown>;

@@ -3,8 +3,8 @@ import test from 'node:test';
 import { once } from 'node:events';
 import ExcelJS from 'exceljs';
 import { createApp, MAX_SUPPORT_ROWS } from '../../src/backend/server.ts';
-import type { ClientConfig } from '../../src/lib/support-report.ts';
-import { MAX_MONTHLY_SNAPSHOTS, type SnapshotRow } from '../../src/lib/queries/monthly-report.ts';
+import type { ClientConfig } from '../../src/support-report/support-report.ts';
+import { MAX_MONTHLY_SNAPSHOTS, type SnapshotRow } from '../../src/monthly-report/monthly-report.ts';
 
 interface ReportResponse {
 	snapshots: number;

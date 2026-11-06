@@ -7,19 +7,19 @@
  *
  * Sends nothing, ever. This is the counterpart to the run journal, which is
  * deliberately unable to name a request or a person because it goes to CI logs
- * (`src/lib/run-journal.ts`). This prints exactly what that cannot, so it is a
+ * (`src/reminder/run-journal.ts`). This prints exactly what that cannot, so it is a
  * local tool for a human at a terminal and must not be wired into the workflow.
  *
  * Every decision below comes from the same library functions the workflow
  * calls, so what it explains is what would actually happen.
  */
-import { loadConfig } from '../src/lib/config.ts';
-import { planDirectMessages } from '../src/lib/direct-messages.ts';
-import { dueLevel, selectEscalations, severityFor } from '../src/lib/escalation.ts';
-import { loadEscalationConfig, personForJiraAccount } from '../src/lib/escalation-config.ts';
-import { readEscalationState, highestNotified } from '../src/lib/escalation-state.ts';
-import { fetchTickets } from '../src/lib/jira.ts';
-import { elapsedSinceRaisedMinutes, overdueMinutesOf, selectReminderTickets } from '../src/lib/sla.ts';
+import { loadConfig } from '../src/shared/config.ts';
+import { planDirectMessages } from '../src/escalation/direct-messages.ts';
+import { dueLevel, selectEscalations, severityFor } from '../src/escalation/escalation.ts';
+import { loadEscalationConfig, personForJiraAccount } from '../src/escalation/escalation-config.ts';
+import { readEscalationState, highestNotified } from '../src/escalation/escalation-state.ts';
+import { fetchTickets } from '../src/shared/jira.ts';
+import { elapsedSinceRaisedMinutes, overdueMinutesOf, selectReminderTickets } from '../src/reminder/sla.ts';
 
 const applyAllowlist = process.argv.includes('--allowlist');
 const config = loadConfig({ ...process.env, REMINDER_DRY_RUN: 'true' });
@@ -62,7 +62,7 @@ console.log(`statuses in play: ${Object.entries(statuses).map(([k, v]) => `${k}=
 await reportPausableStatuses(config.jira);
 const vendorParticipants = new Set(jira.tickets.flatMap((t) => t.participants.map((p) => p.displayName)));
 console.log(`\nvendor participants seen: ${vendorParticipants.size}`);
-console.log('client-side participants were dropped in src/lib/jira.ts and are not visible here');
+console.log('client-side participants were dropped in src/shared/jira.ts and are not visible here');
 
 async function reportPausableStatuses(jiraConfig: typeof config.jira): Promise<void> {
 	const project = jiraConfig.jql.match(/project\s*=\s*"?([A-Za-z][A-Za-z0-9_]*)"?/i)?.[1];

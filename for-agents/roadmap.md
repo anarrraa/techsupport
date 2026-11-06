@@ -84,7 +84,7 @@ Open decisions (record answers here):
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
 | Scheduled run verified in production | Pass | The dry-run immediately after reported `Scanned 26; 17 due, 9 not breached, 0 outside calendar, 0 awaiting window`, `0 request(s) crossed an escalation level` — the seed held — and `2 direct message(s) to 2 recipient(s)` with `11 withheld` by the rollout gate |
 | Production logs are aggregate-only | Pass | The run log above contains no ticket key, no assignee or participant name, no email, and no object id. Checked against two ticket-key prefixes, two assignee display names, a recipient's work address, a Cyrillic summary fragment, and a recipient object id |
-| Scheduled reminder workflow (before) | Was failing | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/lib/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; needs a green scheduled run to confirm |
+| Scheduled reminder workflow (before) | Was failing | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/shared/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; needs a green scheduled run to confirm |
 | Scoped JQL correctness | Pass | On 2026-08-26 `JIRA_JQL` set to `project = DC AND statusCategory != Done AND assignee is not EMPTY` |
 | Local production dry-run | Pass | On 2026-08-26 dry-run scans real DC issues and reaches SLA endpoint |
 | JSM SLA read access | Pass | On 2026-08-26 `GET /rest/servicedeskapi/request/DC-844/sla` returns 200 OK (agent access granted) |
@@ -97,7 +97,7 @@ Open decisions (record answers here):
 | Live bot direct message from this codebase | **Pass** | On 2026-09-08 `npm run verify:bot -- <object-id>` printed `Bot Framework and Graph tokens acquired` then `Direct message delivered`. First message this codebase has ever sent. The full chain ran: client-credentials tokens for both scopes, catalog lookup by external id, install-for-user, personal chat lookup, activity post |
 | Graph application consent | Pass | Implied by the run above: the Graph token was issued and the catalog and installation calls succeeded, so `AppCatalog.Read.All` and the installation permission are consented |
 | First-response reminders route to participants | Pass | Changed 2026-09-08 on the user's instruction: the assignee is the triaging support team, the participants are who acts. A dry-run plans 6 recipients across the open DC requests with `unmappedRecipients: 0`. The three assignee-only support accounts are no longer in the directory and can no longer be messaged |
-| Client contacts excluded from routing | Pass | The participants field on open DC requests holds 14 `atlassian` accounts and 9 `customer` accounts — the latter are Digital Concept's own people, including the reporter of every request. `src/lib/jira.ts` drops `accountType != 'atlassian'` at the adapter, so the client cannot reach routing; asserted at both the adapter and the router |
+| Client contacts excluded from routing | Pass | The participants field on open DC requests holds 14 `atlassian` accounts and 9 `customer` accounts — the latter are Digital Concept's own people, including the reporter of every request. `src/shared/jira.ts` drops `accountType != 'atlassian'` at the adapter, so the client cannot reach routing; asserted at both the adapter and the router |
 | Assignees resolvable to recipients | Superseded | The four agents on open DC requests — Uyanga, Unursaikhan, Delgertsetseg, Khulan — are in the directory as of 2026-09-08 with both their Jira account id and Entra object id, so a first-response breach now reaches the person who owes the reply. Before this, every such breach only raised `N breached request(s) have no assignee entry`, and the escalation chain fired above a first rung that had never been rung |
 | Jira does not expose agent email addresses | Noted | `emailAddress` is absent for `accountType: atlassian` users, so `resolve:ids` cannot map an agent by email. Their Entra object ids were resolved by Graph display-name search instead; the directory keys on `jiraAccountId`, which Jira does expose |
 | Recipient identifiers | Pass | Entra object ids for both pilot recipients recorded in `config/escalation.json` 2026-09-08. A first attempt used the app registration's own object id and Graph answered 404; that case now reports `unknown-recipient` with the distinction spelled out |
@@ -114,7 +114,7 @@ Open decisions (record answers here):
 | **GitHub's cron cannot meet the time-window requirement** | Blocking, measured 2026-09-09 | The 02:00 UTC run on 2026-09-09 never fired at all. Measuring every past `schedule` event against its cron time gives delays of 45, 46, 128, 130, 131, 135, 135, 154, 160, 168, 295, 357 and 489 minutes — a median around two hours and a tail past eight. A 10:23 Ulaanbaatar slot therefore lands at 12:23 typically and 18:23 at worst, outside the 09:00-12:00 window the team asked for. Moving the cron off the hour (`:00` to `:23`) did not help. `workflow_dispatch` is unaffected: every manual dispatch in this project started within seconds. The fix is an external trigger calling the dispatch API, not more cron tuning |
 | Schedule set to the team's working rhythm | Changed 2026-09-08 | Twice a working day: `0 2 * * 1-5` and `0 7 * * 1-5`, which are 10:00 and 15:00 in Ulaanbaatar (UTC+8, no daylight saving since 2016). `REMINDER_DELIVERY_WINDOW_MINUTES` was raised to equal `REMINDER_REPEAT_MINUTES` in the same change: the gaps between these runs are 300 and 1140 minutes, both whole multiples of 60, so a 15-minute window would have reached only 25% of breaches and always the same 25% |
 | Answered requests stop being reminded | Pass | Verified against live Jira 2026-09-08: 9 of 26 open DC requests have a completed first-response cycle and are excluded by `selectReminderTickets` before any window logic. Replying inside or outside the SLA both end the reminders; only an `ongoing` cycle is eligible |
-| Schedule matches the delivery-window design | Superseded 2026-09-08 | The schedule was `0 0 * * *`. A daily run advances elapsed-since-breach by 1440 minutes and `1440 % 60 == 0`, so `isReminderWindow` returned the same verdict for a given ticket on every run: breaches whose age mod 60 fell outside the 15-minute window were **never** reminded, permanently, not occasionally. Reproduced against `src/lib/sla.ts`: offsets 20 and 47 answered `no` on seven consecutive days; at `*/15 * * * *` every offset is reminded once an hour |
+| Schedule matches the delivery-window design | Superseded 2026-09-08 | The schedule was `0 0 * * *`. A daily run advances elapsed-since-breach by 1440 minutes and `1440 % 60 == 0`, so `isReminderWindow` returned the same verdict for a given ticket on every run: breaches whose age mod 60 fell outside the 15-minute window were **never** reminded, permanently, not occasionally. Reproduced against `src/reminder/sla.ts`: offsets 20 and 47 answered `no` on seven consecutive days; at `*/15 * * * *` every offset is reminded once an hour |
 | Delivery path matches a working bot in this tenant | Pass | On 2026-09-08 the Graph install + chat + activity sequence was taken from `zero/goOrange`'s production edge function rather than designed here |
 | Resolution metric present on DC requests | Pass | On 2026-09-07 a local dry-run scanned 28 DC requests and read the escalation clock on enough of them to select 9 crossings (L2:4, L3:3, L5:2) |
 | Bot dry-run is aggregate-only | Pass | On 2026-09-07 the dry-run output named no request, assignee, or object id |
@@ -223,7 +223,7 @@ document or CI logs.
          elapsed figures drop, because changing a metric's conditions makes JSM
          recalculate.
 
-      No code change: `src/lib/sla.ts` and `src/lib/escalation.ts` already
+      No code change: `src/reminder/sla.ts` and `src/escalation/escalation.ts` already
       exclude a paused cycle, with tests. The application must not second-guess
       Jira's clock (`AGENTS.md`).
 - [ ] Confirm JSM First Response goals match `for-agents/sla-matrix.md`.
@@ -334,11 +334,11 @@ production evidence: no message has been sent from this codebase.
 
 | Module | What it owns |
 | --- | --- |
-| `src/lib/teams-bot.ts` | Bot Connector token (client secret or GitHub OIDC), conversation create, activity post, distinct 403 reasons |
-| `src/lib/escalation.ts` | `for-agents/sla-matrix.md` section 2 thresholds and section 3 routing, pure |
-| `src/lib/escalation-config.ts` | `config/escalation.json` schema, load-time referential integrity, contact resolution that fails visibly |
-| `src/lib/escalation-state.ts` | highest level notified per ticket, restored and saved through `actions/cache` |
-| `src/lib/direct-messages.ts` | who gets which message, pure |
+| `src/shared/teams-bot.ts` | Bot Connector token (client secret or GitHub OIDC), conversation create, activity post, distinct 403 reasons |
+| `src/escalation/escalation.ts` | `for-agents/sla-matrix.md` section 2 thresholds and section 3 routing, pure |
+| `src/escalation/escalation-config.ts` | `config/escalation.json` schema, load-time referential integrity, contact resolution that fails visibly |
+| `src/escalation/escalation-state.ts` | highest level notified per ticket, restored and saved through `actions/cache` |
+| `src/escalation/direct-messages.ts` | who gets which message, pure |
 
 Decisions taken during implementation, both recorded because neither was settled
 by the contract:
@@ -366,7 +366,7 @@ escalation path, which is what contract section 3 describes.
       per ticket. See `for-agents/brd-teams-bot-escalation.md` decisions 2-6.
 - [x] Design and add the config file itself (schema for the person directory
       and the per-project/team L2-L5 mapping decided above). Added 2026-09-07 as
-      `config/escalation.example.json`, validated by `src/lib/escalation-config.ts`.
+      `config/escalation.example.json`, validated by `src/escalation/escalation-config.ts`.
       `config/escalation.json` itself is deliberately absent: the loader fails
       visibly by path rather than shipping placeholder object ids that would
       misdirect messages.
@@ -386,7 +386,7 @@ escalation path, which is what contract section 3 describes.
       rejects email and user principal name for proactive direct messages.
 - [x] Confirm the escalation clock reads the JSM resolution metric rather than
       elapsed time since the first-response breach. Implemented 2026-09-07:
-      `src/lib/escalation.ts` reads `resolutionSla.elapsedMinutes`, which is
+      `src/escalation/escalation.ts` reads `resolutionSla.elapsedMinutes`, which is
       JSM's working-hours elapsed time.
 
 ### Delivery path revised 2026-09-08, from a working bot in the same tenant
@@ -571,15 +571,15 @@ User explicitly prioritized this ahead of remaining MVP acceptance. Requirements
 `for-agents/prd-support-report.md`. Stateless upload → per-group PDF.
 
 - [x] `buildSupportReport` (pure, TDD, synthetic fixtures): grouping, sections, period split, penalties, hours.
-      Evidence 2026-11-05: `tests/lib/support-report.test.ts` 12 pass; root `npm test` 159 pass / 0 fail / 1 skipped;
+      Evidence 2026-11-05: `tests/support-report/support-report.test.ts` 12 pass; root `npm test` 159 pass / 0 fail / 1 skipped;
       typecheck and build exit 0. Not yet run against a real export.
 - [x] Row reader for xlsx and csv (exceljs), required-column error.
-      Evidence 2026-11-05: `tests/backend/support-report-input.test.ts` 3 pass; root `npm test` 164 pass / 0 fail /
+      Evidence 2026-11-05: `tests/support-report/input.test.ts` 3 pass; root `npm test` 164 pass / 0 fail /
       1 skipped; typecheck and build exit 0. Local check on the real Sept DC export (not committed): open list,
       improvements and type counts match the signed "Бусад систем" PDF; the only gap is DC-944, which staff removed
       by hand. A typo'd `Resolved at` (DC-919) now fails visibly instead of counting as open.
 - [x] PDF renderer: Cyrillic TTF, bar charts, signatures.
-      Evidence 2026-11-05: `tests/backend/support-report-pdf.test.ts` pass (valid PDF, embedded Noto Sans,
+      Evidence 2026-11-05: `tests/support-report/pdf.test.ts` pass (valid PDF, embedded Noto Sans,
       deterministic bytes, no number-only pages); root `npm test` 166 pass / 0 fail / 1 skipped; typecheck and build
       exit 0. Local render of the real Sept DC export (not committed; DC-919 typo patched, DC-944 marked `Хасах`):
       totals 43, IT 33 / Change 10, 86% / 37 resolved, 6 open, defects 15 / 12 / 3 match the signed PDF.
@@ -610,13 +610,14 @@ with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
 
 - [x] 0.1 gitignore `documents/` (client-confidential, public repo). Report: `plan/phase-0-clean-slate/reports/2026-11-06-0.1.md`.
 - [x] 0.2 commit the current uncommitted work. Report: `plan/phase-0-clean-slate/reports/2026-11-06-0.2.md`.
-- [ ] 2.1 Backend feature folders. `src/shared/` (config, http, jira, teams-bot,
+- [x] 2.1 Backend feature folders. `src/shared/` (config, http, jira, teams-bot,
       teams-webhook), `src/reminder/`, `src/escalation/`, `src/monthly-report/`,
       `src/support-report/`; `agents/` and `workflows/` stay (Flue discovery);
       `backend/server.ts` keeps routes only. `tests/` mirrors it; update the
       `npm test` globs and every `src/lib/...` path in `AGENTS.md` and `for-agents/`.
       Pure files stay framework-free; pdfkit/exceljs/express/Prisma only in
       `*-pdf`, `*-input`, `db`, `export`, `server`.
+      Report: `plan/phase-2-restructure/reports/2026-11-06-2.1.md`.
 - [ ] 2.2 Frontend `features/` (monthly-report, support-report, reports-archive,
       chat, teams) + `shared/`; `components/ui/` stays (shadcn).
 - [ ] 2.3 Replace the frontend's copied report types with `import type` from

@@ -1,30 +1,30 @@
 import { defineWorkflow } from '@flue/runtime';
 import * as v from 'valibot';
 import reminderWriter from '../agents/reminder-writer.ts';
-import { generateReminderIntro } from '../lib/reminder-intro.ts';
-import { loadConfig, type AppConfig } from '../lib/config.ts';
-import { windowDecision } from '../lib/delivery-windows.ts';
-import { planDirectMessages } from '../lib/direct-messages.ts';
-import { dueLevel, selectEscalations, severityFor } from '../lib/escalation.ts';
-import { loadEscalationConfig } from '../lib/escalation-config.ts';
+import { generateReminderIntro } from '../reminder/reminder-intro.ts';
+import { loadConfig, type AppConfig } from '../shared/config.ts';
+import { windowDecision } from '../reminder/delivery-windows.ts';
+import { planDirectMessages } from '../escalation/direct-messages.ts';
+import { dueLevel, selectEscalations, severityFor } from '../escalation/escalation.ts';
+import { loadEscalationConfig } from '../escalation/escalation-config.ts';
 import {
 	highestNotified,
 	readEscalationState,
 	recordNotified,
 	writeEscalationState,
-} from '../lib/escalation-state.ts';
-import { fetchTickets, type JiraTicket } from '../lib/jira.ts';
-import { buildReminderMessages } from '../lib/reminder-message.ts';
+} from '../escalation/escalation-state.ts';
+import { fetchTickets, type JiraTicket } from '../shared/jira.ts';
+import { buildReminderMessages } from '../reminder/reminder-message.ts';
 import {
 	createRunJournal,
 	type DirectMessagesObserved,
 	type EscalationObserved,
 	type JournalSink,
 	type RunJournal,
-} from '../lib/run-journal.ts';
-import { elapsedSinceRaisedMinutes, selectReminderTickets } from '../lib/sla.ts';
-import { createBotSender, TeamsDeliveryError } from '../lib/teams-bot.ts';
-import { postToChannel } from '../lib/teams-webhook.ts';
+} from '../reminder/run-journal.ts';
+import { elapsedSinceRaisedMinutes, selectReminderTickets } from '../reminder/sla.ts';
+import { createBotSender, TeamsDeliveryError } from '../shared/teams-bot.ts';
+import { postToChannel } from '../shared/teams-webhook.ts';
 
 export interface JiraTeamsReminderOutput {
 	scanned: number;

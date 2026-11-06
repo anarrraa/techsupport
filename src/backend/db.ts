@@ -1,7 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client.ts';
-import type { JiraTicket } from '../lib/jira.ts';
-import { toSnapshotRows, MAX_MONTHLY_SNAPSHOTS, MonthlyReportLimitError, type SnapshotRow } from '../lib/queries/monthly-report.ts';
+import type { JiraTicket } from '../shared/jira.ts';
+import { toSnapshotRows, MAX_MONTHLY_SNAPSHOTS, MonthlyReportLimitError, type SnapshotRow } from '../monthly-report/monthly-report.ts';
 
 let client: PrismaClient | undefined;
 

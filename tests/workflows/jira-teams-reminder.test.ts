@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { AppConfig } from '../../src/lib/config.ts';
-import { parseWindows } from '../../src/lib/delivery-windows.ts';
-import type { EscalationConfig } from '../../src/lib/escalation-config.ts';
-import type { EscalationState } from '../../src/lib/escalation-state.ts';
-import type { JiraFetchResult, JiraTicket, SlaCycle } from '../../src/lib/jira.ts';
-import { TeamsDeliveryError, type DirectMessage } from '../../src/lib/teams-bot.ts';
+import type { AppConfig } from '../../src/shared/config.ts';
+import { parseWindows } from '../../src/reminder/delivery-windows.ts';
+import type { EscalationConfig } from '../../src/escalation/escalation-config.ts';
+import type { EscalationState } from '../../src/escalation/escalation-state.ts';
+import type { JiraFetchResult, JiraTicket, SlaCycle } from '../../src/shared/jira.ts';
+import { TeamsDeliveryError, type DirectMessage } from '../../src/shared/teams-bot.ts';
 import { runJiraTeamsReminder } from '../../src/workflows/jira-teams-reminder.ts';
 
 const NOW = new Date('2026-08-03T03:00:00.000Z');

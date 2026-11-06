@@ -98,7 +98,7 @@ Implementation must not start until these are answered.
    Teams contact per level (L2-L5). The same file also serves decision 5
    below, since both are identity lookups against the same directory. It must
    be a file the workflow reads at run time, not a hardcoded mapping in
-   `src/lib/`; a missing level's entry fails visibly rather than guessing
+   `src/escalation/`; a missing level's entry fails visibly rather than guessing
    (`AGENTS.md`).
 3. ~~**Off-hours phone call step.**~~ **Resolved 2026-08-24 by user decision.**
    The bot surfaces the on-call NOC contact in the escalation message; a

@@ -7,8 +7,8 @@
  * Prints outcomes only: no token, secret, or recipient identifier reaches the
  * output.
  */
-import { loadTeamsBotConfig } from '../src/lib/config.ts';
-import { createBotSender, TeamsDeliveryError } from '../src/lib/teams-bot.ts';
+import { loadTeamsBotConfig } from '../src/shared/config.ts';
+import { createBotSender, TeamsDeliveryError } from '../src/shared/teams-bot.ts';
 
 const recipient = process.argv[2]?.trim();
 if (!recipient) {

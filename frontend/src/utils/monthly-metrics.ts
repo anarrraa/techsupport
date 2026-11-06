@@ -7,7 +7,7 @@ interface BreachCounts {
   resolutionBreached: number;
 }
 
-/** `GET /api/reports/:month` body; mirrors `src/lib/queries/monthly-report.ts`. */
+/** `GET /api/reports/:month` body; mirrors `src/monthly-report/monthly-report.ts`. */
 export interface MonthlyMetrics extends BreachCounts {
   coverage: MonthlyReport["coverage"];
   firstResponseKnown: number;

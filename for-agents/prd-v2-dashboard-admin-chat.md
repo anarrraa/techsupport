@@ -48,7 +48,7 @@ Both read from the same Jira data and historical SLA snapshots that the reminder
 ### Architecture & Modules
 
 - **Web Service**: Dashboard + Admin Chat run as a separate service from the GitHub Actions reminder workflow. They communicate only via the shared Jira Adapter and the historical snapshot store.
-- **Shared Jira Adapter**: Both the reminder workflow and dashboard import the same module (src/lib/jira.ts) for pagination, timeouts, retries, and SLA lookups. This ensures consistent behavior and eliminates drift.
+- **Shared Jira Adapter**: Both the reminder workflow and dashboard import the same module (src/shared/jira.ts) for pagination, timeouts, retries, and SLA lookups. This ensures consistent behavior and eliminates drift.
 - **Historical Snapshot Store**: During each reminder run, capture the current SLA state for all scanned tickets. Store these snapshots in a database (TBD: PostgreSQL, DynamoDB, or time-series DB like InfluxDB) with a key of (ticket-key, run-id, timestamp). Trends are calculated by aggregating snapshots over time.
 - **Admin Chat Query Engine**: A module that translates natural-language questions into Jira queries and SLA logic checks. Does not modify state, only reads and traces decisions.
 - **Dashboard Data Layer**: Reuses the same Jira Adapter and reads snapshot history for trends. No separate business logic—presentation only.
@@ -114,7 +114,7 @@ A good test exercises external behavior without mocking internal state. Tests sh
 
 ### Test Patterns
 
-- Follow the pattern in `tests/lib/jira.test.ts` for adapter tests (mock HTTP, verify pagination)
+- Follow the pattern in `tests/shared/jira.test.ts` for adapter tests (mock HTTP, verify pagination)
 - Follow the pattern in `tests/workflows/jira-teams-reminder.test.ts` for end-to-end behavior
 - Use the same test utilities (timeout helpers, retry logic verification) to ensure consistency with MVP
 

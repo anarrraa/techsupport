@@ -23,7 +23,7 @@ invariant in `AGENTS.md`.
 decisions are answered)
 
 1. On first-response SLA breach (reusing the existing due-ticket selection in
-   `src/lib/sla.ts`), send a direct message containing: ticket key and link,
+   `src/reminder/sla.ts`), send a direct message containing: ticket key and link,
    priority, the contractual first-response window, and an explicit request
    to respond or update the ticket now.
 
@@ -32,7 +32,7 @@ decisions are answered)
    the people expected to act on it are its **request participants**, so that
    is where the reminder goes. The participants field also contains the
    client's own portal users, who must never be told they owe a response;
-   `src/lib/jira.ts` drops `accountType != 'atlassian'` before routing sees a
+   `src/shared/jira.ts` drops `accountType != 'atlassian'` before routing sees a
    request. The channel post is now optional rather than assumed.
 2. Track elapsed time since breach against the escalation timeline in
    `for-agents/sla-matrix.md` section 2, keyed by contract severity via the
@@ -63,7 +63,7 @@ decisions are answered)
   credential (per BRD open decision 1) is a repository secret and must never
   appear in logs, workflow output, patches, or documentation.
 - Direct-message payloads reuse the existing sanitize/escape/chunk path in
-  `src/lib/reminder-message.ts` rather than a second implementation.
+  `src/reminder/reminder-message.ts` rather than a second implementation.
 
 ## Out of scope
 

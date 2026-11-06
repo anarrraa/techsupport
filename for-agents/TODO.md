@@ -157,13 +157,13 @@ Verified 2026-08-20. Details and evidence in `for-agents/roadmap.md`.
 
 - [x] Add the config file schema (person directory of Jira account -> Entra
       object id, plus a per-project L2-L5 mapping referencing it).
-      `config/escalation.example.json` + `src/lib/escalation-config.ts`.
+      `config/escalation.example.json` + `src/escalation/escalation-config.ts`.
       Populating it with real ids is still open above.
-- [x] Implement the escalation-state store. `src/lib/escalation-state.ts`, saved
+- [x] Implement the escalation-state store. `src/escalation/escalation-state.ts`, saved
       and restored by `actions/cache` in the reminder workflow.
 - [x] Build the contact-directory resolver. Fails visibly on a missing contact
       and checks referential integrity at load time.
-- [x] Implement the direct-message sender. `src/lib/teams-bot.ts`: token by
+- [x] Implement the direct-message sender. `src/shared/teams-bot.ts`: token by
       client secret or GitHub OIDC, conversation create, activity post,
       `403 ForbiddenOperationException` and `403 MessageWritesBlocked` reported
       as distinct reasons.
@@ -171,14 +171,14 @@ Verified 2026-08-20. Details and evidence in `for-agents/roadmap.md`.
       for both transports, so a parameter would have had one value. Revisit only
       if a real direct message shows a literal `&lt;` or `&amp;`.
 - [x] Implement working-hours vs off-hours routing per `for-agents/sla-matrix.md`
-      section 3. `src/lib/escalation.ts`, using JSM's `withinCalendarHours` so
+      section 3. `src/escalation/escalation.ts`, using JSM's `withinCalendarHours` so
       no calendar math is duplicated.
 - [x] Add unit tests for every threshold in section 2, both routings. Elapsed
       working time is read from the JSM **resolution** metric.
 - [x] Add workflow tests: no duplicate escalation across runs, dry-run sends
       zero direct messages and logs counts only.
 - [x] Make the channel webhook optional so a bot-only deployment works. It was
-      already removed from the workflow env while `src/lib/config.ts` still
+      already removed from the workflow env while `src/shared/config.ts` still
       required it, which would have failed every non-dry run.
 
 ## Reference

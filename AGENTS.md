@@ -60,8 +60,13 @@ the priority.
 - Add or update tests for changed behavior, especially workflow side effects and
   privacy guarantees. Tests belong in `tests/`, mirroring `src/`; a `*.test.ts`
   inside `src/agents/` or `src/workflows/` breaks Flue's module discovery.
-- Keep `src/lib/` free of framework imports so the unit suite stays fast. Agent
-  and workflow definitions are the only places `@flue/runtime` belongs.
+- Feature-folder files (`src/shared/`, `src/reminder/`, `src/escalation/`,
+  `src/monthly-report/`, `src/support-report/`) stay framework-free so the unit
+  suite stays fast, except these adapters: `@flue/runtime` only in `src/agents/`
+  and `src/workflows/`; express only in `src/backend/server.ts`; pdfkit only in
+  `src/monthly-report/export.ts` and `src/support-report/pdf.ts`; exceljs only in
+  `src/monthly-report/export.ts` and `src/support-report/input.ts`; Prisma only in
+  `src/backend/db.ts`.
 - Do not claim an integration works without an executed external check.
 - Do not inspect or print `.env` or `gcp-sa.json`; use `.env.example` for variable
   names and documentation.
@@ -103,7 +108,7 @@ work. They require an explicit PRD and roadmap update before implementation.
 The personal Teams bot / escalation feature cleared that gate: every open
 decision in `for-agents/brd-teams-bot-escalation.md` is answered, `for-agents/roadmap.md`
 carries the V2 milestones, and the implementation landed on 2026-09-07
-(`src/lib/teams-bot.ts`, `escalation.ts`, `escalation-config.ts`,
+(`src/shared/teams-bot.ts`, `src/escalation/escalation.ts`, `escalation-config.ts`,
 `escalation-state.ts`, `direct-messages.ts`). Bot transport has recorded live
 message delivery (2026-09-08 and scheduled evidence checked 2026-11-03).
 Full production acceptance remains open; use the current roadmap evidence rather

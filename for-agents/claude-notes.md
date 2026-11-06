@@ -53,8 +53,8 @@
   column absent → "тэмдэглэгээ хийгдээгүй" (never falsely claim none). No LLM / fuzzy grouping (Jira content must not reach an LLM).
 - Sections: one fixed template (union of both samples), each section filtered by `Request Type`; empty section → one line
   "... бүртгэгдээгүй". Per-client config maps that client's Request Type names → sections, optional `"hide": [...]`.
-- Shape: `readRows(file)` (exceljs reads xlsx + csv) → `buildSupportReport(rows, config, period)` in `src/lib/support-report.ts`
-  (pure, TDD surface, synthetic fixtures only — repo is public) → `renderSupportReportPdf(report)` in `src/backend/`. CLI entry via npm script.
+- Shape: `readRows(file)` (exceljs reads xlsx + csv) → `buildSupportReport(rows, config, period)` in `src/support-report/support-report.ts`
+  (pure, TDD surface, synthetic fixtures only — repo is public) → `renderSupportReportPdf(report)` in `src/support-report/pdf.ts`. CLI entry via npm script.
 - PDF needs an embedded Cyrillic TTF (Helvetica has no Cyrillic). Charts: hand-drawn PDFKit bar charts only (pies become bars), no chart lib.
 - No CLI. Dashboard `ReportsPage` gets a "generate report" upload: drop file, pick client config, download one PDF per group.
   Upload endpoint parses in memory and stores nothing. Period auto-suggested from the file (latest `Created` month), editable

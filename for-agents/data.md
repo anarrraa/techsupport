@@ -1,31 +1,31 @@
 # Data and external APIs
 
 No database. Contract values (SLA minutes, levels) are defined in
-`for-agents/sla-matrix.md`; code mirrors them in `src/lib/escalation.ts:16-45`.
+`for-agents/sla-matrix.md`; code mirrors them in `src/escalation/escalation.ts:16-45`.
 
 ## Jira Cloud / JSM (basic auth: `JIRA_EMAIL` + `JIRA_API_TOKEN`)
 
 | Call | Where | Notes |
 | --- | --- | --- |
-| `POST /rest/api/3/search/jql` | `src/lib/jira.ts:251` | token pagination (`nextPageToken`, `isLast`); repeated token throws (`:281`); capped by `JIRA_MAX_RESULTS` / `JIRA_MAX_SEARCH_PAGES`, sets `truncated` |
-| fields requested | `src/lib/jira.ts:258-265` | `summary, status, priority, assignee, comment, <JIRA_PARTICIPANTS_FIELD>` |
-| `GET /rest/servicedeskapi/request/{key}/sla` | `src/lib/jira.ts:310` | per issue, `JIRA_SLA_CONCURRENCY` parallel; needs **agent** access on the project |
+| `POST /rest/api/3/search/jql` | `src/shared/jira.ts:251` | token pagination (`nextPageToken`, `isLast`); repeated token throws (`:281`); capped by `JIRA_MAX_RESULTS` / `JIRA_MAX_SEARCH_PAGES`, sets `truncated` |
+| fields requested | `src/shared/jira.ts:258-265` | `summary, status, priority, assignee, comment, <JIRA_PARTICIPANTS_FIELD>` |
+| `GET /rest/servicedeskapi/request/{key}/sla` | `src/shared/jira.ts:310` | per issue, `JIRA_SLA_CONCURRENCY` parallel; needs **agent** access on the project |
 | `GET /rest/api/2/project/{p}/statuses` | `scripts/trace-run.ts:72` | trace only |
 
-`SlaCycle` (`src/lib/jira.ts:4-26`): `state`, `breached`, `paused`,
+`SlaCycle` (`src/shared/jira.ts:4-26`): `state`, `breached`, `paused`,
 `withinCalendarHours`, `breachTimeEpochMillis`, `elapsedMinutes` (JSM
 `elapsedTime`, from cycle start), `remainingMinutes` (JSM `remainingTime`,
 negative once breached). Two metrics per ticket: first response
 (`JIRA_FIRST_RESPONSE_SLA_NAME`) and resolution (`JIRA_RESOLUTION_SLA_NAME`).
 
-`JiraTicket` (`src/lib/jira.ts:58`): `participants` = vendor-only
+`JiraTicket` (`src/shared/jira.ts:58`): `participants` = vendor-only
 (`accountType 'atlassian'`); `comments` = last `JIRA_COMMENT_LIMIT`, ADF
 flattened, each with `authorIsVendor`.
 
 Priority → severity: Highest→critical, High→high, Medium→medium,
-Low/Lowest→low (`src/lib/escalation.ts:16`).
+Low/Lowest→low (`src/escalation/escalation.ts:16`).
 
-## Microsoft (bot transport, `src/lib/teams-bot.ts`)
+## Microsoft (bot transport, `src/shared/teams-bot.ts`)
 
 | Step | Endpoint | Where |
 | --- | --- | --- |
@@ -39,19 +39,19 @@ Graph cannot post chat messages app-only; Bot Connector does the send
 `not-in-catalog`, `install-forbidden`, `not-installed`, `writes-blocked`,
 `other` (`:28-39`).
 
-Channel transport: Teams Incoming Webhook POST (`src/lib/teams-webhook.ts:4`).
+Channel transport: Teams Incoming Webhook POST (`src/shared/teams-webhook.ts:4`).
 
-Optional model: Gemini 2.5 Flash on Vertex (`src/lib/reminder-intro.ts:38`,
-`src/lib/ticket-digest.ts:180`) via Google WIF in CI.
+Optional model: Gemini 2.5 Flash on Vertex (`src/reminder/reminder-intro.ts:38`,
+`src/escalation/ticket-digest.ts:180`) via Google WIF in CI.
 
-All HTTP goes through `fetchOk` (`src/lib/http.ts:28`): per-attempt timeout,
+All HTTP goes through `fetchOk` (`src/shared/http.ts:28`): per-attempt timeout,
 retries only 429/500/502/503/504 (`:79`), honors `Retry-After` up to 60s.
 
 ## Escalation directory — `config/escalation.json`
 
 Gitignored; in CI written from secret `ESCALATION_DIRECTORY_JSON`
 (`.github/workflows/jira-teams-reminder.yml:62-69`). Shape: see
-`config/escalation.example.json`; schema `src/lib/escalation-config.ts:19-51`.
+`config/escalation.example.json`; schema `src/escalation/escalation-config.ts:19-51`.
 
 ```text
 people:   { <handle>: { name, email?, entraObjectId (UUID, not nil), jiraAccountId? } }
@@ -63,6 +63,6 @@ A level with no contact is an error, never skipped.
 
 ## Escalation state — `.escalation-state/state.json`
 
-`{ "<ticketKey>": <highest level notified 1-5> }` (`src/lib/escalation-state.ts:20-23`).
+`{ "<ticketKey>": <highest level notified 1-5> }` (`src/escalation/escalation-state.ts:20-23`).
 Atomic write via temp + rename (`:56-64`). No pruning. Persisted only in the
 GitHub Actions cache (`yml:79-86`, save `:147-152`).

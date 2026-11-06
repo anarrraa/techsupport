@@ -1,6 +1,6 @@
 # Environment
 
-All parsing: `src/lib/config.ts`. Local runs read `.env` (`--env-file-if-exists`
+All parsing: `src/shared/config.ts`. Local runs read `.env` (`--env-file-if-exists`
 in `package.json` scripts). Names only here — **never read or print `.env` or
 `gcp-sa.json`**. Template: `.env.example`.
 

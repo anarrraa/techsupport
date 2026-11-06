@@ -7,7 +7,7 @@ Status column: **ran** = executed on 2026-10-13 with the result shown;
 | --- | --- | --- |
 | Install | `npm ci` | not re-run (lockfile unchanged) |
 | All tests | `npm test` | ran: 171 pass, 0 fail |
-| One test file | `node --test tests/lib/sla.test.ts` | ran: pass |
+| One test file | `node --test tests/reminder/sla.test.ts` | ran: pass |
 | Tests by name | `node --test --test-name-pattern="dry run" tests/workflows/jira-teams-reminder.test.ts` | ran: 2 pass |
 | Typecheck | `npm run typecheck` | ran: exit 0 |
 | Build | `npm run build` → `dist/server.mjs` | ran: ok |
@@ -28,10 +28,10 @@ No lint or formatter is configured (`package.json` has no such script).
 
 ## Test runner notes
 
-- `node:test` + `node:assert/strict`, no framework (`tests/lib/sla.test.ts:1-2`).
+- `node:test` + `node:assert/strict`, no framework (`tests/reminder/sla.test.ts:1-2`).
 - Node runs `.ts` directly (type stripping); imports keep the `.ts` extension
   (`tsconfig.json:8` `allowImportingTsExtensions`).
-- `npm test` globs only `tests/lib/*.test.ts tests/workflows/*.test.ts`
+- `npm test` globs `tests/{backend,shared,reminder,escalation,monthly-report,support-report,workflows}/*.test.ts`
   (`package.json` `scripts.test`). A test in any other folder is silently not run.
 
 ## CI

@@ -15,7 +15,7 @@ changes.
 
 The complete output is deterministic by default. Gemini on Vertex AI is optional and receives
 aggregate counts only to write a one-line introduction; Jira titles, names, email
-addresses, and links are never sent to the model. `src/lib/reminder-intro.ts` owns that
+addresses, and links are never sent to the model. `src/reminder/reminder-intro.ts` owns that
 contract: its input type cannot express Jira-controlled content, and it reports whether the
 model or the deterministic opener was used rather than failing the run.
 
@@ -37,35 +37,40 @@ bot are independent: either alone is a working deployment.
 Key modules:
 
 ```text
-src/lib/config.ts                    validated environment configuration
-src/lib/http.ts                      timeout and bounded retry policy
-src/lib/jira.ts                      Jira search + JSM SLA adapter
-src/lib/sla.ts                       pure reminder selection policy
-src/lib/reminder-message.ts          deterministic Teams message builder
-src/lib/teams-webhook.ts             Teams webhook adapter
-src/lib/teams-bot.ts                 Bot Connector direct-message adapter
-src/lib/escalation.ts                pure L2-L5 threshold and routing policy
-src/lib/escalation-config.ts         person directory and contact resolver
-src/lib/escalation-state.ts          highest level notified per ticket
-src/lib/direct-messages.ts           pure per-recipient message planning
-src/lib/reminder-intro.ts            optional aggregate-only intro writer
+src/shared/config.ts                 validated environment configuration
+src/shared/http.ts                   timeout and bounded retry policy
+src/shared/jira.ts                   Jira search + JSM SLA adapter
+src/reminder/sla.ts                  pure reminder selection policy
+src/reminder/reminder-message.ts     deterministic Teams message builder
+src/shared/teams-webhook.ts          Teams webhook adapter
+src/shared/teams-bot.ts              Bot Connector direct-message adapter
+src/escalation/escalation.ts         pure L2-L5 threshold and routing policy
+src/escalation/escalation-config.ts  person directory and contact resolver
+src/escalation/escalation-state.ts   highest level notified per ticket
+src/escalation/direct-messages.ts    pure per-recipient message planning
+src/reminder/reminder-intro.ts       optional aggregate-only intro writer
 src/workflows/jira-teams-reminder.ts workflow orchestration
 ```
 
 ## Repository layout
 
 ```text
-src/agents/        Flue-discovered agent bindings
-src/workflows/     Flue-discovered workflow modules
-src/lib/           plain modules, no framework imports
-tests/lib/         unit tests, mirroring src/lib
-tests/workflows/   workflow orchestration tests
+src/agents/          Flue-discovered agent bindings
+src/workflows/       Flue-discovered workflow modules
+src/shared/          config, HTTP, Jira and Teams adapters used by several features
+src/reminder/        first-response reminder policy and messages
+src/escalation/      L2-L5 escalation policy, directory, state, direct messages
+src/monthly-report/  monthly report aggregation and PDF/Excel export
+src/support-report/  client support report: input reader, builder, PDF
+src/backend/         express server, Prisma client (db.ts), generated Prisma output
+tests/<feature>/     unit tests, mirroring src/<feature>
+tests/workflows/     workflow orchestration tests
 ```
 
 Tests live outside `src/` deliberately. Flue scans `src/agents/`, `src/workflows/`
 and `src/channels/` and requires every file found there to default-export the
 matching definition, so a `*.test.ts` beside a workflow fails the build. Keeping
-`src/lib/` free of framework imports is also deliberate: it keeps the unit suite
+the feature folders free of framework imports is also deliberate: it keeps the unit suite
 loading in milliseconds instead of paying for the agent runtime.
 
 ## Authoritative SLA
@@ -250,7 +255,7 @@ people expected to act on it. The field is
 `JIRA_PARTICIPANTS_FIELD`, `customfield_10065` by default.
 
 That field mixes vendor staff with the client's own portal users, and the client
-must never be told they owe a response. `src/lib/jira.ts` keeps only
+must never be told they owe a response. `src/shared/jira.ts` keeps only
 `accountType: 'atlassian'` when it builds `JiraTicket.participants`, so the
 filter happens once at the boundary rather than in every caller — a client
 contact cannot reach routing at all. Two tests hold that line, one at the
@@ -262,7 +267,7 @@ must not stop everyone else's reminders.
 
 ## Escalation
 
-`for-agents/sla-matrix.md` sections 2 and 3 are implemented in `src/lib/escalation.ts`:
+`for-agents/sla-matrix.md` sections 2 and 3 are implemented in `src/escalation/escalation.ts`:
 elapsed working time on the JSM **resolution** metric selects the contractual
 level, and `config/escalation.json` names the person for it. Inside calendar
 hours escalation is sequential; off-hours Critical/High notifies L1 and L2

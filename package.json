@@ -32,7 +32,7 @@
     "resolve:ids": "node --env-file-if-exists=.env scripts/resolve-entra-ids.mjs",
     "trace": "node --env-file-if-exists=.env scripts/trace-run.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/backend/*.test.ts tests/lib/*.test.ts tests/lib/queries/*.test.ts tests/workflows/*.test.ts",
+    "test": "node --test tests/backend/*.test.ts tests/shared/*.test.ts tests/reminder/*.test.ts tests/escalation/*.test.ts tests/monthly-report/*.test.ts tests/support-report/*.test.ts tests/workflows/*.test.ts",
     "dev:backend": "tsx watch --env-file=.env src/backend/server.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

@@ -14,10 +14,10 @@
  * the result is usable.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { loadTeamsBotConfig } from '../src/lib/config.ts';
-import { fetchOk } from '../src/lib/http.ts';
-import { loadEscalationConfig } from '../src/lib/escalation-config.ts';
-import { acquireToken } from '../src/lib/teams-bot.ts';
+import { loadTeamsBotConfig } from '../src/shared/config.ts';
+import { fetchOk } from '../src/shared/http.ts';
+import { loadEscalationConfig } from '../src/escalation/escalation-config.ts';
+import { acquireToken } from '../src/shared/teams-bot.ts';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -1,0 +1,367 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import type { JiraConfig } from '../../src/shared/config.ts';
+import { fetchTickets } from '../../src/shared/jira.ts';
+
+test('paginates Jira search and JSM SLA metrics', async () => {
+	const searchTokens: Array<string | undefined> = [];
+	const fetchImpl: typeof fetch = async (input, init) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			const body = JSON.parse(String(init?.body)) as { nextPageToken?: string };
+			searchTokens.push(body.nextPageToken);
+			return body.nextPageToken
+				? Response.json({ issues: [issue('SUP-2')], isLast: true })
+				: Response.json({ issues: [issue('SUP-1')], isLast: false, nextPageToken: 'page-2' });
+		}
+
+		const parsed = new URL(url);
+		if (url.includes('/SUP-1/sla') && parsed.searchParams.get('start') === '0') {
+			return Response.json({ start: 0, limit: 1, isLastPage: false, values: [metric('Resolution')] });
+		}
+		if (url.includes('/SUP-1/sla')) {
+			return Response.json({ start: 1, limit: 1, isLastPage: true, values: [metric('First response')] });
+		}
+		if (url.includes('/SUP-2/sla')) {
+			return Response.json({
+				start: 0,
+				limit: 1,
+				isLastPage: true,
+				values: [{ name: 'First response', completedCycles: [{}] }],
+			});
+		}
+		throw new Error(`Unexpected URL: ${url}`);
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.deepEqual(searchTokens, [undefined, 'page-2']);
+	assert.equal(result.scanned, 2);
+	assert.equal(result.withoutSla, 0);
+	assert.equal(result.tickets[0]?.firstResponseSla?.breached, true);
+	assert.equal(result.tickets[1]?.firstResponseSla?.state, 'completed');
+	assert.equal('assigneeEmail' in (result.tickets[0] ?? {}), false);
+});
+
+test('rejects SLA pagination that does not advance', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		return Response.json({ start: 0, limit: 0, isLastPage: false, values: [metric('Other')] });
+	};
+
+	await assert.rejects(fetchTickets(config(), fetchImpl, async () => {}), /did not advance/);
+});
+
+test('caps empty Jira search pages even when tokens remain unique', async () => {
+	let page = 0;
+	const fetchImpl: typeof fetch = async () => {
+		page += 1;
+		return Response.json({ issues: [], isLast: false, nextPageToken: `page-${page}` });
+	};
+	const limited = { ...config(), maxSearchPages: 2 };
+
+	await assert.rejects(fetchTickets(limited, fetchImpl, async () => {}), /exceeded 2 pages/);
+	assert.equal(page, 2);
+});
+
+test('does not mark an exact maxResults final page as truncated', async () => {
+	let requestedMaxResults: number | undefined;
+	const fetchImpl: typeof fetch = async (input, init) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			const body = JSON.parse(String(init?.body)) as { maxResults?: number };
+			requestedMaxResults = body.maxResults;
+			return Response.json({ issues: [issue('SUP-1'), issue('SUP-2')], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets({ ...config(), pageSize: 2, maxResults: 2 }, fetchImpl);
+	assert.equal(requestedMaxResults, 2);
+	assert.equal(result.scanned, 2);
+	assert.equal(result.truncated, false);
+});
+
+test('marks an exact maxResults response with more pages as truncated', async () => {
+	let searchCalls = 0;
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			searchCalls += 1;
+			return Response.json({
+				issues: [issue('SUP-1'), issue('SUP-2')],
+				isLast: false,
+				nextPageToken: 'page-2',
+			});
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets({ ...config(), pageSize: 2, maxResults: 2 }, fetchImpl);
+	assert.equal(searchCalls, 1);
+	assert.equal(result.scanned, 2);
+	assert.equal(result.truncated, true);
+});
+
+test('fails when the configured SLA metric is absent from every ticket', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1'), issue('SUP-2')], isLast: true });
+		}
+		return Response.json(slaPage(metric('Resolution')));
+	};
+
+	await assert.rejects(
+		fetchTickets({ ...config(), pageSize: 2 }, fetchImpl),
+		/not found on any of 2 Jira tickets/,
+	);
+});
+
+test('fails when SLA pagination exhausts its page cap', async () => {
+	let slaCalls = 0;
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		slaCalls += 1;
+		const start = Number(new URL(url).searchParams.get('start'));
+		return Response.json({ start, limit: 1, isLastPage: false, values: [metric('Resolution')] });
+	};
+
+	await assert.rejects(
+		fetchTickets({ ...config(), maxSlaPages: 2 }, fetchImpl),
+		/exceeded 2 pages for SUP-1/,
+	);
+	assert.equal(slaCalls, 2);
+});
+
+test('counts mixed present and absent SLA metrics', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1'), issue('SUP-2')], isLast: true });
+		}
+		return Response.json(
+			slaPage(metric(url.includes('/SUP-1/sla') ? 'First response' : 'Resolution')),
+		);
+	};
+
+	const result = await fetchTickets({ ...config(), pageSize: 2 }, fetchImpl);
+	assert.equal(result.scanned, 2);
+	assert.equal(result.withoutSla, 1);
+	assert.equal(result.tickets[0]?.firstResponseSla?.name, 'First response');
+	assert.equal(result.tickets[1]?.firstResponseSla, null);
+});
+
+test('does not exceed the configured SLA lookup concurrency', async () => {
+	let active = 0;
+	let maxActive = 0;
+	const issues = Array.from({ length: 5 }, (_, index) => issue(`SUP-${index + 1}`));
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues, isLast: true });
+		}
+		active += 1;
+		maxActive = Math.max(maxActive, active);
+		await new Promise((resolve) => setImmediate(resolve));
+		active -= 1;
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets(
+		{ ...config(), pageSize: 5, maxResults: 5, slaConcurrency: 2 },
+		fetchImpl,
+	);
+	assert.equal(result.scanned, 5);
+	assert.equal(maxActive, 2);
+});
+
+test('canonicalizes generated Jira ticket URLs across accepted base URL edges', async () => {
+	const cases = [
+		{
+			baseUrl: 'https://EXAMPLE.atlassian.net:443/root path)/',
+			key: 'SUP-1',
+			expected: 'https://example.atlassian.net/root%20path%29/browse/SUP-1',
+		},
+		{
+			baseUrl: 'https://example.atlassian.net/nested///?ignored=yes#fragment',
+			key: 'SUP )1',
+			expected: 'https://example.atlassian.net/nested/browse/SUP%20%291',
+		},
+		{
+			baseUrl: 'https://example.atlassian.net/',
+			key: 'SUP-1',
+			expected: 'https://example.atlassian.net/browse/SUP-1',
+		},
+	];
+
+	for (const entry of cases) {
+		const result = await fetchSingleTicket(entry.baseUrl, entry.key);
+		assert.equal(result.tickets[0]?.url, entry.expected);
+		assert.doesNotMatch(result.tickets[0]?.url ?? '', /[\s()]/);
+	}
+});
+
+test('requires HTTPS before constructing generated Jira ticket URLs', async () => {
+	let requestCount = 0;
+	const fetchImpl: typeof fetch = async () => {
+		requestCount += 1;
+		throw new Error('Unexpected request');
+	};
+
+	await assert.rejects(
+		fetchTickets({ ...config(), baseUrl: 'http://example.atlassian.net' }, fetchImpl),
+		/Jira base URL must use HTTPS/,
+	);
+	assert.equal(requestCount, 0);
+});
+
+test('reads both configured metrics and the assignee account from one SLA response', async () => {
+	const slaRequests: string[] = [];
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		slaRequests.push(url);
+		return Response.json({
+			start: 0,
+			limit: 10,
+			isLastPage: true,
+			values: [metric('First response'), metric('Time to resolution')],
+		});
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	// One request carries both clocks; the escalation clock costs nothing extra.
+	assert.equal(slaRequests.length, 1);
+	assert.equal(result.tickets[0]?.assigneeAccountId, 'account-SUP-1');
+	assert.equal(result.tickets[0]?.firstResponseSla?.elapsedMinutes, 120);
+	assert.equal(result.tickets[0]?.resolutionSla?.name, 'Time to resolution');
+	assert.equal(result.withoutResolutionSla, 0);
+});
+
+test('reports a missing resolution metric without failing the first-response path', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({ issues: [issue('SUP-1')], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.equal(result.withoutSla, 0);
+	assert.equal(result.withoutResolutionSla, 1);
+	assert.equal(result.tickets[0]?.resolutionSla, null);
+});
+
+test('keeps client portal users out of the participant list', async () => {
+	// The field mixes vendor staff with the client's own people. Telling the
+	// client they owe a response is the one delivery this project must never
+	// make, so the filter is asserted at the boundary that produces the list.
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			const issueWithParticipants = {
+				...issue('SUP-1'),
+				fields: {
+					...issue('SUP-1').fields,
+					customfield_10065: [
+						{ accountId: 'agent-1', displayName: 'Vendor Dev', accountType: 'atlassian' },
+						{ accountId: 'qm:tenant:client-1', displayName: 'Client Manager', accountType: 'customer' },
+						{ accountId: 'agent-2', displayName: 'Vendor Lead', accountType: 'atlassian' },
+						{ displayName: 'No account id', accountType: 'atlassian' },
+					],
+				},
+			};
+			return Response.json({ issues: [issueWithParticipants], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.deepEqual(result.tickets[0]?.participants, [
+		{ accountId: 'agent-1', displayName: 'Vendor Dev' },
+		{ accountId: 'agent-2', displayName: 'Vendor Lead' },
+	]);
+});
+
+test('treats an absent or malformed participants field as nobody', async () => {
+	const fetchImpl: typeof fetch = async (input) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			return Response.json({
+				issues: [{ ...issue('SUP-1'), fields: { ...issue('SUP-1').fields, customfield_10065: null } }],
+				isLast: true,
+			});
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.deepEqual(result.tickets[0]?.participants, []);
+});
+
+function config(): JiraConfig {
+	return {
+		baseUrl: 'https://example.atlassian.net',
+		email: 'support@example.com',
+		apiToken: 'token',
+		jql: 'project = SUP',
+		pageSize: 1,
+		maxResults: 10,
+		maxSearchPages: 10,
+		slaPageSize: 1,
+		maxSlaPages: 10,
+		slaConcurrency: 2,
+		firstResponseSlaName: 'First response',
+		resolutionSlaName: 'Time to resolution',
+		participantsField: 'customfield_10065',
+		http: { timeoutMs: 1_000, maxRetries: 0 },
+	};
+}
+
+function issue(key: string) {
+	return {
+		key,
+		fields: {
+			summary: `Summary ${key}`,
+			status: { name: 'Waiting for support' },
+			priority: { name: 'High' },
+			assignee: { displayName: 'Developer', accountId: `account-${key}` },
+		},
+	};
+}
+
+function metric(name: string) {
+	return {
+		name,
+		ongoingCycle: {
+			breached: true,
+			paused: false,
+			withinCalendarHours: true,
+			breachTime: { epochMillis: 1_722_500_000_000 },
+			elapsedTime: { millis: 7_200_000 },
+		},
+	};
+}
+
+function slaPage(value: ReturnType<typeof metric>) {
+	return { start: 0, limit: 1, isLastPage: true, values: [value] };
+}
+
+async function fetchSingleTicket(baseUrl: string, key: string) {
+	let requestCount = 0;
+	const fetchImpl: typeof fetch = async () => {
+		requestCount += 1;
+		return requestCount === 1
+			? Response.json({ issues: [issue(key)], isLast: true })
+			: Response.json({ start: 0, limit: 1, isLastPage: true, values: [metric('First response')] });
+	};
+	return fetchTickets({ ...config(), baseUrl }, fetchImpl, async () => {});
+}

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { once } from 'node:events';
 import { captureSnapshot, db, disconnect } from '../../src/backend/db.ts';
 import { createApp } from '../../src/backend/server.ts';
-import type { JiraTicket } from '../../src/lib/jira.ts';
+import type { JiraTicket } from '../../src/shared/jira.ts';
 
 // Explicit opt-in to a disposable database; never use a developer's DATABASE_URL.
 test('Postgres snapshot capture is idempotent and the HTTP report reads it', {
