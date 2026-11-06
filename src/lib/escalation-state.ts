@@ -4,7 +4,7 @@ import * as v from 'valibot';
 
 /**
  * The highest escalation level already notified per ticket
- * (`docs/brd-teams-bot-escalation.md` decision 6). This is the only persisted
+ * (`for-agents/brd-teams-bot-escalation.md` decision 6). This is the only persisted
  * state in the project and exists for exactly one reason: a level must never be
  * notified twice for the same ticket (`AGENTS.md`).
  *

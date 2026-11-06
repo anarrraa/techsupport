@@ -445,7 +445,7 @@ Dark mode: Background #1F2937, border #374151, hover background #111827
 
 ## Implementation Notes
 
-1. All colors and typography from `docs/design-system-dashboard.md`
+1. All colors and typography from `for-agents/design-system-dashboard.md`
 2. Messages are fully responsive: stack at mobile, side-by-side at desktop
 3. Admin Chat uses the same authentication/session as the Dashboard
 4. Typing indicators and loading states are optional nice-to-haves

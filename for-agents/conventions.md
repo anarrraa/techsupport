@@ -40,5 +40,5 @@ Patterns the code follows. Copy them.
 
 - Commit subject: plain English sentence stating the behavior, no prefix
   (`git log`: "One recipient's failure must not silence everyone else's reminder").
-- Roadmap work updates `docs/mvp-roadmap.md` in the same change (`AGENTS.md`).
-- Use `CONTEXT.md` vocabulary in names and messages.
+- Roadmap work updates `for-agents/roadmap.md` in the same change (`AGENTS.md`).
+- Use `for-agents/CONTEXT.md` vocabulary in names and messages.

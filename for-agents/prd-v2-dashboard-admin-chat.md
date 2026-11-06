@@ -1,5 +1,9 @@
 # PRD: Tech Success Dashboard + Admin Chat (V2)
 
+> Historical broader proposal. The current authorized internal monthly scope
+> is `for-agents/prd-monthly-dashboard.md`; owner workloads, client access,
+> authorization, chat, and operations telemetry require separate acceptance.
+
 ## Problem Statement
 
 Support leads currently lack a unified view of their team's SLA performance. To understand ticket load, response trends, or why the automated reminder system made a specific decision, they must navigate Jira directly, read opaque logs, or guess. This creates friction: 

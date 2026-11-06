@@ -12,7 +12,7 @@ import {
 import type { JiraTicket, SlaCycle } from '../../src/lib/jira.ts';
 
 /**
- * Every number asserted here is copied from `docs/sla-matrix.md`. The contract
+ * Every number asserted here is copied from `for-agents/sla-matrix.md`. The contract
  * states each level as "+Xh after the previous level's mark"; the module stores
  * the running totals, so the sums are restated independently below.
  */

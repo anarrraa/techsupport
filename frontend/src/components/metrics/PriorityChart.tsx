@@ -15,9 +15,10 @@ export function PriorityChart({ byPriority }: { byPriority: PriorityBreakdown[] 
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={byPriority} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" vertical={false} />
-            <XAxis dataKey="priority" tick={axis} stroke="var(--border)" />
+            <XAxis dataKey="priority" tickFormatter={(p) => t(`priority.${p}` as "priority.high")} tick={axis} stroke="var(--border)" />
             <YAxis tick={axis} allowDecimals={false} stroke="var(--border)" />
             <Tooltip
+              labelFormatter={(value) => t(`priority.${value}` as "priority.high")}
               cursor={{ fill: "var(--muted)" }}
               contentStyle={{
                 background: "var(--popover)",
@@ -29,6 +30,7 @@ export function PriorityChart({ byPriority }: { byPriority: PriorityBreakdown[] 
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="tickets" name={t("metric.tickets")} fill="var(--primary)" radius={[4, 4, 0, 0]} />
             <Bar dataKey="breaches" name={t("metric.breaches")} fill="var(--breached)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="resolutionBreached" name={t("metric.resolutionBreaches")} fill="var(--warning)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

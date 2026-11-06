@@ -12,7 +12,7 @@ import { buildDirectMessages } from './reminder-message.ts';
 
 /**
  * Who gets a direct message on this run, and what it says. Pure: it renders and
- * decides, it never sends, so every routing rule in `docs/sla-matrix.md` is unit
+ * decides, it never sends, so every routing rule in `for-agents/sla-matrix.md` is unit
  * testable without touching Teams.
  */
 

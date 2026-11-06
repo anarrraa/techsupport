@@ -12,14 +12,14 @@ the traps around them.
   and `serializeViews` sends only the JSON payload (`src/lib/ticket-digest.ts:347`).
   So with `REMINDER_USE_LLM_DIGEST=true` the model sees ticket JSON under the
   *intro* instructions. Off by default, so production is unaffected today.
-- **ADR 0001 precondition is now triggered.** `docs/adr/0001-reminder-intro-sandbox-tools.md`
+- **ADR 0001 precondition is now triggered.** `for-agents/adr/0001-reminder-intro-sandbox-tools.md`
   says: the first time request-derived text reaches a model, the default sandbox
   (shell + unrestricted network) must be narrowed *before* that ships. The digest
   sends summaries and client comments. Do not enable `REMINDER_USE_LLM_DIGEST`
   until this is resolved.
-- `CONTEXT.md` lists "digest" as an *Avoid* word for **Reminder**; the new module
+- `for-agents/CONTEXT.md` lists "digest" as an *Avoid* word for **Reminder**; the new module
   uses "Ticket Digest" for a different thing (per-request line). Don't rename
-  either without updating `CONTEXT.md`.
+  either without updating `for-agents/CONTEXT.md`.
 
 ## SLA / time
 
@@ -60,7 +60,7 @@ the traps around them.
   object id. The example file's nil UUID is rejected on purpose
   (`src/lib/escalation-config.ts:17,33`).
 - The sanitizer turns `>` into `&gt;`; correct for the webhook, possibly shown
-  literally in a bot DM (open item in `TODO.md`).
+  literally in a bot DM (open item in `for-agents/TODO.md`).
 
 ## Identity / privacy
 
@@ -76,7 +76,7 @@ the traps around them.
 
 ## Fail-visibly checks (don't remove)
 
-- `scanned === 0` outside dry-run throws (`src/workflows/jira-teams-reminder.ts:169`).
+- Empty scans warn and succeed without sends (user decision 2026-11-03); Jira request failures and missing configured metrics on non-empty scans still fail visibly.
 - Resolution SLA missing on all tickets throws (`:280`); no vendor participant on
   all tickets throws (`:290`).
 - `ESCALATION_SEED_ONLY` + dry-run throws (`:335`).

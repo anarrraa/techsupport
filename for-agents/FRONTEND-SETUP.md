@@ -41,7 +41,7 @@ npm run dev
 
 ## Project Structure
 
-Create the folder structure matching `/docs/implementation-stack.md`:
+Create the folder structure matching `/for-agents/implementation-stack.md`:
 
 ```bash
 mkdir -p src/{pages,components/{layout,metrics,tables,chat,common},hooks,utils}
@@ -399,4 +399,4 @@ export function TrendChart({ data }) {
 
 ## Next: Backend Setup
 
-See `docs/implementation-stack.md` for Express.js + Prisma backend.
+See `for-agents/implementation-stack.md` for Express.js + Prisma backend.

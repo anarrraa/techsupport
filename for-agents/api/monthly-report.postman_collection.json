@@ -1,0 +1,130 @@
+{
+  "info": {
+    "name": "Internal monthly snapshot reporting",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:5301"
+    }
+  ],
+  "item": [
+    {
+      "name": "Database health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"health reports connected database\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().database).to.eql(\"connected\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Monthly observations",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/reports/2026-10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"report has truthful coverage and metric partitions\", () => {",
+              "  pm.response.to.have.status(200); const r = pm.response.json();",
+              "  pm.expect(r.month).to.eql(\"2026-10\");",
+              "  pm.expect(r.firstResponseKnown + r.firstResponseMissing).to.eql(r.tickets);",
+              "  pm.expect(r.resolutionKnown + r.resolutionMissing).to.eql(r.tickets);",
+              "  pm.expect(r.coverage.capturedDays).to.be.within(0,31);",
+              "  if (r.snapshots === 0) { pm.expect(r.coverage.firstCapturedAt).to.eql(null); pm.expect(r.coverage.lastCapturedAt).to.eql(null); pm.expect(r.firstResponseBreachRate).to.eql(null); }",
+              "  pm.expect(r.team).to.eql([]); pm.expect(r.trend).to.eql([]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invalid month",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/reports/2026-13"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"invalid month rejected\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invalid format",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/reports/2026-10/export?format=csv"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"invalid format rejected\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PDF export",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/reports/2026-10/export?format=pdf"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"PDF attachment\", () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/pdf\"); pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"2026-10.pdf\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Excel export",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/reports/2026-10/export?format=excel"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Excel attachment\", () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"spreadsheetml\"); pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"2026-10.xlsx\"); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

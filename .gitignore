@@ -12,3 +12,8 @@ config/escalation.json
 .github/*
 # Generated Prisma client (npm run db:generate)
 src/backend/generated/
+# Client support report configs: signer names and phones. Only *.json.sample is committed.
+config/support-report/*.json
+
+# Client-confidential system documentation (docs-chat corpus). Never commit.
+documents/

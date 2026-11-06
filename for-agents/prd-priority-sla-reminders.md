@@ -11,7 +11,7 @@ data to an LLM, or repeat the same reminder on every scheduled run.
 
 ## Source of truth
 
-`docs/sla-matrix.md` defines the contractual goals. Jira Service Management owns
+`for-agents/sla-matrix.md` defines the contractual goals. Jira Service Management owns
 the matching SLA goals, working-hours calendar, pauses, and holidays. The workflow
 consumes JSM's First Response SLA cycle rather than calculating age from `created`
 or `updated`.
@@ -26,7 +26,7 @@ or `updated`.
    a 15-minute window every 60 minutes for a workflow scheduled every 15 minutes.
    **Superseded 2026-09-08:** the workflow runs twice a working day and the
    window is open, because a sparse schedule and a narrow window silently drop
-   most breaches. See `docs/mvp-roadmap.md`.
+   most breaches. See `for-agents/roadmap.md`.
 5. Sort by priority and then longest overdue; group by assignee.
 6. Produce factual ticket lines deterministically, escape Jira-controlled text,
    and split oversized messages.
@@ -35,7 +35,9 @@ or `updated`.
    aggregate counts.
 9. Bound external calls with timeouts, retries, pagination limits, and SLA lookup
    concurrency.
-10. Fail visibly when the configured SLA metric is absent from every scanned
+10. An empty scan warns and completes successfully without sending messages.
+    Invalid Jira queries and authentication failures still fail visibly.
+11. Fail visibly when the configured SLA metric is absent from every scanned
     issue.
 
 ## Delivery and security

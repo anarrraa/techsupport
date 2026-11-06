@@ -1,0 +1,14 @@
+{
+	"client": "Жишээ Клиент ХХК",
+	"contractor": "Жишээ Гүйцэтгэгч ХХК",
+	"groups": [
+		{ "name": "Үндсэн систем", "systems": ["Core"], "scope": "Үндсэн системийн дэмжлэг үйлчилгээ" },
+		{ "name": "Бусад систем", "systems": "*rest" }
+	],
+	"sections": { "Доголдол": "defects", "Сайжруулалт": "improvements", "Өөрчлөлтийн хүсэлт": "paid" },
+	"penaltyRates": { "Core": { "daily": 10000, "contract": "№ DEMO-1" } },
+	"improvementHoursPerMonth": 40,
+	"firstResponseTargetMinutes": 60,
+	"signer": { "organization": "Жишээ Гүйцэтгэгч ХХК", "name": "А. Жишээ", "title": "Төслийн менежер", "phone": "0000-0000" },
+	"receiver": { "organization": "Жишээ Клиент ХХК", "name": "Б. Жишээ", "title": "IT менежер" }
+}

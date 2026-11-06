@@ -4,10 +4,12 @@ A scheduled Flue workflow that reads Jira Service Management's authoritative
 **First Response SLA**, selects currently breached requests, and posts a concise
 developer-grouped reminder to a Microsoft Teams channel.
 
+Agent context and project documents are indexed in [for-agents/README.md](for-agents/README.md).
+
 ## Project status
 
 The implementation baseline exists, but the production MVP is not complete. See
-`docs/mvp-roadmap.md` for current evidence, release blockers, rollout steps, and
+`for-agents/roadmap.md` for current evidence, release blockers, rollout steps, and
 the definition of done. Repository agents must follow `AGENTS.md` before making
 changes.
 
@@ -68,7 +70,7 @@ loading in milliseconds instead of paying for the agent runtime.
 
 ## Authoritative SLA
 
-`docs/sla-matrix.md` is the business source of truth:
+`for-agents/sla-matrix.md` is the business source of truth:
 
 | Jira priority | First response |
 | --- | ---: |
@@ -117,7 +119,7 @@ implemented separately.
 ## Setup
 
 1. Configure the First Response SLA in Jira Service Management to match
-   `docs/sla-matrix.md`.
+   `for-agents/sla-matrix.md`.
 2. Create a Jira API token for an account that can read the selected requests and
    their SLA information.
 3. Optional: create a Teams channel Incoming Webhook for the aggregated channel
@@ -260,7 +262,7 @@ must not stop everyone else's reminders.
 
 ## Escalation
 
-`docs/sla-matrix.md` sections 2 and 3 are implemented in `src/lib/escalation.ts`:
+`for-agents/sla-matrix.md` sections 2 and 3 are implemented in `src/lib/escalation.ts`:
 elapsed working time on the JSM **resolution** metric selects the contractual
 level, and `config/escalation.json` names the person for it. Inside calendar
 hours escalation is sequential; off-hours Critical/High notifies L1 and L2
@@ -309,7 +311,7 @@ Teams. Dry-run logs counts only and does not log ticket content.
 
 ## Monthly dashboard backend
 
-`docs/prd-monthly-dashboard.md`. With `DATABASE_URL` set, every run (dry-run
+`for-agents/prd-monthly-dashboard.md`. With `DATABASE_URL` set, every run (dry-run
 included) stores one `SLASnapshot` row per scanned ticket: JSM's figures only,
 no summary, comment, or person. A capture failure is a warning, never a failed
 run. The API has no auth yet and binds to `127.0.0.1`.
@@ -320,6 +322,38 @@ docker run -d --name dashboard-pg -p 127.0.0.1:5433:5432 \
 export DATABASE_URL=postgres://postgres@localhost:5433/dashboard
 npm run db:push        # schema-first: prisma/schema.prisma
 npm run dev:backend    # :3001, GET /health, GET /api/reports/YYYY-MM
+```
+
+Start the frontend in a second terminal after starting the backend:
+
+```sh
+cd frontend
+npm ci
+npm run dev          # http://127.0.0.1:5173/dashboard; /api proxies to :3001
+```
+
+Root `npm run dev` starts the Flue workflow development server, not the dashboard.
+The report supports UTC month selection, refresh, both SLA breach counts,
+first/latest capture dates, capture days, missing SLA flags, and PDF/Excel
+exports. Database reads reject months larger than 100,000 snapshots with HTTP
+413 rather than displaying a partial result. API contract and smoke checks:
+[monthly-report-api.md](for-agents/monthly-report-api.md).
+
+The dashboard, archive, PDF, and Excel exports read stored snapshots. There is
+no sample-data fallback: empty months have zero tickets and unavailable databases
+return HTTP 503. These are sampled-ticket metrics, not complete historical SLA
+compliance: no data exists before capture starts, and closed tickets outside the
+configured JQL are not newly captured.
+
+For scheduled capture, configure a reachable PostgreSQL database in the GitHub
+`DATABASE_URL` secret after applying the schema. The workflow passes that secret
+to capture; a missing URL disables capture. This deployment remains unverified.
+Keep the unauthenticated report API bound to localhost.
+
+Optional PostgreSQL regression against a disposable database:
+
+```sh
+TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5433/dashboard node --test tests/backend/db.test.ts
 ```
 
 ## GitHub Actions

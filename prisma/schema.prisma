@@ -1,4 +1,4 @@
-// Monthly dashboard store: docs/prd-monthly-dashboard.md.
+// Monthly dashboard store: for-agents/prd-monthly-dashboard.md.
 // Holds what JSM reported, never free text: no summary, comment, or person.
 
 generator client {

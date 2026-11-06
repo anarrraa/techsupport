@@ -48,8 +48,13 @@ export function monthRange(month: string): { start: Date; end: Date } | null {
 	const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
 	if (!match) return null;
 	const year = Number(match[1]);
+	if (year === 0) return null;
 	const index = Number(match[2]) - 1;
-	return { start: new Date(Date.UTC(year, index, 1)), end: new Date(Date.UTC(year, index + 1, 1)) };
+	const start = new Date(0);
+	start.setUTCFullYear(year, index, 1);
+	const end = new Date(start);
+	end.setUTCMonth(index + 1);
+	return { start, end };
 }
 
 interface BreachCounts {
@@ -58,7 +63,23 @@ interface BreachCounts {
 	resolutionBreached: number;
 }
 
+export interface CaptureCoverage {
+	firstCapturedAt: string | null;
+	lastCapturedAt: string | null;
+	capturedDays: number;
+}
+
+export const MAX_MONTHLY_SNAPSHOTS = 100_000;
+export class MonthlyReportLimitError extends Error {
+	constructor() { super('Monthly report exceeds snapshot limit'); this.name = 'MonthlyReportLimitError'; }
+}
+
 export interface MonthlyMetrics extends BreachCounts {
+	coverage: CaptureCoverage;
+	firstResponseKnown: number;
+	firstResponseMissing: number;
+	resolutionKnown: number;
+	resolutionMissing: number;
 	month: string;
 	snapshots: number;
 	firstResponseBreachRate: number | null;
@@ -71,15 +92,29 @@ export interface MonthlyMetrics extends BreachCounts {
  * Breach is JSM's flag on that snapshot; nothing here recomputes it.
  */
 export function aggregateMonth(month: string, rows: SnapshotRow[]): MonthlyMetrics {
+	const range = monthRange(month);
+	if (!range) throw new Error('month must be YYYY-MM');
+	rows = rows.filter(row => row.capturedAt >= range.start && row.capturedAt < range.end);
+	if (rows.length > MAX_MONTHLY_SNAPSHOTS) throw new MonthlyReportLimitError();
 	const latest = new Map<string, SnapshotRow>();
+	let first: Date | null = null;
+	let last: Date | null = null;
+	const days = new Set<string>();
 	for (const row of rows) {
+		if (!first || row.capturedAt < first) first = row.capturedAt;
+		if (!last || row.capturedAt > last) last = row.capturedAt;
+		days.add(row.capturedAt.toISOString().slice(0, 10));
 		const seen = latest.get(row.ticketKey);
 		if (!seen || row.capturedAt > seen.capturedAt) latest.set(row.ticketKey, row);
 	}
 
 	const total: BreachCounts = { tickets: 0, firstResponseBreached: 0, resolutionBreached: 0 };
 	const byPriority: Record<string, BreachCounts> = Object.create(null) as Record<string, BreachCounts>;
+	let firstResponseKnown = 0;
+	let resolutionKnown = 0;
 	for (const row of latest.values()) {
+		if (row.firstResponseBreached !== null) firstResponseKnown++;
+		if (row.resolutionBreached !== null) resolutionKnown++;
 		const bucket = (byPriority[row.priority] ??= {
 			tickets: 0,
 			firstResponseBreached: 0,
@@ -95,6 +130,11 @@ export function aggregateMonth(month: string, rows: SnapshotRow[]): MonthlyMetri
 	return {
 		month,
 		snapshots: rows.length,
+		coverage: { firstCapturedAt: first?.toISOString() ?? null, lastCapturedAt: last?.toISOString() ?? null, capturedDays: days.size },
+		firstResponseKnown,
+		firstResponseMissing: latest.size - firstResponseKnown,
+		resolutionKnown,
+		resolutionMissing: latest.size - resolutionKnown,
 		...total,
 		firstResponseBreachRate: rate(total.firstResponseBreached, total.tickets),
 		resolutionBreachRate: rate(total.resolutionBreached, total.tickets),

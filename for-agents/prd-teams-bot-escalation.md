@@ -1,19 +1,19 @@
 # PRD: Personal Teams bot — direct SLA reminders and contract escalation (V2)
 
 Status: proposed, blocked on the open decisions in
-`docs/brd-teams-bot-escalation.md`
+`for-agents/brd-teams-bot-escalation.md`
 
 ## Problem
 
 The MVP posts one aggregated Teams channel message per breach cycle. The
-contract in `docs/sla-matrix.md` requires notifying the individually
+contract in `for-agents/sla-matrix.md` requires notifying the individually
 responsible person and escalating through five levels (L1-L5) on a fixed
 timeline, with different rules for working hours and off-hours. See
-`docs/brd-teams-bot-escalation.md` for the full business case.
+`for-agents/brd-teams-bot-escalation.md` for the full business case.
 
 ## Source of truth
 
-`docs/sla-matrix.md` sections 1-3 define, per Jira priority, the
+`for-agents/sla-matrix.md` sections 1-3 define, per Jira priority, the
 first-response window, the L1-L5 escalation timeline, and the working-hours
 vs off-hours notification rules. Jira Service Management remains the sole
 source of SLA breach, pause, and calendar state, unchanged from the MVP
@@ -35,7 +35,7 @@ decisions are answered)
    `src/lib/jira.ts` drops `accountType != 'atlassian'` before routing sees a
    request. The channel post is now optional rather than assumed.
 2. Track elapsed time since breach against the escalation timeline in
-   `docs/sla-matrix.md` section 2, keyed by contract severity via the
+   `for-agents/sla-matrix.md` section 2, keyed by contract severity via the
    existing priority mapping table.
 3. When a ticket remains unresolved past each level's threshold, notify the
    next level's contact (L2 -> L3 -> L4 -> L5), resolved through the contact
@@ -79,7 +79,7 @@ decisions are answered)
 answered)
 
 - Escalation-level selection is unit-tested against every threshold in
-  `docs/sla-matrix.md` section 2, for both working-hours and off-hours.
+  `for-agents/sla-matrix.md` section 2, for both working-hours and off-hours.
 - Direct-message content passes through the same sanitize/escape/chunk tests
   as the existing channel message.
 - Dry-run sends zero direct messages and logs counts only.
@@ -88,9 +88,9 @@ answered)
 
 ## Dependencies / blockers
 
-- `docs/mvp-roadmap.md` Milestone 3 is still open: the integration account's
+- `for-agents/roadmap.md` Milestone 3 is still open: the integration account's
   JSM SLA API access currently returns `403 Forbidden`. This blocks live
   verification of V2 too, since it reads the same SLA data.
-- The four open decisions in `docs/brd-teams-bot-escalation.md` must be
-  answered before any implementation task in `TODO.md` starts, per the
+- The four open decisions in `for-agents/brd-teams-bot-escalation.md` must be
+  answered before any implementation task in `for-agents/TODO.md` starts, per the
   `AGENTS.md` scope guard.

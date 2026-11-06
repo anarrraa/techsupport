@@ -1,19 +1,19 @@
 # MVP completion roadmap
 
-Last reviewed: 2026-09-07
+Last reviewed: 2026-11-06
 
 ## Goal
 
 Ship the contract-based First Response SLA reminder described in
-`docs/prd-priority-sla-reminders.md` as a production-verified workflow. Jira
+`for-agents/prd-priority-sla-reminders.md` as a production-verified workflow. Jira
 Service Management remains the source of truth for SLA state and calendar
 calculations. This roadmap tracks release readiness; the PRD tracks product
 requirements.
 
 ## Current verdict
 
-**Baseline implemented; production MVP not complete. V2 bot implemented, not
-verified.**
+**Baseline implemented; production MVP acceptance remains open. Teams bot has
+verified live delivery; dashboard database integration is locally verified.**
 
 The Jira and SLA blockers that masked each other are cleared: `JIRA_JQL` is
 scoped to DC and the integration account reads SLA data. Local acceptance
@@ -23,11 +23,52 @@ branches are covered.
 What is left for the MVP is external verification, not code: a controlled
 Jira-to-Teams delivery and observed scheduled runs (milestones 3 and 4).
 
-The V2 personal-bot and escalation code landed on 2026-09-07 and is unit tested,
-but **no message has been sent from this codebase**. It is gated on three
-administrator actions — publishing the Teams app package, configuring the OIDC
-federated credential, and collecting Entra object ids — tracked in V2 milestone
-2 below.
+The V2 personal-bot and escalation code landed on 2026-09-07. Live delivery
+was recorded on 2026-09-08; on 2026-11-03, scheduled run
+[41598181147](https://github.com/anarrraa/techsupport/actions/runs/41598181147)
+succeeded and logged 3 direct messages to 3 recipients and one L2 crossing.
+This verifies transport execution, not recipient-side rendering or every
+production SLA/calendar acceptance check. Historical unchecked prerequisites
+below must not be read as proof they are still absent.
+
+## End state and phases — set 2026-11-06
+
+**End state.** One internal "Tech Success" system for the Zerotech support team:
+
+1. A scheduled workflow reads Jira SLA state and reminds/escalates (L2-L5) in
+   Teams, by channel post and personal bot message. Production verified.
+2. One internal web app, behind Microsoft Entra login for staff only:
+   monthly SLA dashboard with PDF/Excel export, the client support report
+   generator, and a chat that answers from `documents/` (RAG).
+3. Hosted and running unattended: backend + frontend, Postgres with pgvector,
+   snapshot capture from every scheduled run.
+
+Jira stays the only SLA authority throughout. Client login, live operations
+telemetry, and Jira-backed chat answers are not part of the end state.
+
+**Phases.** Scope per phase and completion reports: `plan/`. "Human" = blocked on an admin, the client, or the user, not on code;
+those run alongside the code phases.
+
+| # | Phase | Kind | Done when | Detail |
+| --- | --- | --- | --- | --- |
+| 0 | Clean slate: gitignore `documents/`, commit current work, rotate `TEAMS_BOT_APP_PASSWORD`, remove stray root files `f`/`fd` | User | Clean `git status`, password rotated | "Restructure + documentation chat", TODO.md |
+| 1 | MVP production acceptance: JSM goals/calendar/metric confirmed, controlled live delivery, 4 scheduled runs observed | Human | MVP definition of done all checked | Milestones 3-4 |
+| 2 | Restructure: backend feature folders, frontend `features/`, shared types | Code | Same test counts pass after each move | 2.1-2.3 |
+| 3 | Documentation chat (pgvector RAG, Vertex) | Code + user GCP | Real questions answered with correct sources | 3.1-3.6, `prd-docs-chat.md` |
+| 4 | Bot production: catalog publish, Graph consent, GitHub OIDC, escalation directory, seeded state, two-person staged run, Low L5 answer, fortnight of window data | Human | V2 milestone 2 all checked | V2 milestones 1-2, TODO.md |
+| 5 | Hosting + auth: PRD for Entra login; host chosen; deploy app + DB; scheduled capture writes to it | Code + user decision | Staff log in to the hosted app; a scheduled run's snapshot appears | Needs a PRD update first (auth is out of scope today) |
+| 6 | Reporting acceptance: browser/keyboard check, real client export through the UI, staff side-by-side review, `Time to first response` format | Human + code fixes | Support staff sign off one month's reports | "Internal reporting completion", "Client support report generator" |
+
+Order: 0 → 2 → 3 → 5 → 6 for code; 1 and 4 run in parallel as soon as the
+people they wait on are available. Phase 5 must precede any exposure of chat
+or reports beyond localhost.
+
+Open decisions (record answers here):
+
+- Host for phase 5. Recommendation: Cloud Run + Cloud SQL Postgres (supports
+  pgvector) in the same GCP project as Vertex, so one set of credentials. Not
+  yet chosen.
+- Entra group that may log in.
 
 ## Evidence snapshot
 
@@ -35,9 +76,9 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 141 passed, 0 failed on 2026-10-19 |
-| Type checking | Pass | `npm run typecheck` exit 0 on 2026-10-19 |
-| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-10-19 |
+| Unit tests | Pass | `npm test`: 147 passed, 0 failed, 1 opt-in database check skipped on 2026-11-04 with Node 22.19.0/npm 10.9.3; the database check separately passed against disposable PostgreSQL 16 |
+| Type checking | Pass | `npm run typecheck` exit 0 on 2026-11-04 |
+| Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-04 |
 | GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
 | **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
@@ -52,7 +93,7 @@ federated credential, and collecting Entra object ids — tracked in V2 mileston
 | Escalation message quotes the right clock | Fixed 2026-09-08 | The first preview printed `0м хэтэрсэн` on escalation rows: it quoted the first-response clock on a message raised by the resolution clock, and a request past its resolution mark can have no first-response cycle at all. Escalation rows now read the resolution cycle and say `шийдэгдээгүй`; DC-811 went from `0м` to `158ц` |
 | Overdue uses working hours | Pass | On 2026-08-26 `elapsedMinutes` from JSM used instead of clock time |
 | Empty scan detection | Pass | On 2026-08-26 `scanned: 0` in non-dry-run mode throws visible error |
-| V2 bot and escalation code | Implemented, unverified | Added 2026-09-07 with unit coverage for every `docs/sla-matrix.md` section 2 threshold; no live send |
+| V2 bot and escalation code | Live transport verified | Added 2026-09-07; live send recorded 2026-09-08 and successful scheduled delivery checked 2026-11-03 (run `41598181147`). Full rollout acceptance remains open |
 | Live bot direct message from this codebase | **Pass** | On 2026-09-08 `npm run verify:bot -- <object-id>` printed `Bot Framework and Graph tokens acquired` then `Direct message delivered`. First message this codebase has ever sent. The full chain ran: client-credentials tokens for both scopes, catalog lookup by external id, install-for-user, personal chat lookup, activity post |
 | Graph application consent | Pass | Implied by the run above: the Graph token was issued and the catalog and installation calls succeeded, so `AppCatalog.Read.All` and the installation permission are consented |
 | First-response reminders route to participants | Pass | Changed 2026-09-08 on the user's instruction: the assignee is the triaging support team, the participants are who acts. A dry-run plans 6 recipients across the open DC requests with `unmappedRecipients: 0`. The three assignee-only support accounts are no longer in the directory and can no longer be messaged |
@@ -145,17 +186,10 @@ document or CI logs.
 
 - [x] Point `JIRA_JQL` at a service desk project that exists.
   - Set 2026-08-26: `project = DC AND statusCategory != Done AND assignee is not EMPTY ORDER BY priority DESC, updated ASC`. Dry-run scans real DC issues.
-- [ ] **Decide what an empty scan should mean.** `scanned === 0` outside dry-run
-      throws, added 2026-08-26 so a misconfigured `JIRA_JQL` could not look
-      healthy. It cannot distinguish a broken query from a genuinely empty
-      queue, so a day when the team has closed everything produces a red
-      scheduled run, twice a day, until a request appears. A wholly invalid JQL
-      is already rejected by Jira with a 400, which throws on its own; what this
-      guard adds is catching a *valid* query that matches the wrong thing.
-      Options: keep it, warn and exit clean, or fail only after N consecutive
-      empty runs (the state file could hold the count). Left as it stands — it
-      was a deliberate decision, and DC has 26 open requests, so it is not
-      imminent.
+- [x] **Decide what an empty scan should mean.** User chose warn and succeed
+      on 2026-11-03. Zero tickets now returns aggregate zero counts and no
+      channel or bot sends. Workflow regression test passes. Jira errors and
+      missing configured metrics on non-empty scans still fail visibly.
 - [ ] **Make the resolution clock pause while waiting on the client.** Diagnosed
       2026-09-08; `npm run trace` reports `paused clocks: first response 0,
       resolution 0` and `statuses in play: Open=26`.
@@ -192,7 +226,7 @@ document or CI logs.
       No code change: `src/lib/sla.ts` and `src/lib/escalation.ts` already
       exclude a paused cycle, with tests. The application must not second-guess
       Jira's clock (`AGENTS.md`).
-- [ ] Confirm JSM First Response goals match `docs/sla-matrix.md`.
+- [ ] Confirm JSM First Response goals match `for-agents/sla-matrix.md`.
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
 - [x] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.
   - Confirmed 2026-08-20 through `GET /rest/api/3/field`, which lists SLA metrics
@@ -256,7 +290,7 @@ The MVP is done only when all of the following are true:
 
 Scope: the direct-message transport only. Escalation levels, the contact
 directory, and off-hours routing stay blocked on the open decisions in
-`docs/brd-teams-bot-escalation.md`. Do not implement them here.
+`for-agents/brd-teams-bot-escalation.md`. Do not implement them here.
 
 ### Verified delivery mechanism
 
@@ -301,7 +335,7 @@ production evidence: no message has been sent from this codebase.
 | Module | What it owns |
 | --- | --- |
 | `src/lib/teams-bot.ts` | Bot Connector token (client secret or GitHub OIDC), conversation create, activity post, distinct 403 reasons |
-| `src/lib/escalation.ts` | `docs/sla-matrix.md` section 2 thresholds and section 3 routing, pure |
+| `src/lib/escalation.ts` | `for-agents/sla-matrix.md` section 2 thresholds and section 3 routing, pure |
 | `src/lib/escalation-config.ts` | `config/escalation.json` schema, load-time referential integrity, contact resolution that fails visibly |
 | `src/lib/escalation-state.ts` | highest level notified per ticket, restored and saved through `actions/cache` |
 | `src/lib/direct-messages.ts` | who gets which message, pure |
@@ -323,13 +357,13 @@ escalation path, which is what contract section 3 describes.
 
 ### Remaining before bot code enters `src/`
 
-- [x] Answer every open decision in `docs/brd-teams-bot-escalation.md`,
+- [x] Answer every open decision in `for-agents/brd-teams-bot-escalation.md`,
       including decisions 5 and 6 added by this milestone. Resolved
       2026-08-24: contact directory and identity mapping both live in one
       repo config file (person directory + per-project escalation-level
       mapping); off-hours step surfaces the on-call contact only, no paging
       integration; escalation state persists in a GitHub Actions cache keyed
-      per ticket. See `docs/brd-teams-bot-escalation.md` decisions 2-6.
+      per ticket. See `for-agents/brd-teams-bot-escalation.md` decisions 2-6.
 - [x] Design and add the config file itself (schema for the person directory
       and the per-project/team L2-L5 mapping decided above). Added 2026-09-07 as
       `config/escalation.example.json`, validated by `src/lib/escalation-config.ts`.
@@ -427,7 +461,9 @@ infrastructure for.
       `User.Read.All`.
 - [ ] Configure the GitHub OIDC federated credential on the Entra app
       registration (audience `api://AzureADTokenExchange`).
-- [ ] Populate `config/escalation.json` with real object ids and commit it.
+- [ ] Verify the private escalation directory contains all intended object ids.
+      Never commit it; deliver it through `ESCALATION_DIRECTORY_JSON` as described
+      in the evidence snapshot. Prior pilot configuration is recorded there.
 - [ ] Run `npm run verify:bot -- <object-id>` and record the outcome here.
 - [ ] Seed the escalation state before the first live run:
       `ESCALATION_SEED_ONLY=true` with `REMINDER_DRY_RUN` unset. A dry-run on
@@ -453,7 +489,7 @@ infrastructure for.
 
 ### V2 milestone 3: monthly dashboard backend
 
-Requirements: `docs/prd-monthly-dashboard.md`. Approved 2026-10-19 by the user
+Requirements: `for-agents/prd-monthly-dashboard.md`. Approved 2026-10-19 by the user
 ahead of the open MVP milestones 3 and 4, which stay open.
 
 - [x] Prisma schema (`SLASnapshot`, `MonthlyReport`, `ChatMessage`) applies with
@@ -473,7 +509,128 @@ ahead of the open MVP milestones 3 and 4, which stay open.
       breaches) from synthetic `DEMO-*` snapshots, fetch 200, no console errors.
       Team, daily trend, prior month, and response times stay empty: the API
       does not provide them.
+- [x] Restore database-backed reports and exports, preserving the frontend.
+      Approved 2026-11-03. Removed hardcoded report/export data and random
+      archive metrics; Prisma uses the generated client and PostgreSQL adapter.
+      PostgreSQL 16 check on a disposable local database passed capture,
+      duplicate suppression, health, and HTTP report reads with synthetic data.
+      HTTP regressions cover exports, latest snapshots, invalid inputs, empty
+      data, and sanitized 503 responses. Frontend typecheck, 6 tests, and build
+      passed 2026-11-03; missing snapshot typing, a missing translation, and
+      pre-existing unused imports were corrected. Postman requests against the
+      local server passed 2 assertions (connected health and truthful empty
+      report), exit 0. The installed CLI does not support `postman status`. Optional `DATABASE_URL` secret is wired
+      into the local workflow file; not deployed or configured in GitHub.
 - [ ] Capture verified against a real scheduled run's database (external).
+
+## Internal reporting completion — 2026-11-04
+
+User authorized a research agent followed by an implementation agent to complete
+features, database integration, and dashboard layouts. The implementation scope
+is the internal monthly snapshot experience in `for-agents/prd-monthly-dashboard.md`;
+MVP external acceptance remains open. Existing product design and MN/EN apply.
+
+- [x] Month selection, refresh, coverage metadata, and both SLA metrics.
+- [x] Missing-metric disclosure and honest observed-data labels/exports.
+- [x] Bounded monthly reads; visible errors instead of truncated reports.
+- [x] Implement report/archive layouts with MN/EN, theme tokens, responsive
+      structure, labeled controls, reduced-motion support, and export errors.
+- [x] Query/HTTP/export/frontend regressions and disposable PostgreSQL evidence.
+- [ ] Browser visual, viewport, and keyboard acceptance (not executed).
+- [ ] Production database provisioning/deployment and scheduled capture (external).
+
+Executed evidence, 2026-11-04:
+
+- Research agent inspected code and recommended the snapshot-only scope; builder
+  implemented it; parent reviewed and corrected small contrast/adapter issues.
+- Pinned Node 22.19.0/npm 10.9.3 toolchain verification passed. Root `npm test`
+  passed 147, failed 0, skipped 1 opt-in DB test; typecheck and build exit 0.
+- Frontend `npm test` passed 10, failed 0; typecheck and build exit 0 using the
+  same pinned toolchain. Build retains a ~640 KB chunk-size advisory.
+- `npm run db:push` applied the existing schema to disposable PostgreSQL 16.
+  Opt-in database test passed capture, duplicate suppression, health, and HTTP
+  reads under pinned Node 22.19.0. No schema expansion or real Jira rows used.
+- Local Postman collection passed 6 requests / 6 assertions, exit 0, with cloud
+  event reporting disabled. Contract/checks: `for-agents/monthly-report-api.md`.
+- A real PostgreSQL month containing 100,001 synthetic rows returned 413 for
+  report, PDF, and Excel; no partial result. Fixtures were deleted afterward.
+- Ad hoc server rendering verified selected month, capture dates, missing-flag
+  labels, and PDF/Excel controls in MN/EN. This is not browser visual evidence.
+- Historical priority schemes stay in API/export totals; the mapped chart/table
+  explicitly disclose their narrower contract-priority scope.
+
+Remaining: production PostgreSQL and `DATABASE_URL`, release of the local
+changes, scheduled capture evidence, Jira pause/calendar/goals, recipient-side
+Teams rendering, four controlled scheduled runs, and Low L5 business decision.
+No commits, pushes, secret changes, live messages, or production deployment were
+performed in this change. Local test server/database were temporary.
+
+## Client support report generator — authorized 2026-11-05
+
+User explicitly prioritized this ahead of remaining MVP acceptance. Requirements:
+`for-agents/prd-support-report.md`. Stateless upload → per-group PDF.
+
+- [x] `buildSupportReport` (pure, TDD, synthetic fixtures): grouping, sections, period split, penalties, hours.
+      Evidence 2026-11-05: `tests/lib/support-report.test.ts` 12 pass; root `npm test` 159 pass / 0 fail / 1 skipped;
+      typecheck and build exit 0. Not yet run against a real export.
+- [x] Row reader for xlsx and csv (exceljs), required-column error.
+      Evidence 2026-11-05: `tests/backend/support-report-input.test.ts` 3 pass; root `npm test` 164 pass / 0 fail /
+      1 skipped; typecheck and build exit 0. Local check on the real Sept DC export (not committed): open list,
+      improvements and type counts match the signed "Бусад систем" PDF; the only gap is DC-944, which staff removed
+      by hand. A typo'd `Resolved at` (DC-919) now fails visibly instead of counting as open.
+- [x] PDF renderer: Cyrillic TTF, bar charts, signatures.
+      Evidence 2026-11-05: `tests/backend/support-report-pdf.test.ts` pass (valid PDF, embedded Noto Sans,
+      deterministic bytes, no number-only pages); root `npm test` 166 pass / 0 fail / 1 skipped; typecheck and build
+      exit 0. Local render of the real Sept DC export (not committed; DC-919 typo patched, DC-944 marked `Хасах`):
+      totals 43, IT 33 / Change 10, 86% / 37 resolved, 6 open, defects 15 / 12 / 3 match the signed PDF.
+      Visual check at 60 dpi only; no side-by-side review by support staff yet.
+- [x] Upload endpoint (in-memory) + `ReportsPage` generate form; local gitignored client configs.
+      Evidence 2026-11-06: `GET /api/support-reports/configs`, `POST /api/support-reports/period`,
+      `POST /api/support-reports?config&from&to&group` in `src/backend/server.ts` (10 MB raw body, 20 000-row cap → 413,
+      input errors → 400 with the reason, only the status is logged); configs in gitignored
+      `config/support-report/<id>.json`, synthetic `example.json.sample` committed. After a separate review
+      (CHANGES-REQUESTED, all blocking findings fixed: typed `SupportInputError`, server faults → 500 without details,
+      `Object.hasOwn` config lookup, one download button per group, stale-period race): `tests/backend/server.test.ts`
+      9 pass; root `npm test` 171 pass / 0 fail / 1 skipped; typecheck and build exit 0; frontend `npm test` 12 pass and
+      `npm run build` exit 0. Local run with a synthetic CSV: curl and the `/reports` form (agent-browser) downloaded a
+      valid PDF from each group button (Cyrillic renders), and a file missing columns shows "Missing required columns: …"
+      on upload with the buttons disabled.
+      Not yet run against a real client export through the UI.
+- [ ] Confirm `Time to first response` export format with a real sample.
+
+## Restructure + documentation chat — authorized 2026-11-06
+
+User asked for a feature-folder restructure (backend and frontend) and a RAG chat
+over `documents/` (`for-agents/prd-docs-chat.md`). No DDD/Clean layers and no
+monorepo tooling: `src/lib` is already a framework-free core, and the repo is
+already one git repo with two packages. Numbers match "End state and phases"
+above; each item is its own commit and ends
+with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
+`npm test` / `npm run build` when it changes).
+
+- [x] 0.1 gitignore `documents/` (client-confidential, public repo). Report: `plan/phase-0-clean-slate/reports/2026-11-06-0.1.md`.
+- [x] 0.2 commit the current uncommitted work. Report: `plan/phase-0-clean-slate/reports/2026-11-06-0.2.md`.
+- [ ] 2.1 Backend feature folders. `src/shared/` (config, http, jira, teams-bot,
+      teams-webhook), `src/reminder/`, `src/escalation/`, `src/monthly-report/`,
+      `src/support-report/`; `agents/` and `workflows/` stay (Flue discovery);
+      `backend/server.ts` keeps routes only. `tests/` mirrors it; update the
+      `npm test` globs and every `src/lib/...` path in `AGENTS.md` and `for-agents/`.
+      Pure files stay framework-free; pdfkit/exceljs/express/Prisma only in
+      `*-pdf`, `*-input`, `db`, `export`, `server`.
+- [ ] 2.2 Frontend `features/` (monthly-report, support-report, reports-archive,
+      chat, teams) + `shared/`; `components/ui/` stays (shadcn).
+- [ ] 2.3 Replace the frontend's copied report types with `import type` from
+      the backend's pure files; delete the copies.
+- [ ] 3.1 Enable pgvector and add `DocChunk` to `prisma/schema.prisma`. DB change, needs user approval.
+- [ ] 3.2 Pure Markdown chunker `src/docs-chat/chunk.ts` (TDD).
+- [ ] 3.3 Vertex adapter (embed + generate, bounded) and `npm run docs:index`
+      with content-hash skip.
+- [ ] 3.4 `POST /api/chat` → embed question → top-k by cosine (optional
+      client filter) → grounded answer + sources; tests with a fake adapter.
+- [ ] 3.5 Wire `AdminChatPage` to the endpoint (replace the stub in
+      `api-client.ts`), show sources and a client picker.
+- [ ] 3.6 Live check — index the real `documents/` with the user's GCP
+      project, ask known questions, record results here. Not done until executed.
 
 ## Post-MVP direction
 
@@ -481,6 +638,13 @@ The Tech Success dashboard, Microsoft Entra group authorization, durable
 notification ledger, personal Teams bot messages, read receipts, acknowledgements,
 and analytics database are a separate V2. Do not add them to this MVP unless the
 PRD and this roadmap are explicitly revised first.
+
+## Agent context organization
+
+On 2026-11-03, project requirements, SLA matrix, task list, setup/design
+references, and this roadmap were consolidated in `for-agents/` at the user's
+request. `AGENTS.md` remains the root entry point; `for-agents/README.md` indexes
+the documents. This is a file organization change, not release acceptance.
 
 ## Roadmap update protocol
 

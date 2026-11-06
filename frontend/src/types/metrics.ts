@@ -14,6 +14,7 @@ export interface PriorityBreakdown {
   priority: Priority;
   tickets: number;
   breaches: number;
+  resolutionBreached: number;
   avgFirstResponseMinutes: number | null; // null: backend has no response times yet
   goalMinutes: number | null;
 }

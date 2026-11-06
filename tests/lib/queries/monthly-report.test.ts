@@ -51,6 +51,8 @@ test('each ticket counts once, as its latest snapshot reported it', () => {
 	assert.deepEqual(aggregateMonth('2026-10', rows), {
 		month: '2026-10',
 		snapshots: 4,
+		coverage: { firstCapturedAt: '2026-10-01T02:00:00.000Z', lastCapturedAt: '2026-10-03T02:00:00.000Z', capturedDays: 3 },
+		firstResponseKnown: 3, firstResponseMissing: 0, resolutionKnown: 2, resolutionMissing: 1,
 		tickets: 3,
 		firstResponseBreached: 2,
 		resolutionBreached: 1,
@@ -109,3 +111,30 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		...overrides,
 	};
 }
+
+
+test('early years do not map into 1900 and boundaries remain UTC', () => {
+	assert.equal(monthRange('0001-01')?.start.toISOString(), '0001-01-01T00:00:00.000Z');
+	assert.equal(monthRange('0099-12')?.end.toISOString(), '0100-01-01T00:00:00.000Z');
+	assert.equal(monthRange('9999-12')?.end.getUTCFullYear(), 10000);
+	assert.equal(monthRange('0000-01'), null);
+});
+
+test('coverage uses all in-month observations while known flags use latest tickets only', () => {
+	const rows = [
+		row('A-1', 'High', '2026-09-30T23:59:59Z', true, true),
+		row('A-1', 'High', '2026-10-01T00:00:00Z', true, true),
+		{ ...row('A-1', 'High', '2026-10-02T00:00:00Z', false, null), firstResponseBreached: null },
+		row('A-2', 'Low', '2026-10-02T01:00:00Z', false, false),
+		row('A-3', 'Low', '2026-11-01T00:00:00Z', true, true),
+	];
+	const metrics = aggregateMonth('2026-10', rows);
+	assert.equal(metrics.snapshots, 3);
+	assert.equal(metrics.tickets, 2);
+	assert.deepEqual(metrics.coverage, { firstCapturedAt: '2026-10-01T00:00:00.000Z', lastCapturedAt: '2026-10-02T01:00:00.000Z', capturedDays: 2 });
+	assert.equal(metrics.firstResponseKnown, 1);
+	assert.equal(metrics.firstResponseMissing, 1);
+	assert.equal(metrics.resolutionKnown, 1);
+	assert.equal(metrics.resolutionMissing, 1);
+	assert.equal(metrics.firstResponseBreached, 0);
+});

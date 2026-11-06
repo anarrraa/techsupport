@@ -3,12 +3,12 @@
 Status: proposed (V2). Delivery mechanism resolved and verified 2026-08-20; all
 six open decisions resolved 2026-08-24. Implementation is still blocked on the
 infrastructure/admin follow-ups tracked in the V2 milestone in
-`docs/mvp-roadmap.md` (recipient installation model, per-recipient Entra
+`for-agents/roadmap.md` (recipient installation model, per-recipient Entra
 object ids, and the config file itself) — see `AGENTS.md` scope guard.
 
 ## Business context
 
-`docs/sla-matrix.md` (extracted from Хавсралт 6 of the service contract) is the
+`for-agents/sla-matrix.md` (extracted from Хавсралт 6 of the service contract) is the
 contractual source of truth. It defines per-priority first-response windows and
 a five-level escalation timeline (L1 support -> L2 developer -> L3 team lead ->
 L4 CTO -> L5 executive), plus different notification rules for working hours
@@ -16,13 +16,13 @@ versus off-hours.
 
 ## Business problem
 
-The MVP (`docs/prd-priority-sla-reminders.md`) posts one aggregated message to a
+The MVP (`for-agents/prd-priority-sla-reminders.md`) posts one aggregated message to a
 Teams channel when tickets breach the first response SLA. The workflow is
 scheduled every 15 minutes, but each breach has one delivery window per repeat
 interval, 60 minutes by default. **Superseded 2026-09-08:** the workflow now
 runs twice a working day and the delivery window is open, so the schedule is the
 cadence. The MVP is an implemented baseline, not yet
-production verified; see `docs/mvp-roadmap.md`. It does not:
+production verified; see `for-agents/roadmap.md`. It does not:
 
 - address the individually responsible person directly,
 - escalate to the next contractual level when a ticket stays unresolved,
@@ -58,7 +58,7 @@ responsible person being asked directly.
 - Every first-response breach produces a direct message within one scheduled
   run. **Revised 2026-09-08:** to the request's participants rather than its
   assignee — the assignee triages, the participants act. See the revision note
-  in `docs/prd-teams-bot-escalation.md`.
+  in `for-agents/prd-teams-bot-escalation.md`.
 - An unresolved breach escalates to the correct contractual level within the
   correct time window, without duplicate notifications inside one delivery
   window.
@@ -85,7 +85,7 @@ Implementation must not start until these are answered.
    `Teamwork.Migrate.All`, applies only to chats in migration mode. A
    registered Bot Framework bot is the only mechanism that can direct-message
    a person from an unattended job. A working direct message was delivered on
-   2026-08-20; see the V2 milestone in `docs/mvp-roadmap.md`.
+   2026-08-20; see the V2 milestone in `for-agents/roadmap.md`.
 
    The prerequisite chain is longer than this document originally stated. It
    is an **Azure subscription**, then an Entra app registration, then an

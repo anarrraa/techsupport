@@ -11,6 +11,9 @@ const counts = (tickets: number, firstResponseBreached: number) => ({
 test("toMonthlyReport maps Jira priorities and first-response breaches", () => {
   const report = toMonthlyReport(
     {
+      coverage: { firstCapturedAt: "2026-10-01T00:00:00.000Z", lastCapturedAt: "2026-10-02T00:00:00.000Z", capturedDays: 2 },
+      firstResponseKnown: 6, firstResponseMissing: 1,
+      resolutionKnown: 5, resolutionMissing: 2,
       month: "2026-10",
       snapshots: 9,
       tickets: 7,
@@ -22,6 +25,12 @@ test("toMonthlyReport maps Jira priorities and first-response breaches", () => {
     },
     "2026-10-21T00:00:00Z",
   );
+  assert.equal(report.coverage.capturedDays, 2);
+  assert.equal(report.coverage.lastCapturedAt, "2026-10-02T00:00:00.000Z");
+  assert.equal(report.firstResponseKnown, 6);
+  assert.equal(report.firstResponseMissing, 1);
+  assert.equal(report.resolutionKnown, 5);
+  assert.equal(report.resolutionMissing, 2);
   assert.equal(report.summary.tickets.value, 7);
   assert.equal(report.summary.breaches.value, 2);
   assert.equal(report.summary.compliance.value, 1 - 2 / 7);
@@ -41,6 +50,9 @@ test("toMonthlyReport maps Jira priorities and first-response breaches", () => {
 test("toMonthlyReport leaves compliance empty for a month with no tickets", () => {
   const report = toMonthlyReport(
     {
+      coverage: { firstCapturedAt: null, lastCapturedAt: null, capturedDays: 0 },
+      firstResponseKnown: 0, firstResponseMissing: 0,
+      resolutionKnown: 0, resolutionMissing: 0,
       month: "2026-11",
       snapshots: 0,
       tickets: 0,

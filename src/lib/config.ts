@@ -17,7 +17,7 @@ export interface JiraConfig {
 	maxSlaPages: number;
 	slaConcurrency: number;
 	firstResponseSlaName: string;
-	/** The JSM metric that drives the escalation clock in `docs/sla-matrix.md`. */
+	/** The JSM metric that drives the escalation clock in `for-agents/sla-matrix.md`. */
 	resolutionSlaName: string;
 	/**
 	 * Custom field holding Request participants. The id differs per Jira

@@ -66,7 +66,7 @@ const defaultDependencies: WorkflowDependencies = {
 	writeEscalationState,
 	createBotSender,
 	// Opt-in by DATABASE_URL, and loaded lazily so a run without a database never
-	// touches Prisma (docs/prd-monthly-dashboard.md).
+	// touches Prisma (for-agents/prd-monthly-dashboard.md).
 	captureSnapshot: async (tickets, capturedAt) => {
 		if (!process.env.DATABASE_URL) return;
 		const { captureSnapshot, disconnect } = await import('../backend/db.ts');
@@ -146,10 +146,12 @@ export async function runJiraTeamsReminder(
 		log.warn(`Snapshot capture failed (${error instanceof Error ? error.name : 'unknown'}); reminders unaffected`);
 	}
 
-	if (jira.scanned === 0 && !config.reminder.dryRun) {
-		throw new Error(
-			'Jira search returned 0 issues — check JIRA_JQL configuration',
-		);
+	if (jira.scanned === 0) {
+		log.warn('Jira search returned 0 issues; no reminders sent — check JIRA_JQL if unexpected');
+		return {
+			scanned: 0, ticketCount: 0, messageCount: 0, notified: false,
+			developerCount: 0, directMessageCount: 0, escalationCount: 0,
+		};
 	}
 
 	// The channel post needs a webhook; without one the bot transport carries the

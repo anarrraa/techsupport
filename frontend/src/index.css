@@ -4,7 +4,7 @@
 /* Class-based dark mode: <html class="dark">. */
 @custom-variant dark (&:is(.dark *));
 
-/* Values from docs/design-system-dashboard.md. */
+/* Values from for-agents/design-system-dashboard.md. */
 :root {
   --radius: 0.5rem;
   --background: #ffffff;
@@ -13,7 +13,7 @@
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
-  --primary: #3b82f6;
+  --primary: #2563eb;
   --primary-foreground: #ffffff;
   --secondary: #f3f4f6;
   --secondary-foreground: #111827;
@@ -37,6 +37,8 @@
 }
 
 .dark {
+  --primary: #60a5fa;
+  --primary-foreground: #111827;
   --background: #111827;
   --foreground: #f9fafb;
   --card: #1f2937;
@@ -95,4 +97,8 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }

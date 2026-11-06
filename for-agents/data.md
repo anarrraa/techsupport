@@ -1,7 +1,7 @@
 # Data and external APIs
 
 No database. Contract values (SLA minutes, levels) are defined in
-`docs/sla-matrix.md`; code mirrors them in `src/lib/escalation.ts:16-45`.
+`for-agents/sla-matrix.md`; code mirrors them in `src/lib/escalation.ts:16-45`.
 
 ## Jira Cloud / JSM (basic auth: `JIRA_EMAIL` + `JIRA_API_TOKEN`)
 

@@ -95,6 +95,8 @@ jobs:
 
       - name: Run reminder
         env:
+          # Optional snapshot store; capture failures never block reminders.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
           GOOGLE_CLOUD_LOCATION: ${{ secrets.GOOGLE_CLOUD_LOCATION }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}

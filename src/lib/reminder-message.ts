@@ -25,7 +25,7 @@ export function buildReminderMessages(
  * The same escaped, chunked body as the channel post, addressed to one person.
  * Level 1 is the assignee's own first-response reminder and carries the
  * contractual response window; levels 2-5 are the contract's escalation
- * contacts (`docs/sla-matrix.md` section 2).
+ * contacts (`for-agents/sla-matrix.md` section 2).
  */
 export function buildDirectMessages(options: {
 	recipientName: string;

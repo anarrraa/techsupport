@@ -1,10 +1,19 @@
 # TODO
 
-Last updated: 2026-09-07
+Last updated: 2026-11-04
 
 This tracks actionable next steps across the MVP and the proposed V2
 (personal Teams bot + contract escalation). See `AGENTS.md` for required
 reading order and non-negotiable invariants before touching any of this.
+
+## Internal monthly reporting
+
+- [x] Complete the internal observed-data report UI, UTC month selection,
+      capture coverage, missing metrics, both SLA breach counts, and exports.
+      Local pinned-toolchain, PostgreSQL, and API evidence is in `roadmap.md`.
+- [ ] Verify actual browser layouts and keyboard flows.
+- [ ] Provision production PostgreSQL, deploy local changes, and verify a real
+      scheduled run writes the snapshots shown by the dashboard.
 
 ## Now — blocking, in order
 
@@ -51,7 +60,7 @@ reading order and non-negotiable invariants before touching any of this.
       projects in scope.
   - Done 2026-08-26: agent access granted on DC. `GET
     /rest/servicedeskapi/request/DC-844/sla` returns 200 OK.
-- [x] Make an empty scan loud. `scanned: 0` now exits with error in non-dry-run mode.
+- [x] Empty scan policy: user chose warning and successful zero-message exit on 2026-11-03; covered by workflow regression test.
 - [x] Report overdue time in working hours. `overdueMinutes` now reads `elapsedTime`
       from JSM metric instead of clock time.
 - [ ] Decide what `developer.privacyUrl` and `termsOfUseUrl` should point at.
@@ -64,14 +73,14 @@ reading order and non-negotiable invariants before touching any of this.
       background.
 - [x] Record the bot's Entra application id. Done 2026-09-08: **SLA Reminder
       Bot**, `b76bcdfb-5a16-44c4-81e0-860780daa2da`. Now in the evidence
-      table in `docs/mvp-roadmap.md` and in `.env.example`, so no future step
+      table in `for-agents/roadmap.md` and in `.env.example`, so no future step
       starts with a hunt through the Azure portal.
 - [ ] Get an administrator to publish the Teams app package to the
       organisation catalog. Build it with
       `npm run package:teams`. **No Teams app setup
       policy is needed** — superseded 2026-09-08 by the goOrange delivery path,
       which installs the app per recipient through Graph. See the revision note
-      in `docs/mvp-roadmap.md`.
+      in `for-agents/roadmap.md`.
 - [ ] Grant and consent the Graph **application** permissions on the app
       registration: `AppCatalog.Read.All`, and
       `TeamsAppInstallation.ReadWriteSelfForUser.All` (narrower — limited to this
@@ -104,7 +113,7 @@ reading order and non-negotiable invariants before touching any of this.
 - [ ] Confirm with the client what Low L5 means. The contract gives it no clock
       mark ("only if SLA breached"), so Low currently never escalates past L4.
 - [x] Get the user's answers to the open decisions in
-      `docs/brd-teams-bot-escalation.md`. All six resolved as of 2026-08-24:
+      `for-agents/brd-teams-bot-escalation.md`. All six resolved as of 2026-08-24:
   - [x] Bot delivery mechanism. **Resolved 2026-08-20 by executed test.**
         Graph app-only chat messaging does not exist; a Bot Framework bot is
         the only option, and a direct message was delivered successfully.
@@ -119,13 +128,13 @@ reading order and non-negotiable invariants before touching any of this.
         to a Microsoft Entra object id.
   - [x] Escalation state storage (decision 6): a GitHub Actions cache keyed
         per ticket holds "highest level notified."
-- [x] Add a V2 milestone to `docs/mvp-roadmap.md` before writing any bot code
+- [x] Add a V2 milestone to `for-agents/roadmap.md` before writing any bot code
       (`AGENTS.md` scope guard). Added 2026-08-20 with the verified delivery
       evidence and the Azure prerequisites already established.
 
 ## Done — V2 delivery path prerequisites
 
-Verified 2026-08-20. Details and evidence in `docs/mvp-roadmap.md`.
+Verified 2026-08-20. Details and evidence in `for-agents/roadmap.md`.
 
 - [x] Azure subscription available.
 - [x] Entra app registration, single tenant, secret held outside the repository.
@@ -161,7 +170,7 @@ Verified 2026-08-20. Details and evidence in `docs/mvp-roadmap.md`.
       Escape target **not** parameterised: the sanitize/escape path is identical
       for both transports, so a parameter would have had one value. Revisit only
       if a real direct message shows a literal `&lt;` or `&amp;`.
-- [x] Implement working-hours vs off-hours routing per `docs/sla-matrix.md`
+- [x] Implement working-hours vs off-hours routing per `for-agents/sla-matrix.md`
       section 3. `src/lib/escalation.ts`, using JSM's `withinCalendarHours` so
       no calendar math is duplicated.
 - [x] Add unit tests for every threshold in section 2, both routings. Elapsed
@@ -174,8 +183,8 @@ Verified 2026-08-20. Details and evidence in `docs/mvp-roadmap.md`.
 
 ## Reference
 
-- Contract SLA/escalation values: `docs/sla-matrix.md`
-- Shipped MVP behavior and status: `docs/prd-priority-sla-reminders.md`,
-  `docs/mvp-roadmap.md`
-- V2 business case: `docs/brd-teams-bot-escalation.md`
-- V2 product spec: `docs/prd-teams-bot-escalation.md`
+- Contract SLA/escalation values: `for-agents/sla-matrix.md`
+- Shipped MVP behavior and status: `for-agents/prd-priority-sla-reminders.md`,
+  `for-agents/roadmap.md`
+- V2 business case: `for-agents/brd-teams-bot-escalation.md`
+- V2 product spec: `for-agents/prd-teams-bot-escalation.md`

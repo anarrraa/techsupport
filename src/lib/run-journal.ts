@@ -6,7 +6,7 @@ import type { IntroReason, IntroResult } from './reminder-intro.ts';
  *
  * Every event shape here is deliberately unable to express a request's
  * identity, title, assignee, or link. That is the enforcement of the invariant
- * in AGENTS.md and the definition of done in docs/mvp-roadmap.md: no ticket
+ * in AGENTS.md and the definition of done in for-agents/roadmap.md: no ticket
  * content or personal data in operational output. Redaction is not a step this
  * module performs, it is a shape its callers cannot escape. The two map-shaped
  * events are keyed by closed unions rather than `string` for that reason: a

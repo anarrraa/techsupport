@@ -3,7 +3,7 @@
  *
  * GitHub's scheduler is not a clock: measured against their cron times, past
  * runs of this workflow were 45 to 489 minutes late, a median near two hours
- * (`docs/mvp-roadmap.md`). No cron expression fixes that, so the schedule stops
+ * (`for-agents/roadmap.md`). No cron expression fixes that, so the schedule stops
  * being the thing that decides when a message may be sent — a run happens
  * whenever GitHub gets to it, and this decides whether it delivers.
  *

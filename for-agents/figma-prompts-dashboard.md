@@ -305,7 +305,7 @@ Metric cards:
 
 ## Implementation Notes
 
-1. All colors reference `docs/design-system-dashboard.md`
+1. All colors reference `for-agents/design-system-dashboard.md`
 2. Ensure 12-column responsive grid for main content
 3. Use provided spacing scale (xs=4px, sm=8px, md=16px, lg=24px, xl=32px)
 4. All text is translatable (Mongolian/English)

@@ -85,15 +85,17 @@ test('does not post to Teams when no ticket is due', async () => {
 	});
 });
 
-test('fails when scanned is 0 in non-dry-run mode', async () => {
-	await assert.rejects(
-		run({
-			tickets: [],
-			config: config({ dryRun: false }),
-			post: async () => {},
-		}),
-		/Jira search returned 0 issues/,
-	);
+test('an empty production queue warns and succeeds without channel or bot delivery', async () => {
+	const result = await run({
+		tickets: [],
+		config: config({ dryRun: false, bot: true }),
+		post: async () => { assert.fail('empty queue must not post'); },
+	});
+	assert.equal(result.output.scanned, 0);
+	assert.equal(result.output.notified, false);
+	assert.equal(result.output.directMessageCount, 0);
+	assert.deepEqual(result.sent, []);
+	assert.ok(result.logs.some((line) => line.includes('Jira search returned 0 issues')));
 });
 
 test('dry-run skips Teams and exposes aggregate-only logs, model input, and output', async () => {

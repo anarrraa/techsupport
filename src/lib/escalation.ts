@@ -1,7 +1,7 @@
 import type { JiraTicket } from './jira.ts';
 
 /**
- * The contract's escalation chain, from `docs/sla-matrix.md` sections 2 and 3.
+ * The contract's escalation chain, from `for-agents/sla-matrix.md` sections 2 and 3.
  *
  * Every threshold here is elapsed working time on the JSM **resolution** metric,
  * not clock time since the first-response breach: the contract escalates a
@@ -21,7 +21,7 @@ const SEVERITY_BY_PRIORITY: Record<string, Severity> = {
 	Lowest: 'low',
 };
 
-/** First response allowance in minutes, `docs/sla-matrix.md` section 1. */
+/** First response allowance in minutes, `for-agents/sla-matrix.md` section 1. */
 const FIRST_RESPONSE_MINUTES: Record<Severity, number> = {
 	critical: 30,
 	high: 45,

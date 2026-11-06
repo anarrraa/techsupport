@@ -1,5 +1,9 @@
 # PRD: Tech Success Dashboard + Admin Chat
 
+> Historical broader proposal. The current authorized internal monthly scope
+> is `for-agents/prd-monthly-dashboard.md`; owner workloads, client access,
+> authorization, chat, and operations telemetry require separate acceptance.
+
 Status: design phase (post-MVP V2)
 
 ## Problem

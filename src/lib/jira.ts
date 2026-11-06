@@ -71,7 +71,7 @@ export interface JiraTicket {
 	comments: JiraComment[];
 	url: string;
 	firstResponseSla: SlaCycle | null;
-	/** The escalation clock of `docs/sla-matrix.md` section 2. */
+	/** The escalation clock of `for-agents/sla-matrix.md` section 2. */
 	resolutionSla: SlaCycle | null;
 }
 

@@ -4,16 +4,27 @@ These instructions apply to the entire repository.
 
 ## Required context
 
+`for-agents/` is the central location for agent context: requirements, contract
+values, roadmap, tasks, architecture, conventions, and reference material. Start
+with `for-agents/README.md` for its index. Maintain those files in that folder;
+do not create duplicate roadmaps or task lists elsewhere. Paths below are
+relative to the repository root.
+
 Before planning or changing code, read these files in order:
 
-1. `docs/prd-priority-sla-reminders.md` for the current MVP requirements.
-2. `docs/mvp-roadmap.md` for current status, blockers, execution order, and the
+1. `for-agents/prd-priority-sla-reminders.md` for the current MVP requirements.
+2. `for-agents/roadmap.md` for current status, blockers, execution order, and the
    definition of done.
-3. `docs/sla-matrix.md` for contractual SLA goals and explicit assumptions.
+3. `for-agents/sla-matrix.md` for contractual SLA goals and explicit assumptions.
 4. `README.md` for architecture, setup, commands, and operational limits.
-5. `docs/brd-teams-bot-escalation.md` and `docs/prd-teams-bot-escalation.md` for
+5. `for-agents/brd-teams-bot-escalation.md` and `for-agents/prd-teams-bot-escalation.md` for
    the proposed V2 personal-bot/escalation work, if touching that scope.
-6. `TODO.md` for the current actionable task list across the MVP and V2.
+6. `for-agents/TODO.md` for the current actionable task list across the MVP and V2.
+7. `for-agents/gotchas.md` and `for-agents/conventions.md` before making changes;
+   use `for-agents/architecture.md`, `commands.md`, `data.md`, and `env.md` as
+   needed. Read `for-agents/CONTEXT.md` for the project vocabulary.
+8. For dashboard work, read `for-agents/prd-monthly-dashboard.md` and the
+   applicable dashboard specifications and design references listed in the index.
 
 The PRD defines behavior. The SLA matrix defines contract values. The roadmap
 defines release status and work priority. If they conflict, stop and surface the
@@ -74,8 +85,11 @@ not treat local success as production evidence.
 
 When roadmap work is completed:
 
-- Update `docs/mvp-roadmap.md` in the same change.
+- Update `for-agents/roadmap.md` in the same change.
 - Check a task only when its acceptance condition has evidence.
+- Write a report to `for-agents/plan/phase-<n>-<name>/reports/` for every
+  finished item, and `REPORT.md` when a phase closes. Format and rules:
+  `for-agents/plan/README.md`. Link the report from the checked roadmap item.
 - Refresh the evidence snapshot when a newer local or GitHub result supersedes it.
 - Keep the PRD focused on requirements; keep progress and run evidence in the
   roadmap.
@@ -87,12 +101,19 @@ bot, durable delivery ledger, read receipts, and acknowledgements are post-MVP V
 work. They require an explicit PRD and roadmap update before implementation.
 
 The personal Teams bot / escalation feature cleared that gate: every open
-decision in `docs/brd-teams-bot-escalation.md` is answered, `docs/mvp-roadmap.md`
+decision in `for-agents/brd-teams-bot-escalation.md` is answered, `for-agents/roadmap.md`
 carries the V2 milestones, and the implementation landed on 2026-09-07
 (`src/lib/teams-bot.ts`, `escalation.ts`, `escalation-config.ts`,
-`escalation-state.ts`, `direct-messages.ts`). It is unit tested and **not
-production verified**: no message has been sent from this codebase. V2 milestone
-2 in the roadmap lists what is left, all of it external.
+`escalation-state.ts`, `direct-messages.ts`). Bot transport has recorded live
+message delivery (2026-09-08 and scheduled evidence checked 2026-11-03).
+Full production acceptance remains open; use the current roadmap evidence rather
+than interpreting historical unchecked prerequisites as current failures.
+
+The monthly internal reporting experience is also authorized in
+`for-agents/prd-monthly-dashboard.md` and `for-agents/roadmap.md`, reconfirmed
+2026-11-04. It uses stored observations and preserves Jira as SLA authority.
+Client access, authentication deployment, live ownership/operations telemetry,
+and model summaries remain separate scope.
 
 These invariants apply to that code in addition to the ones above:
 

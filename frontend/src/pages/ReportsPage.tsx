@@ -1,110 +1,34 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Download, FileText, Table2 } from "lucide-react";
-import { api, CURRENT_MONTH } from "@/utils/api-client";
-
-interface MonthReport {
-  month: string;
-  tickets: number;
-  compliance: number;
-}
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ExportActions } from '@/components/reports/ExportActions';
+import { SupportReportForm } from '@/components/reports/SupportReportForm';
+import { QueryState } from '@/components/common/QueryState';
+import { useI18n } from '@/i18n';
+import { CURRENT_MONTH } from '@/utils/api-client';
+import { loadArchive, ReportRequestError } from '@/utils/report-requests';
+import { formatMonth, formatNumber } from '@/utils/format';
 
 export function ReportsPage() {
-  const [reports, setReports] = useState<MonthReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [downloadingMonth, setDownloadingMonth] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    // Generate mock reports for the last 12 months
-    const months: MonthReport[] = [];
-    const now = new Date();
-    for (let i = 11; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const month = date.toISOString().slice(0, 7);
-      months.push({
-        month,
-        tickets: Math.floor(Math.random() * 30) + 10,
-        compliance: Math.random() * 0.3 + 0.7,
-      });
-    }
-    setReports(months);
-    setLoading(false);
-  }, []);
-
-  const handleDownloadPDF = async (month: string) => {
-    setDownloadingMonth(month);
-    try {
-      await api.downloadPDF(month);
-    } finally {
-      setDownloadingMonth(null);
-    }
-  };
-
-  const handleDownloadExcel = async (month: string) => {
-    setDownloadingMonth(month);
-    try {
-      await api.downloadExcel(month);
-    } finally {
-      setDownloadingMonth(null);
-    }
-  };
-
-  if (loading) {
-    return <div className="p-8">Loading reports...</div>;
-  }
-
-  return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Reports Archive</h1>
-        <p className="text-gray-600">Download SLA reports from previous months</p>
-      </div>
-
-      <div className="space-y-4">
-        {reports.map((report) => (
-          <div
-            key={report.month}
-            className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-          >
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">
-                {new Date(report.month + "-01").toLocaleDateString("default", {
-                  year: "numeric",
-                  month: "long",
-                })}
-              </h3>
-              <div className="text-sm text-gray-600 mt-1 space-y-1">
-                <p>Tickets: {report.tickets}</p>
-                <p>Compliance: {(report.compliance * 100).toFixed(1)}%</p>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDownloadPDF(report.month)}
-                disabled={downloadingMonth === report.month}
-                className="flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                PDF
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDownloadExcel(report.month)}
-                disabled={downloadingMonth === report.month}
-                className="flex items-center gap-2"
-              >
-                <Table2 className="w-4 h-4" />
-                Excel
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+  const { t, locale } = useI18n();
+  const { data: reports, error, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['report-archive', CURRENT_MONTH], queryFn: () => loadArchive(),
+  });
+  return <div className="space-y-6">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div><h1 className="text-2xl font-semibold">{t('reports.archive')}</h1><p className="mt-2 text-sm text-muted-foreground">{t('reports.archiveDescription')}</p></div>
+      <Button className="min-h-11" variant="outline" disabled={isFetching} onClick={() => void refetch()}><RefreshCw className="size-4" aria-hidden />{t('reports.refresh')}</Button>
     </div>
-  );
+    <SupportReportForm />
+    <p className="max-w-prose text-sm leading-6 text-muted-foreground">{t('reports.sampleNote')}</p>
+    {isLoading && <QueryState isLoading error={null} />}
+    {error && <div role="alert" className="rounded-lg border border-destructive bg-card p-4"><p>{error instanceof ReportRequestError && error.status === 413 ? t('reports.tooLarge') : t('state.error')}</p><Button className="mt-3 min-h-11" variant="outline" disabled={isFetching} onClick={() => void refetch()}>{t('reports.retry')}</Button></div>}
+    {!error && reports?.length === 0 && <p className="rounded-lg border bg-card p-6 text-muted-foreground">{t('reports.noArchive')}</p>}
+    {!error && <div className="divide-y rounded-lg border bg-card">{reports?.map(report => <article key={report.month} className="flex flex-wrap items-center justify-between gap-4 p-4 md:p-5">
+      <div className="space-y-2"><h2 className="font-semibold"><Link className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring" to={`/dashboard?month=${report.month}`}>{formatMonth(report.month, locale)}</Link></h2>
+        <dl className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground"><div><dt>{t('reports.observed')}</dt><dd className="font-medium tabular-nums text-foreground">{formatNumber(report.summary.tickets.value ?? 0, locale)}</dd></div><div><dt>{t('metric.breaches')}</dt><dd className="font-medium tabular-nums text-foreground">{formatNumber(report.summary.breaches.value ?? 0, locale)}</dd></div><div><dt>{t('metric.resolutionBreaches')}</dt><dd className="font-medium tabular-nums text-foreground">{formatNumber(report.summary.resolutionBreaches.value ?? 0, locale)}</dd></div></dl>
+      </div><ExportActions month={report.month} />
+    </article>)}</div>}
+  </div>;
 }

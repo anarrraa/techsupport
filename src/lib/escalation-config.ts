@@ -4,7 +4,7 @@ import type { ContactLevel } from './escalation.ts';
 
 /**
  * The escalation directory, resolved from a repository file at run time rather
- * than hardcoded in this module (`docs/brd-teams-bot-escalation.md` decisions 2
+ * than hardcoded in this module (`for-agents/brd-teams-bot-escalation.md` decisions 2
  * and 5). Teams rejects an email or user principal name for a proactive direct
  * message, so every recipient needs a Microsoft Entra object id.
  *

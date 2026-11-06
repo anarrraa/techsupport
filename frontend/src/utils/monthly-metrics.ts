@@ -9,6 +9,11 @@ interface BreachCounts {
 
 /** `GET /api/reports/:month` body; mirrors `src/lib/queries/monthly-report.ts`. */
 export interface MonthlyMetrics extends BreachCounts {
+  coverage: MonthlyReport["coverage"];
+  firstResponseKnown: number;
+  firstResponseMissing: number;
+  resolutionKnown: number;
+  resolutionMissing: number;
   month: string;
   snapshots: number;
   firstResponseBreachRate: number | null;
@@ -16,7 +21,7 @@ export interface MonthlyMetrics extends BreachCounts {
   byPriority: Record<string, BreachCounts>;
 }
 
-// Jira priority names per docs/sla-matrix.md (assumed mapping).
+// Jira priority names per for-agents/sla-matrix.md (assumed mapping).
 // ponytail: Lowest folds into low; any other name is left out of the breakdown but still counts in totals.
 const PRIORITY_BY_JIRA_NAME: Record<string, Priority> = {
   Highest: "critical",
@@ -40,20 +45,29 @@ export function toMonthlyReport(m: MonthlyMetrics, generatedAt: string): Monthly
       priority,
       tickets: 0,
       breaches: 0,
+      resolutionBreached: 0,
       avgFirstResponseMinutes: null,
       goalMinutes: null,
     };
     row.tickets += counts.tickets;
     row.breaches += counts.firstResponseBreached;
+    row.resolutionBreached += counts.resolutionBreached;
     buckets.set(priority, row);
   }
 
   return {
     month: m.month,
+    snapshots: m.snapshots,
     generatedAt,
+    coverage: m.coverage,
+    firstResponseKnown: m.firstResponseKnown, firstResponseMissing: m.firstResponseMissing,
+    resolutionKnown: m.resolutionKnown, resolutionMissing: m.resolutionMissing,
+    firstResponseBreachRate: m.firstResponseBreachRate,
+    resolutionBreachRate: m.resolutionBreachRate,
     summary: {
       tickets: { value: m.tickets, previous: null },
       breaches: { value: m.firstResponseBreached, previous: null },
+      resolutionBreaches: { value: m.resolutionBreached, previous: null },
       compliance: {
         value: m.firstResponseBreachRate === null ? null : 1 - m.firstResponseBreachRate,
         previous: null,
