@@ -618,8 +618,9 @@ with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
       Pure files stay framework-free; pdfkit/exceljs/express/Prisma only in
       `*-pdf`, `*-input`, `db`, `export`, `server`.
       Report: `plan/phase-2-restructure/reports/2026-11-06-2.1.md`.
-- [ ] 2.2 Frontend `features/` (monthly-report, support-report, reports-archive,
+- [x] 2.2 Frontend `features/` (monthly-report, support-report, reports-archive,
       chat, teams) + `shared/`; `components/ui/` stays (shadcn).
+      Report: `plan/phase-2-restructure/reports/2026-11-06-2.2.md`.
 - [ ] 2.3 Replace the frontend's copied report types with `import type` from
       the backend's pure files; delete the copies.
 - [ ] 3.1 Enable pgvector and add `DocChunk` to `prisma/schema.prisma`. DB change, needs user approval.

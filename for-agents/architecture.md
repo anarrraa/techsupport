@@ -42,6 +42,8 @@ flowchart TD
 | `src/escalation/direct-messages.ts` | pure per-recipient plan |
 | `src/escalation/ticket-digest.ts` | `DigestTicketView` (identity-free), owner resolution, model prompt, fallback |
 | `src/agents/*.ts` | thin Flue `defineAgent` bindings; prompt text lives in the feature folder |
+| `frontend/src/features/<name>/` | one folder per screen: monthly-report, support-report, reports-archive, chat, teams |
+| `frontend/src/shared/` | code used by 2+ features: `utils/` (api-client, report-requests, format, colors), `i18n.tsx`, `components/` (layout, common, ExportActions); `components/ui/` + `lib/utils.ts` stay (shadcn aliases) |
 | `scripts/` | local tools: trace, verify bot, resolve Entra ids, package Teams app, toolchain check |
 | `packages/teams-app/` | Teams app manifest + icons (`npm run package:teams`) |
 | `config/escalation.example.json` | directory shape; real `config/escalation.json` is gitignored |

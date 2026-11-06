@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { I18nProvider } from "@/i18n";
-import { AdminChatPage } from "@/pages/AdminChatPage";
-import { DashboardPage } from "@/pages/DashboardPage";
-import { ReportsPage } from "@/pages/ReportsPage";
-import { TeamsPage } from "@/pages/TeamsPage";
+import { AppLayout } from "@/shared/components/layout/AppLayout";
+import { I18nProvider } from "@/shared/i18n";
+import { AdminChatPage } from "@/features/chat/AdminChatPage";
+import { DashboardPage } from "@/features/monthly-report/DashboardPage";
+import { ReportsPage } from "@/features/reports-archive/ReportsPage";
+import { TeamsPage } from "@/features/teams/TeamsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5 * 60_000, retry: 1 } },
