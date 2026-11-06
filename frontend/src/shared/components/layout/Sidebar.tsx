@@ -1,5 +1,5 @@
 import { BarChart3, FileText, LayoutDashboard, MessageSquare, Users, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/shared/i18n";
@@ -13,22 +13,24 @@ const links = [
 ] as const;
 
 /** Fixed 240px rail on lg+, slide-over drawer below it. */
-export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function Sidebar({ open, onClose, opener }: { open: boolean; onClose: () => void; opener: RefObject<HTMLElement | null> }) {
   const { t } = useI18n();
   const asideRef = useRef<HTMLElement>(null);
-  // Drawer mode: move focus in; Escape closes and returns focus to the opener.
+  // Drawer mode: focus moves in; every close path (X, backdrop, link, Escape, widening to lg) returns it to the opener.
   useEffect(() => {
     if (!open) return;
-    const opener = document.activeElement as HTMLElement | null;
     asideRef.current?.querySelector("button")?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      onClose();
-      opener?.focus();
-    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const wide = matchMedia("(min-width: 1024px)");
+    const onWide = (e: MediaQueryListEvent) => e.matches && onClose();
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    wide.addEventListener("change", onWide);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      wide.removeEventListener("change", onWide);
+      if (opener.current?.isConnected) opener.current.focus();
+    };
+  }, [open, onClose, opener]);
   return (
     <>
       {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onClose} aria-hidden />}

@@ -99,5 +99,7 @@ test('support upload errors lead with the localized text and keep the 4xx server
   assert.equal(supportErrorText(new ReportRequestError(400, 'Missing required columns: System'), text), 'INVALID: Missing required columns: System');
   assert.equal(supportErrorText(new ReportRequestError(413), text), 'TOO_LARGE');
   assert.equal(supportErrorText(new ReportRequestError(500, 'PRIVATE'), text), 'GENERIC');
+  assert.equal(supportErrorText(new ReportRequestError(404, 'Unknown config'), text), 'GENERIC');
+  assert.equal(supportErrorText(new ReportRequestError(400), text), 'GENERIC');
   assert.equal(supportErrorText(new TypeError('Failed to fetch'), text), 'GENERIC');
 });
