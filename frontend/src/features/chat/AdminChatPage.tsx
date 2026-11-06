@@ -55,7 +55,7 @@ export function AdminChatPage() {
       <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2 text-xs text-muted-foreground">
         <p className="flex-1">{t("chat.notice")}</p>
         <select
-          className="h-8 rounded-md border border-input bg-transparent px-2 text-sm text-foreground"
+          className="h-11 rounded-md border border-input bg-transparent px-2 text-sm text-foreground"
           aria-label={t("chat.client")}
           value={client}
           onChange={(e) => setClient(e.target.value)}
@@ -74,7 +74,7 @@ export function AdminChatPage() {
             <p>{t("chat.empty")}</p>
             <div className="flex flex-wrap justify-center gap-2">
               {(["chat.suggest1", "chat.suggest2"] as const).map((k) => (
-                <Button key={k} variant="outline" size="sm" onClick={() => ask(t(k))}>
+                <Button key={k} variant="outline" size="sm" className="min-h-11" onClick={() => ask(t(k))}>
                   {t(k)}
                 </Button>
               ))}

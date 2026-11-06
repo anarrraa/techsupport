@@ -537,7 +537,12 @@ MVP external acceptance remains open. Existing product design and MN/EN apply.
 - [x] Implement report/archive layouts with MN/EN, theme tokens, responsive
       structure, labeled controls, reduced-motion support, and export errors.
 - [x] Query/HTTP/export/frontend regressions and disposable PostgreSQL evidence.
-- [ ] Browser visual, viewport, and keyboard acceptance (not executed).
+- [ ] Browser visual, viewport, and keyboard acceptance. Executed 2026-11-06
+      locally (headless Chromium, synthetic data, 4 pages × 3 viewports × mn/en ×
+      light/dark): 48/48 without page h-scroll; fixed tabbable off-screen mobile
+      drawer, Escape/focus for the drawer, and sub-44px targets. Open: support
+      upload validation messages stay English in mn. Report:
+      `plan/phase-6-reporting-acceptance/reports/2026-11-06-6.1-browser.md`.
 - [ ] Production database provisioning/deployment and scheduled capture (external).
 
 Executed evidence, 2026-11-04:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useI18n } from "@/shared/i18n";
 import { Header } from "./Header";
@@ -15,11 +15,12 @@ export function AppLayout() {
   const { t } = useI18n();
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const titleKey = titles[pathname as keyof typeof titles] ?? "nav.dashboard";
 
   return (
     <div className="flex min-h-dvh">
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <Sidebar open={menuOpen} onClose={closeMenu} />
       <div className="flex min-w-0 flex-1 flex-col bg-muted">
         <Header title={t(titleKey)} onMenu={() => setMenuOpen(true)} />
         <main className="mx-auto w-full max-w-[1400px] flex-1 p-3 md:p-6">

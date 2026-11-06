@@ -80,3 +80,9 @@
 - Docs chat corpus = `documents/**/*.md` (279 client system docs, ~3.8 MB). Gitignored — repo is public.
 - Sending those docs to Vertex AI in the user's own GCP project is accepted by the user's request; Jira data never goes there.
 - Gates still open: committing current work (Phase 0b) and enabling pgvector on the DB (Phase 4a) need explicit user OK.
+
+## Browser acceptance (6.1) — decisions (2026-11-06)
+
+- Closed mobile drawer uses `invisible` (keeps links out of Tab order) instead of `inert` (React 18 has no typed `inert` prop and
+  `lg` must stay interactive). Slide-out animation is lost on close; slide-in stays.
+- 6.1 left unchecked: support upload 4xx messages are English in the mn locale. Needs a decision (translate server messages vs accept).

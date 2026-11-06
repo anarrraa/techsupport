@@ -50,14 +50,14 @@ export function SupportReportForm() {
     {configError ? <p role="alert" className="text-sm">{t('state.error')}</p>
       : configs?.length === 0 ? <p className="text-sm text-muted-foreground">{t('support.noConfigs')}</p>
       : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className={label}><span>{t('support.file')}</span><Input type="file" accept=".xlsx,.csv" disabled={busy !== null && busy !== 'period'} onChange={e => void pick(e.target.files?.[0] ?? null)} /></label>
+        <label className={label}><span>{t('support.file')}</span><Input className="h-11" type="file" accept=".xlsx,.csv" disabled={busy !== null && busy !== 'period'} onChange={e => void pick(e.target.files?.[0] ?? null)} /></label>
         <label className={label}><span>{t('support.config')}</span>
-          <select className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" disabled={!configs || busy !== null} value={config?.id ?? ''} onChange={e => setConfigId(e.target.value)}>
+          <select className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm" disabled={!configs || busy !== null} value={config?.id ?? ''} onChange={e => setConfigId(e.target.value)}>
             {!configs && <option value="">{t('state.loading')}</option>}
             {configs?.map(c => <option key={c.id} value={c.id}>{c.client}</option>)}
           </select></label>
-        <label className={label}><span>{t('support.from')}</span><Input type="month" required disabled={busy !== null} value={from} onChange={e => setFrom(e.target.value)} /></label>
-        <label className={label}><span>{t('support.to')}</span><Input type="month" required min={from} disabled={busy !== null} value={to} onChange={e => setTo(e.target.value)} /></label>
+        <label className={label}><span>{t('support.from')}</span><Input className="h-11" type="month" required disabled={busy !== null} value={from} onChange={e => setFrom(e.target.value)} /></label>
+        <label className={label}><span>{t('support.to')}</span><Input className="h-11" type="month" required min={from} disabled={busy !== null} value={to} onChange={e => setTo(e.target.value)} /></label>
       </div>}
     {config && <div className="space-y-2"><p className="text-sm text-muted-foreground">{t('support.groups')}</p>
       <div className="flex flex-wrap gap-2">{config.groups.map((name, i) =>
