@@ -85,4 +85,4 @@
 
 - Closed mobile drawer uses `invisible` (keeps links out of Tab order) instead of `inert` (React 18 has no typed `inert` prop and
   `lg` must stay interactive). Slide-out animation is lost on close; slide-in stays.
-- 6.1 left unchecked: support upload 4xx messages are English in the mn locale. Needs a decision (translate server messages vs accept).
+- Support upload 4xx: frontend shows a localized lead (`support.invalid`) + the server detail unchanged (column names stay as in the export). 6.1 checked.

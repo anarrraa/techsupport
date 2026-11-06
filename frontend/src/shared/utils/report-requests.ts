@@ -38,6 +38,13 @@ export async function loadArchive(read = fetchReport, now = new Date(), active =
   return reports;
 }
 
+/** Localized lead for a support upload failure; a 4xx server reason (column names, ticket keys) follows as-is. */
+export function supportErrorText(e: unknown, text: { invalid: string; tooLarge: string; generic: string }): string {
+  if (!(e instanceof ReportRequestError)) return text.generic;
+  if (e.status === 413) return text.tooLarge;
+  return e.status < 500 ? `${text.invalid} ${e.message}` : text.generic;
+}
+
 export type SupportConfig = { id: string; client: string; groups: string[] };
 
 // 4xx bodies are our own validation messages (shown to the uploader); 5xx bodies are never echoed.

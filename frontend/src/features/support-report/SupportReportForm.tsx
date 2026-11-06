@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/shared/i18n';
 import { api } from '@/shared/utils/api-client';
-import { fetchSupportConfigs, fetchSupportPeriod, ReportRequestError } from '@/shared/utils/report-requests';
+import { fetchSupportConfigs, fetchSupportPeriod, supportErrorText } from '@/shared/utils/report-requests';
 
 export function SupportReportForm() {
   const { t } = useI18n();
@@ -18,8 +18,7 @@ export function SupportReportForm() {
   const [busy, setBusy] = useState<'period' | number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const config = configs?.find(c => c.id === configId) ?? configs?.[0];
-  const reason = (e: unknown) => e instanceof ReportRequestError && e.status === 413 ? t('support.tooLarge')
-    : e instanceof ReportRequestError && e.status < 500 ? e.message : t('state.error');
+  const reason = (e: unknown) => supportErrorText(e, { invalid: t('support.invalid'), tooLarge: t('support.tooLarge'), generic: t('state.error') });
 
   async function pick(next: File | null) {
     latest.current = next;

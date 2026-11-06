@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { archiveMonths, askChat, fetchChatClients, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError } from '../../../src/shared/utils/report-requests.ts';
+import { archiveMonths, askChat, fetchChatClients, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError, supportErrorText } from '../../../src/shared/utils/report-requests.ts';
 import type { MonthlyReport } from '../../../src/types/report.ts';
 
 test('archive reads exactly 12 UTC months newest first across a year boundary', () => {
@@ -92,4 +92,12 @@ test('chat posts the question, locale and optional client as JSON with a timeout
 test('chat failures reject without echoing a server error body', async () => {
   const fail = (async () => new Response('PRIVATE', { status: 500 })) as typeof fetch;
   await assert.rejects(() => askChat('q', 'en', undefined, fail), error => error instanceof ReportRequestError && error.status === 500 && !error.message.includes('PRIVATE'));
+});
+
+test('support upload errors lead with the localized text and keep the 4xx server detail', () => {
+  const text = { invalid: 'INVALID:', tooLarge: 'TOO_LARGE', generic: 'GENERIC' };
+  assert.equal(supportErrorText(new ReportRequestError(400, 'Missing required columns: System'), text), 'INVALID: Missing required columns: System');
+  assert.equal(supportErrorText(new ReportRequestError(413), text), 'TOO_LARGE');
+  assert.equal(supportErrorText(new ReportRequestError(500, 'PRIVATE'), text), 'GENERIC');
+  assert.equal(supportErrorText(new TypeError('Failed to fetch'), text), 'GENERIC');
 });
