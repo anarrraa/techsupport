@@ -1,10 +1,13 @@
-import { Languages, Menu, Moon, Sun } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Languages, LogOut, Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/shared/i18n";
+import { fetchMe } from "@/shared/utils/report-requests";
 
 export function Header({ title, onMenu }: { title: string; onMenu: (button: HTMLButtonElement) => void }) {
   const { t, locale, setLocale } = useI18n();
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => fetchMe(), staleTime: Infinity });
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
 
   useEffect(() => {
@@ -35,6 +38,17 @@ export function Header({ title, onMenu }: { title: string; onMenu: (button: HTML
       <Button variant="ghost" size="icon" className="size-11" onClick={() => setDark(!dark)} aria-label={t("theme.toggle")}>
         {dark ? <Sun /> : <Moon />}
       </Button>
+      {me && (
+        <>
+          <span className="hidden max-w-48 truncate text-sm text-muted-foreground sm:inline">{me.name}</span>
+          <Button asChild variant="ghost" size="sm" className="min-h-11">
+            <a href="/api/auth/logout">
+              <LogOut />
+              {t("auth.signOut")}
+            </a>
+          </Button>
+        </>
+      )}
     </header>
   );
 }

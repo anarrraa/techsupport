@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { archiveMonths, askChat, fetchChatClients, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError, supportErrorText } from '../../../src/shared/utils/report-requests.ts';
+import { archiveMonths, askChat, fetchChatClients, fetchMe, withLogin, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError, supportErrorText } from '../../../src/shared/utils/report-requests.ts';
 import type { MonthlyReport } from '../../../src/types/report.ts';
 
 test('archive reads exactly 12 UTC months newest first across a year boundary', () => {
@@ -102,4 +102,23 @@ test('support upload errors lead with the localized text and keep the 4xx server
   assert.equal(supportErrorText(new ReportRequestError(404, 'Unknown config'), text), 'GENERIC');
   assert.equal(supportErrorText(new ReportRequestError(400), text), 'GENERIC');
   assert.equal(supportErrorText(new TypeError('Failed to fetch'), text), 'GENERIC');
+});
+
+test('a 401 from the API starts Entra login; other statuses do not', async () => {
+  const logins: number[] = [];
+  for (const status of [401, 403, 404, 500, 200]) {
+    const fetcher = withLogin((async () => new Response(null, { status })) as typeof fetch, () => logins.push(status));
+    assert.equal((await fetcher('/api/reports/2026-10')).status, status);
+  }
+  assert.deepEqual(logins, [401]);
+});
+
+test('the signed-in name comes from /api/auth/me; no auth routes (localhost dev) means no user', async () => {
+  const me = (status: number) => (async (url: string | URL | Request) => {
+    assert.equal(String(url), '/api/auth/me');
+    return status === 200 ? Response.json({ name: 'Staff One' }) : new Response(null, { status });
+  }) as typeof fetch;
+  assert.deepEqual(await fetchMe(me(200)), { name: 'Staff One' });
+  assert.equal(await fetchMe(me(404)), null);
+  await assert.rejects(fetchMe(me(503)), (e) => e instanceof ReportRequestError && e.status === 503);
 });

@@ -661,7 +661,8 @@ Scope and reports: `plan/phase-5-hosting-auth/`. Requirements:
 - [x] 5.2 Backend auth: login/callback/logout/me, session guard on `/api`,
       fail-closed startup; tests with a local signing key, no network.
       Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.2.md`.
-- [ ] 5.3 Frontend: 401 → `/api/auth/login`; signed-in name + sign-out in the header.
+- [x] 5.3 Frontend: 401 → `/api/auth/login`; signed-in name + sign-out in the header.
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.3.md`.
 - [ ] 5.4 Container: Dockerfile + `.dockerignore`, Express serves `frontend/dist`;
       `docker build`/`run` proof; README "Deploy (Cloud Run)" runbook (not executed).
 - [ ] 5.5 Deploy with the user's project, tenant and group; staff log in; a

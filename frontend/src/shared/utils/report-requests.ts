@@ -7,6 +7,25 @@ export class ReportRequestError extends Error {
   constructor(status: number, message = `Report request failed (${status})`) { super(message); this.status = status; }
 }
 
+/** A 401 means no or an expired session: send the browser to Entra login instead of showing an error. */
+export function withLogin(fetcher: typeof fetch, login = () => window.location.assign('/api/auth/login')): typeof fetch {
+  return async (input, init) => {
+    const response = await fetcher(input, init);
+    if (response.status === 401) login();
+    return response;
+  };
+}
+
+const apiFetch: typeof fetch = (input, init) => withLogin(fetch)(input, init);
+
+/** The signed-in staff member; null when the server runs without login (localhost dev has no auth routes). */
+export async function fetchMe(fetcher: typeof fetch = apiFetch): Promise<{ name: string } | null> {
+  const response = await fetcher('/api/auth/me', { signal: AbortSignal.timeout(15_000) });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new ReportRequestError(response.status);
+  return response.json();
+}
+
 /** Only the current and previous 11 UTC months, independent of local timezone. */
 export function archiveMonths(now = new Date()): string[] {
   return Array.from({ length: 12 }, (_, i) => {
@@ -16,13 +35,13 @@ export function archiveMonths(now = new Date()): string[] {
   });
 }
 
-export async function fetchReport(month: string, fetcher: typeof fetch = fetch): Promise<MonthlyReport> {
+export async function fetchReport(month: string, fetcher: typeof fetch = apiFetch): Promise<MonthlyReport> {
   const response = await fetcher(`/api/reports/${encodeURIComponent(month)}`, { signal: AbortSignal.timeout(15_000) });
   if (!response.ok) throw new ReportRequestError(response.status);
   return response.json() as Promise<MonthlyReport>;
 }
 
-export async function fetchExport(month: string, format: 'pdf' | 'excel', fetcher: typeof fetch = fetch): Promise<Blob> {
+export async function fetchExport(month: string, format: 'pdf' | 'excel', fetcher: typeof fetch = apiFetch): Promise<Blob> {
   const response = await fetcher(`/api/reports/${encodeURIComponent(month)}/export?format=${format}`, { signal: AbortSignal.timeout(15_000) });
   if (!response.ok) throw new ReportRequestError(response.status);
   return response.blob();
@@ -56,29 +75,29 @@ async function supportResponse(response: Response): Promise<Response> {
   throw new ReportRequestError(response.status, typeof reason === 'string' ? reason : undefined);
 }
 
-export async function fetchSupportConfigs(fetcher: typeof fetch = fetch): Promise<SupportConfig[]> {
+export async function fetchSupportConfigs(fetcher: typeof fetch = apiFetch): Promise<SupportConfig[]> {
   return (await supportResponse(await fetcher('/api/support-reports/configs', { signal: AbortSignal.timeout(15_000) }))).json();
 }
 
-export async function fetchSupportPeriod(file: File, fetcher: typeof fetch = fetch): Promise<Period> {
+export async function fetchSupportPeriod(file: File, fetcher: typeof fetch = apiFetch): Promise<Period> {
   const query = new URLSearchParams({ filename: file.name });
   const response = await fetcher(`/api/support-reports/period?${query}`, { method: 'POST', body: file, signal: AbortSignal.timeout(60_000) });
   return (await supportResponse(response)).json();
 }
 
-export async function fetchSupportReport(file: File, params: Period & { config: string; group: number }, fetcher: typeof fetch = fetch): Promise<{ blob: Blob; filename: string }> {
+export async function fetchSupportReport(file: File, params: Period & { config: string; group: number }, fetcher: typeof fetch = apiFetch): Promise<{ blob: Blob; filename: string }> {
   const query = new URLSearchParams({ config: params.config, from: params.from, to: params.to, group: String(params.group), filename: file.name });
   const response = await supportResponse(await fetcher(`/api/support-reports?${query}`, { method: 'POST', body: file, signal: AbortSignal.timeout(60_000) }));
   const encoded = /filename\*=UTF-8''([^;]+)/.exec(response.headers.get('Content-Disposition') ?? '')?.[1];
   return { blob: await response.blob(), filename: encoded ? decodeURIComponent(encoded) : `support-report-${params.group}.pdf` };
 }
 
-export async function fetchChatClients(fetcher: typeof fetch = fetch): Promise<string[]> {
+export async function fetchChatClients(fetcher: typeof fetch = apiFetch): Promise<string[]> {
   return (await supportResponse(await fetcher('/api/chat/clients', { signal: AbortSignal.timeout(15_000) }))).json();
 }
 
 /** No `client` means all clients. */
-export async function askChat(question: string, locale: Locale, client?: string, fetcher: typeof fetch = fetch): Promise<ChatAnswer> {
+export async function askChat(question: string, locale: Locale, client?: string, fetcher: typeof fetch = apiFetch): Promise<ChatAnswer> {
   const response = await fetcher('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
