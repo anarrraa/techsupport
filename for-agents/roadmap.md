@@ -1,6 +1,6 @@
 # MVP completion roadmap
 
-Last reviewed: 2026-11-06
+Last reviewed: 2026-11-07
 
 ## Goal
 
@@ -76,16 +76,19 @@ Open decisions (record answers here):
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 190 tests, 189 passed, 0 failed, 1 opt-in database check skipped on 2026-11-06 after the phase 3 review fixes; frontend 14 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
+| Unit tests | Pass | `npm test`: 190 tests, 189 passed, 0 failed, 1 opt-in database check skipped on 2026-11-06 after the phase 3 review fixes, and again on 2026-11-07 at `a469bdb` (Node 26 / npm 11, not the pinned toolchain; `npm ci`, typecheck and build also exit 0); frontend 14 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
 | Docs chat live (Vertex + pgvector) | Pass with one miss | 2026-11-06: real `documents/` indexed into a throwaway pgvector DB with the user's GCP project (gcloud default); 6/7 known questions answered and cited correctly; logs counts-only. Re-checked after the review fixes the same day: index 2762 new then 0, 2 answers cited, no-answer question returned empty sources. Not yet on a shared database |
 | Type checking | Pass | `npm run typecheck` exit 0 (root and frontend) on 2026-11-06 after the phase 3 review fixes |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-06; frontend `npm run build` exit 0 the same day |
-| GitHub CI | Pass | Run `30893672018` passed install, test, typecheck, and build on 2026-08-04 |
+| GitHub CI | **Fail** on `main` | 2026-11-07: run [42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976) on `a9cffcf` failed at `npm ci` — lockfile missing `react@19.3.1`, `react-dom@19.3.1`, `scheduler@0.28.0`. Fix `a469bdb` is local, not pushed. The reminder workflow runs the same `npm ci`, so the next scheduled run (Mon 2026-11-09) fails until it is pushed. Last green CI: `37286379216` on `a6b529a` (2026-10-05) |
 | **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
 | Scheduled run verified in production | Pass | The dry-run immediately after reported `Scanned 26; 17 due, 9 not breached, 0 outside calendar, 0 awaiting window`, `0 request(s) crossed an escalation level` — the seed held — and `2 direct message(s) to 2 recipient(s)` with `11 withheld` by the rollout gate |
-| Production logs are aggregate-only | Pass | The run log above contains no ticket key, no assignee or participant name, no email, and no object id. Checked against two ticket-key prefixes, two assignee display names, a recipient's work address, a Cyrillic summary fragment, and a recipient object id |
-| Scheduled reminder workflow (before) | Was failing | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/shared/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; needs a green scheduled run to confirm |
+| Production logs are aggregate-only | **Fail** 2026-11-07 | App output is aggregate-only in all 88 runs since 2026-09-09 (fixed templates; no ticket-key pattern, Cyrillic, or `@` in it). But the reminder step's `env:` echo prints the `TEAMS_BOT_RECIPIENT_ALLOWLIST` *variable*, and one of its two entries is a staff email in plaintext — in every run, public repository. Fix: carry it as a secret or as object ids (`.github/` change) and delete the old run logs — user. Earlier check, superseded: the run log above contains no ticket key, no assignee or participant name, no email, and no object id. Checked against two ticket-key prefixes, two assignee display names, a recipient's work address, a Cyrillic summary fragment, and a recipient object id |
+| Scheduled reminder workflow (before) | Was failing | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/shared/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; confirmed 2026-11-07 — see "Scheduled runs observed" |
+| Scheduled runs observed | Pass 2026-11-07 | 84 consecutive `schedule` runs 2026-09-10 → 2026-11-06, all `success`, two per weekday. First [34442164854](https://github.com/anarrraa/techsupport/actions/runs/34442164854), first in-window delivery [35566617736](https://github.com/anarrraa/techsupport/actions/runs/35566617736), latest [42229509047](https://github.com/anarrraa/techsupport/actions/runs/42229509047). 22 in-window runs delivered 74 direct-message legs, 0 failed; 42 zero-due runs sent nothing |
+| Escalation state cache chain | Pass 2026-11-07 | 90 consecutive runs, [34204079955](https://github.com/anarrraa/techsupport/actions/runs/34204079955) → [42229509047](https://github.com/anarrraa/techsupport/actions/runs/42229509047), each restored the previous run's `escalation-state-<id>` and saved its own; zero misses |
+| Dry-run dispatch 2026-11-07 | Not dispatched | Dry runs also save a new escalation-state cache entry (`Save escalation state` is `if: always()`; dispatch dry runs `34204079955` and `34208522918` did). Not allowed in this evidence pass |
 | Scoped JQL correctness | Pass | On 2026-08-26 `JIRA_JQL` set to `project = DC AND statusCategory != Done AND assignee is not EMPTY` |
 | Local production dry-run | Pass | On 2026-08-26 dry-run scans real DC issues and reaches SLA endpoint |
 | JSM SLA read access | Pass | On 2026-08-26 `GET /rest/servicedeskapi/request/DC-844/sla` returns 200 OK (agent access granted) |
@@ -109,10 +112,11 @@ Open decisions (record answers here):
 | Bot application id known | Pass | Read from the Azure portal 2026-09-08: `b76bcdfb-5a16-44c4-81e0-860780daa2da`, single tenant, one secret, activated. Recorded here deliberately: an application id and a tenant id are not secrets — the app id is substituted into every published Teams manifest and the tenant id is returned by any sign-in endpoint for the domain. Staff email addresses and Entra object ids are a different class and are kept out of tracked files |
 | Package accepted by Teams | Fixed 2026-09-08 | The first upload was rejected: `Schema validation failed at 'packageName': Property "packageName" has not been defined and the schema does not allow additional properties`. Manifest 1.23 sets `additionalProperties: false`, and `packageName` — valid in 1.16, which this manifest was first written against — is not in it. Removed. Teams names the offending property exactly, so no local allowlist was added to duplicate that check |
 | Teams app package built with the real id | Pass | On 2026-09-08 `npm run package:teams` produced `packages/sla-reminder-teams-app.zip` carrying that id as both manifest `id` and `botId`, `scopes: [personal]`, `isNotificationOnly: true` |
-| Teams app published to the organisation catalog | Not attempted | administrator action; per-person custom upload only proved the path on 2026-08-20 |
-| GitHub OIDC federated credential on the Entra app | Not attempted | code path implemented and unit tested; the credential itself is not configured |
-| `config/escalation.json` populated | Not attempted | Jira account ids for the two pilot recipients resolved 2026-09-07; object ids still needed, via `npm run resolve:ids` |
-| **GitHub's cron cannot meet the time-window requirement** | Blocking, measured 2026-09-09 | The 02:00 UTC run on 2026-09-09 never fired at all. Measuring every past `schedule` event against its cron time gives delays of 45, 46, 128, 130, 131, 135, 135, 154, 160, 168, 295, 357 and 489 minutes — a median around two hours and a tail past eight. A 10:23 Ulaanbaatar slot therefore lands at 12:23 typically and 18:23 at worst, outside the 09:00-12:00 window the team asked for. Moving the cron off the hour (`:00` to `:23`) did not help. `workflow_dispatch` is unaffected: every manual dispatch in this project started within seconds. The fix is an external trigger calling the dispatch API, not more cron tuning |
+| Teams app published to the organisation catalog | Unknown 2026-11-07 | Catalog lookup and install succeed in every delivering run, but the code accepts a sideloaded entry when no `organization` one exists and the log does not say which. Teams admin to confirm. Earlier: administrator action; per-person custom upload only proved the path on 2026-08-20 |
+| GitHub OIDC federated credential on the Entra app | Not configured | code path implemented and unit tested; 2026-11-07: `TEAMS_BOT_APP_PASSWORD` is set in every run, so the secret path is in use |
+| `config/escalation.json` populated | Superseded | Object ids recorded 2026-09-08 ("Recipient identifiers"), secret set the same day; every run since writes it. 2026-11-07: delivering runs still warn 1-2 breached requests with no participant in the directory |
+| **GitHub's cron misses the delivery windows** | Blocking, re-measured 2026-11-07 | Cron `0 1`/`0 6` UTC (09:00/14:00 Ulaanbaatar) since 2026-09-09, 84 runs: the 09:00 slot started 276-407 min late (median 302), the 14:00 slot 288-546 min late (median 376). Neither slot ever landed in its own window (0/42 each); the morning slot's delay put it in the afternoon window 22 times. 20 of 42 weekdays had no in-window run, including 9 straight (2026-10-14 → 10-26). The 546-min tail exceeds the 489 measured before, which by TODO.md's rule calls for an external trigger calling `workflow_dispatch` — user decision |
+| GitHub's cron cannot meet the time-window requirement (before) | Measured 2026-09-09 | The 02:00 UTC run on 2026-09-09 never fired at all. Measuring every past `schedule` event against its cron time gives delays of 45, 46, 128, 130, 131, 135, 135, 154, 160, 168, 295, 357 and 489 minutes — a median around two hours and a tail past eight. A 10:23 Ulaanbaatar slot therefore lands at 12:23 typically and 18:23 at worst, outside the 09:00-12:00 window the team asked for. Moving the cron off the hour (`:00` to `:23`) did not help. `workflow_dispatch` is unaffected: every manual dispatch in this project started within seconds. The fix is an external trigger calling the dispatch API, not more cron tuning |
 | Schedule set to the team's working rhythm | Changed 2026-09-08 | Twice a working day: `0 2 * * 1-5` and `0 7 * * 1-5`, which are 10:00 and 15:00 in Ulaanbaatar (UTC+8, no daylight saving since 2016). `REMINDER_DELIVERY_WINDOW_MINUTES` was raised to equal `REMINDER_REPEAT_MINUTES` in the same change: the gaps between these runs are 300 and 1140 minutes, both whole multiples of 60, so a 15-minute window would have reached only 25% of breaches and always the same 25% |
 | Answered requests stop being reminded | Pass | Verified against live Jira 2026-09-08: 9 of 26 open DC requests have a completed first-response cycle and are excluded by `selectReminderTickets` before any window logic. Replying inside or outside the SLA both end the reminders; only an `ongoing` cycle is eligible |
 | Schedule matches the delivery-window design | Superseded 2026-09-08 | The schedule was `0 0 * * *`. A daily run advances elapsed-since-breach by 1440 minutes and `1440 % 60 == 0`, so `isReminderWindow` returned the same verdict for a given ticket on every run: breaches whose age mod 60 fell outside the 15-minute window were **never** reminded, permanently, not occasionally. Reproduced against `src/reminder/sla.ts`: offsets 20 and 47 answered `no` on seven consecutive days; at `*/15 * * * *` every offset is reminded once an hour |
@@ -228,7 +232,16 @@ document or CI logs.
       exclude a paused cycle, with tests. The application must not second-guess
       Jira's clock (`AGENTS.md`).
 - [ ] Confirm JSM First Response goals match `for-agents/sla-matrix.md`.
+  - Evidence 2026-11-07: not checked — no Jira credentials on this machine (the
+    main checkout's `.env` holds only `DATABASE_URL`) and Actions logs carry no
+    goal durations by design. Needs the user to put Jira credentials in `.env`
+    for a read-only aggregate pass, or a JSM admin to read the SLA goals.
+    [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
+  - Evidence 2026-11-07: indirect only. Across 84 scheduled runs, due requests
+    were never `outside calendar` at 13:37-15:48 local and always were at
+    18:49-23:07 local. Opening hour, 18:00 close, and holidays unconfirmed; same
+    blocker as above (user credentials or JSM admin).
 - [x] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.
   - Confirmed 2026-08-20 through `GET /rest/api/3/field`, which lists SLA metrics
     without needing agent permission. The instance defines `Time to first
@@ -239,8 +252,10 @@ document or CI logs.
   - Confirmed 2026-08-26: agent access granted on DC project. `GET
     /rest/servicedeskapi/request/DC-844/sla` returns 200 OK with full SLA data
     including `elapsedTime` (working-hours elapsed time from JSM).
-- [ ] Confirm the Teams webhook accepts the payload and renders escaped text.
+- [x] Confirm the Teams webhook accepts the payload and renders escaped text.
   - The webhook is now optional; a bot-only deployment skips this check.
+  - N/A 2026-11-07: `TEAMS_WEBHOOK_URL` is empty in all 88 runs since
+    2026-09-09; the deployment is bot-only. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [x] Confirm required GitHub secrets and variables are configured.
   - Configured 2026-09-08. The repository had **none** of either, so the nightly
     schedule could never have worked regardless of the webhook break.
@@ -249,26 +264,58 @@ document or CI logs.
     `TEAMS_BOT_APP_ID`, `TEAMS_BOT_TENANT_ID`, `TEAMS_BOT_RECIPIENT_ALLOWLIST`.
     Still missing: `TEAMS_BOT_APP_PASSWORD` as a secret, or the OIDC federated
     credential in its place.
-- [ ] Confirm `JIRA_RESOLUTION_SLA_NAME` exactly matches the production metric.
+- [x] Confirm `JIRA_RESOLUTION_SLA_NAME` exactly matches the production metric.
   - `GET /rest/api/3/field` listed `Time to resolution` on 2026-08-20, which is
     the configured default; confirm it is the metric JSM actually attaches to DC
     requests.
-- [ ] If Gemini is enabled, confirm WIF, Vertex IAM, region, and model access.
+  - Confirmed 2026-11-07: the variable is `Time to resolution` in every run, and
+    all 22 in-window scheduled runs since 2026-09-10 selected escalation
+    crossings (L2-L5) from that clock on DC requests. A missing configured clock
+    fails the run visibly (unit test `fails visibly when no ticket carries the
+    escalation clock`); none failed. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
+- [x] If Gemini is enabled, confirm WIF, Vertex IAM, region, and model access.
+  - N/A 2026-11-07: `REMINDER_USE_LLM_INTRO` is empty in all 88 runs since
+    2026-09-09, so the Google auth step is skipped and no model is called.
 - [ ] Run `workflow_dispatch` with `dry_run=true` and verify aggregate-only output.
+  - Evidence 2026-11-07: dispatch dry runs `34204079955`, `34208522918`,
+    `34319541377`, `34328562958` printed aggregate-only app output, **but** the
+    step's `env:` echo prints the `TEAMS_BOT_RECIPIENT_ALLOWLIST` variable, one
+    entry of which is a staff email in plaintext — in all 88 runs since
+    2026-09-09, on a public repository. Fix needs a `.github/` change (carry the
+    allowlist as a secret, or list object ids) and deleting the old run logs —
+    user. No new dispatch was made: dry runs also save a new escalation-state
+    cache entry (`if: always()`), which this pass was not allowed to write.
+    [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 
 ## Milestone 4: controlled rollout
 
 - [ ] Create or identify one controlled Jira request for each relevant SLA state:
   due, paused, outside calendar, and not breached.
+  - Evidence 2026-11-07: open; needs a Jira write or a Jira reader (user / Jira
+    admin). `paused` cannot exist until the pause workflow above is fixed.
 - [ ] Run a dry-run and compare aggregate selection with Jira.
+  - Evidence 2026-11-07: open; no Jira credentials on this machine (user).
 - [ ] Run one controlled live delivery and verify Teams content and links.
+  - Evidence 2026-11-07: delivery done (bot, 2026-09-08 local; dispatch
+    [34329397461](https://github.com/anarrraa/techsupport/actions/runs/34329397461) delivered 5; 22 scheduled runs
+    delivered since). Content and links still need a pilot recipient to look
+    (user).
 - [ ] Verify a no-due run posts nothing.
-- [ ] Observe at least four consecutive scheduled runs.
+  - Evidence 2026-11-07: 42 scheduled runs had `0 due` and sent nothing
+    (`notified:false`, `directMessageCount 0`), but every one was also outside
+    the delivery window, so the window gate stopped them first. Still needs one
+    in-window run with zero due; unit test `does not post to Teams when no
+    ticket is due` passes in every run.
+- [x] Observe at least four consecutive scheduled runs. Observed 2026-11-07:
+      84 consecutive scheduled runs, 2026-09-10 to 2026-11-06, all `success`,
+      exactly two per weekday. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [x] Verify the schedule does not repeat a reminder needlessly. Superseded
       2026-09-08: the workflow runs twice a working day, so the schedule is the
       cadence and the delivery window is deliberately open. A narrow window on a
       sparse schedule reached only 25% of breaches, always the same 25%.
-- [ ] Record the successful GitHub run URLs in the evidence snapshot.
+- [x] Record the successful GitHub run URLs in the evidence snapshot. Done
+      2026-11-07: "Scheduled runs observed" and "Escalation state cache chain"
+      rows. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [ ] Update the PRD status from `implemented baseline` to `production verified`.
 
 ## MVP definition of done
@@ -278,14 +325,30 @@ The MVP is done only when all of the following are true:
 - [ ] Milestones 1 through 4 are complete.
 - [ ] `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` pass locally
   and in GitHub Actions.
+  - Evidence 2026-11-07: local pass (190 tests, 189 pass, 1 skipped) on Node 26 /
+    npm 11, not the pinned toolchain. CI on `main` `a9cffcf`
+    ([42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976)) **failed** at `npm ci` (lockfile out
+    of sync); the fix `a469bdb` is not pushed. The reminder workflow runs the
+    same `npm ci`, so the next scheduled run (Mon 2026-11-09) will fail until it
+    is pushed — user.
 - [ ] Dry-run and ordinary operational logs contain aggregate counts only.
+  - Evidence 2026-11-07: app output is aggregate-only in all 88 runs; the
+    workflow `env:` echo of the allowlist variable is not (see Milestone 3).
 - [ ] All external calls and retry waits are bounded.
 - [ ] A controlled Jira-to-Teams delivery has succeeded.
-- [ ] Scheduled execution has been observed without duplicate 15-minute posts.
+  - Evidence 2026-11-07: succeeded through the personal bot (see Milestone 4);
+    the channel webhook was never configured. Whether bot delivery satisfies
+    the MVP item is the user's call — left unchecked rather than guessed.
+- [x] Scheduled execution has been observed without duplicate 15-minute posts.
+      2026-11-07: 84 scheduled runs, at most one in-window run per weekday, runs
+      at least four hours apart in one concurrency group. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [ ] Production Jira SLA goals, calendar, metric name, and priority mapping are
   confirmed.
 - [ ] No secret, token, ticket content, or personal data is present in Git history
   or GitHub Actions logs.
+  - Evidence 2026-11-07: **fails** — a staff email from the allowlist variable
+    is printed in every reminder run log since 2026-09-09 (public repository).
+    Git history not re-audited in this pass.
 
 ## V2 milestone 1: personal Teams bot delivery path
 
@@ -457,22 +520,44 @@ infrastructure for.
 
 - [ ] Publish the Teams app package to the organisation catalog. Build it with
       `npm run package:teams`.
+  - Evidence 2026-11-07: catalog lookup succeeds in every delivering run, but
+    the code falls back to a sideloaded entry and the log does not say which
+    one was used. Teams admin to confirm in Teams admin center → Manage apps.
 - [ ] Grant and consent the Graph application permissions:
       `TeamsAppInstallation.ReadWriteForUser.All`, `AppCatalog.Read.All`,
       `User.Read.All`.
+  - Evidence 2026-11-07: catalog read and per-user installation are proven by
+    22 delivering scheduled runs; `User.Read.All` is unproven. Entra admin to
+    confirm, or drop it if `resolve:ids` is not used.
 - [ ] Configure the GitHub OIDC federated credential on the Entra app
       registration (audience `api://AzureADTokenExchange`).
+  - Evidence 2026-11-07: not configured in practice — `TEAMS_BOT_APP_PASSWORD`
+    is set in every run, so the client-secret path is in use. Entra admin.
 - [ ] Verify the private escalation directory contains all intended object ids.
       Never commit it; deliver it through `ESCALATION_DIRECTORY_JSON` as described
       in the evidence snapshot. Prior pilot configuration is recorded there.
-- [ ] Run `npm run verify:bot -- <object-id>` and record the outcome here.
-- [ ] Seed the escalation state before the first live run:
+  - Evidence 2026-11-07: every delivering run warns `1-2 breached request(s)
+    have no participant in the escalation directory`. User to say whether those
+    people are meant to be absent.
+- [x] Run `npm run verify:bot -- <object-id>` and record the outcome here.
+      Recorded 2026-09-08 in the evidence snapshot ("Live bot direct message
+      from this codebase": `Direct message delivered`); 22 scheduled deliveries
+      since. Not re-run on 2026-11-07 (it sends a message). [Report](plan/phase-4-bot-production/reports/2026-11-07-evidence.md).
+- [x] Seed the escalation state before the first live run:
       `ESCALATION_SEED_ONLY=true` with `REMINDER_DRY_RUN` unset. A dry-run on
       2026-09-07 found 9 DC requests that have already crossed a level (L2:4,
       L3:3, L5:2); without seeding, the first live run delivers all of them,
       including two to the L5 contact.
+      Done 2026-09-08 in the Actions cache: [34203911077](https://github.com/anarrraa/techsupport/actions/runs/34203911077)
+      (`seed_only`, 7 crossed L2:2 L3:3 L5:2, 0 messages) preceded the first
+      live GitHub delivery [34329397461](https://github.com/anarrraa/techsupport/actions/runs/34329397461).
+      [Report](plan/phase-4-bot-production/reports/2026-11-07-evidence.md).
 - [ ] Run `workflow_dispatch` with `dry_run=true` and confirm the direct-message
       counts look right and no identity appears in the log.
+  - Evidence 2026-11-07: counts look right (dry runs skipped 2, 1, 5, 5; the
+    following live dispatch delivered 5), but an identity **does** appear: the
+    `env:` echo prints a staff email from `TEAMS_BOT_RECIPIENT_ALLOWLIST` in
+    every run. Fix is a `.github/` change — user.
 - [x] Run one controlled live delivery with the allowlist set to the two pilot
       recipients. Done 2026-09-08 from a local run: `Delivered 3 direct
       message(s) to 3 recipient(s)` covering 7 requests at L2, L3 and L5, with
@@ -481,12 +566,22 @@ infrastructure for.
 - [x] Confirm no level is notified twice. The immediately following run reported
       `0 request(s) crossed an escalation level` and delivered nothing, against
       the state file the first run wrote.
-- [ ] Seed the **Actions cache** state before the first scheduled run. The state
+- [x] Seed the **Actions cache** state before the first scheduled run. The state
       written above is local; the cache is separate and starts empty, so a
       scheduled run would re-deliver all 7 without `seed_only=true` first.
+      Done 2026-09-08 by run `34203911077`; first scheduled run `34442164854`
+      restored the chain. [Report](plan/phase-4-bot-production/reports/2026-11-07-evidence.md).
 - [ ] Confirm the escalation state cache survives between scheduled runs and that
       no level is notified twice.
+  - Evidence 2026-11-07: the cache half holds — 90 consecutive runs from
+    `34204079955` to `42229509047` each restored the previous run's
+    `escalation-state-<id>`, zero misses. The other half is by design not true
+    yet: while the allowlist withholds a sibling leg (6-12 per run), the level is
+    left unrecorded and the pilot recipient gets it again next in-window run
+    (`src/escalation/direct-messages.ts:141`). Re-check after the allowlist is
+    lifted (user).
 - [ ] Confirm the Low L5 threshold question with the client.
+  - Evidence 2026-11-07: open — client.
 
 ### V2 milestone 3: monthly dashboard backend
 

@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-11-04
+Last updated: 2026-11-07
 
 This tracks actionable next steps across the MVP and the proposed V2
 (personal Teams bot + contract escalation). See `AGENTS.md` for required
@@ -23,9 +23,21 @@ reading order and non-negotiable invariants before touching any of this.
       nothing. The cron sits at each window's start for the most room. No
       external scheduler — that would have been new infrastructure for a
       problem a clock check solves.
-- [ ] Record a fortnight of run times and missed windows. If the delay tail is
+- [x] Record a fortnight of run times and missed windows. If the delay tail is
       worse than the 45-489 minutes measured, escalate to an external trigger
-      calling `workflow_dispatch`.
+      calling `workflow_dispatch`. Recorded 2026-11-07 over 84 scheduled runs:
+      delays 276-546 min, neither cron slot ever landed in its own window, 20 of
+      42 weekdays had no in-window run. Tail is worse than 489 → next item.
+      Roadmap evidence snapshot, [report](plan/phase-4-bot-production/reports/2026-11-07-evidence.md).
+- [ ] Decide on an external trigger calling `workflow_dispatch` at 09:00 and
+      14:00 Ulaanbaatar (user). Added 2026-11-07 from the measurement above.
+- [ ] Push `a469bdb` (user). CI on `main` `a9cffcf` fails at `npm ci`; the
+      reminder workflow runs the same step, so the Mon 2026-11-09 scheduled run
+      fails until the lockfile fix is on `main`. Added 2026-11-07.
+- [ ] Stop printing a staff email in every reminder run log (user, `.github/`
+      change). The step's `env:` echo shows the `TEAMS_BOT_RECIPIENT_ALLOWLIST`
+      repository variable; carry it as a secret or as object ids, then delete
+      the old run logs (public repository). Found 2026-11-07.
 
 - [x] Deploy. PR #2 and #3 merged 2026-09-08; escalation state seeded in the
       Actions cache (run `34203911077`, 0 messages sent); a dry-run on `main`
@@ -41,6 +53,8 @@ reading order and non-negotiable invariants before touching any of this.
       which is correct for the channel webhook but may show literally in a
       direct message. Look at that line in the next real delivery before
       deciding whether the bot needs its own escape target.
+      Evidence 2026-11-07: 22 scheduled deliveries since; nobody has looked yet —
+      a pilot recipient (user).
 
 - [x] Configure the GitHub secrets and variables. Done 2026-09-08; the
       repository previously had none of either. Dispatch run `34185580185`
@@ -81,6 +95,8 @@ reading order and non-negotiable invariants before touching any of this.
       policy is needed** — superseded 2026-09-08 by the goOrange delivery path,
       which installs the app per recipient through Graph. See the revision note
       in `for-agents/roadmap.md`.
+      Evidence 2026-11-07: install works, but the code also accepts a sideloaded
+      entry and logs don't say which was used (Teams admin to confirm).
 - [ ] Grant and consent the Graph **application** permissions on the app
       registration: `AppCatalog.Read.All`, and
       `TeamsAppInstallation.ReadWriteSelfForUser.All` (narrower — limited to this
@@ -88,30 +104,41 @@ reading order and non-negotiable invariants before touching any of this.
       refuses). `User.Read.All` only if `npm run resolve:ids` is used rather than
       reading the two object ids from the portal. goOrange already holds this
       shape of permission in the tenant, so the pattern is approved.
+      Evidence 2026-11-07: catalog read and installation proven by 22 delivering
+      runs; `User.Read.All` unconfirmed (Entra admin).
 - [ ] Configure a GitHub OIDC federated credential on the Entra app
       registration (decided 2026-08-24, matching the existing Vertex
       authentication pattern) instead of a client secret. Audience
       `api://AzureADTokenExchange`, subject
       `repo:<owner>/<repo>:ref:refs/heads/main`. The code path exists and is
       unit tested; only the credential is missing.
-- [ ] Fill in `config/escalation.json`: it already carries both pilot
+      Evidence 2026-11-07: still missing — every run uses the secret (Entra admin).
+- [x] Fill in `config/escalation.json`: it already carries both pilot
       recipients' emails and real Jira account ids, so `npm run resolve:ids`
       fills the rest — or read the two object ids straight from the Azure portal.
       Then `gh secret set ESCALATION_DIRECTORY_JSON < config/escalation.json`.
       **Do not commit it.** This repository is public and the file names real
       people; it is gitignored for that reason.
+      Done 2026-09-08 (roadmap "Recipient identifiers", secret set); every run
+      since writes it. Checked 2026-11-07.
 - [x] Prove the transport from this codebase. Done 2026-09-08:
       `Direct message delivered`. Recorded in the evidence snapshot.
-- [ ] Stage the first live run to two people only: set the
+- [x] Stage the first live run to two people only: set the
       `TEAMS_BOT_RECIPIENT_ALLOWLIST` repository variable to
       the two pilot recipients. Widen it once the messages read the
-      way they should.
-- [ ] Seed the escalation state before the first live run
+      way they should. Checked 2026-11-07: the variable holds two entries in
+      every run since 2026-09-09 and 6-12 recipient legs are withheld per
+      delivering run. Widening also unblocks "no level notified twice" (roadmap
+      V2 milestone 2).
+- [x] Seed the escalation state before the first live run
       (`ESCALATION_SEED_ONLY=true`, `REMINDER_DRY_RUN` unset). The 2026-09-07
       dry-run found 9 DC requests already past a level, two of them past L5.
       Without this the first live run delivers the whole backlog at once.
+      Done 2026-09-08 by run `34203911077` (7 crossed, 0 messages), before the
+      first live GitHub delivery `34329397461`. Checked 2026-11-07.
 - [ ] Confirm with the client what Low L5 means. The contract gives it no clock
       mark ("only if SLA breached"), so Low currently never escalates past L4.
+      Evidence 2026-11-07: still open — client.
 - [x] Get the user's answers to the open decisions in
       `for-agents/brd-teams-bot-escalation.md`. All six resolved as of 2026-08-24:
   - [x] Bot delivery mechanism. **Resolved 2026-08-20 by executed test.**
