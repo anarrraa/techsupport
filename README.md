@@ -319,7 +319,8 @@ Teams. Dry-run logs counts only and does not log ticket content.
 `for-agents/prd-monthly-dashboard.md`. With `DATABASE_URL` set, every run (dry-run
 included) stores one `SLASnapshot` row per scanned ticket: JSM's figures only,
 no summary, comment, or person. A capture failure is a warning, never a failed
-run. The API has no auth yet and binds to `127.0.0.1`.
+run. Without the Entra variables the API has no auth and binds to `127.0.0.1`;
+the server refuses any other host until they are set (see Deploy below).
 
 ```sh
 # pgvector image: the schema enables the `vector` extension (docs chat), so plain postgres fails db push
@@ -362,6 +363,80 @@ Optional PostgreSQL regression against a disposable database:
 ```sh
 TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5433/dashboard node --test tests/backend/db.test.ts
 ```
+
+## Deploy (Cloud Run)
+
+Requirements: [prd-hosting-auth.md](for-agents/prd-hosting-auth.md). One container
+(`Dockerfile`): Express serves the API and `frontend/dist`; Cloud SQL PostgreSQL
+with pgvector; Microsoft Entra login limited to one group. Every `/api` route
+except `/api/health` and `/api/auth/*` needs a session. Without all six auth
+variables the server exits instead of listening on `0.0.0.0`.
+
+**Runbook, not executed.** Nothing below has been run; no cloud resource exists.
+Replace every `<PLACEHOLDER>`; none of the ids are known to this repo.
+
+```sh
+gcloud config set project <PROJECT_ID>
+gcloud services enable run.googleapis.com sqladmin.googleapis.com artifactregistry.googleapis.com \
+  secretmanager.googleapis.com aiplatform.googleapis.com
+
+# Database (pgvector is available on Cloud SQL PostgreSQL)
+gcloud sql instances create <INSTANCE> --database-version=POSTGRES_16 --region=<REGION> --tier=db-custom-1-3840
+gcloud sql databases create dashboard --instance=<INSTANCE>
+gcloud sql users create <DB_USER> --instance=<INSTANCE> --password=<DB_PASSWORD>
+# Schema (creates the vector extension): from a workstation through the Cloud SQL Auth Proxy
+cloud-sql-proxy <PROJECT_ID>:<REGION>:<INSTANCE> --port 5432 &
+DATABASE_URL='postgresql://<DB_USER>:<DB_PASSWORD>@127.0.0.1:5432/dashboard' npm run db:push
+DATABASE_URL='postgresql://<DB_USER>:<DB_PASSWORD>@127.0.0.1:5432/dashboard' npm run docs:index   # optional: docs chat
+
+# Secrets (values typed or piped, never committed)
+printf '%s' '<ENTRA_CLIENT_SECRET>' | gcloud secrets create entra-client-secret --data-file=-
+openssl rand -base64 48 | tr -d '\n' | gcloud secrets create session-secret --data-file=-
+printf '%s' 'postgresql://<DB_USER>:<DB_PASSWORD>@localhost/dashboard?host=/cloudsql/<PROJECT_ID>:<REGION>:<INSTANCE>' \
+  | gcloud secrets create database-url --data-file=-
+
+# Runtime identity
+gcloud iam service-accounts create techsupport-run
+for role in roles/cloudsql.client roles/secretmanager.secretAccessor roles/aiplatform.user; do
+  gcloud projects add-iam-policy-binding <PROJECT_ID> \
+    --member=serviceAccount:techsupport-run@<PROJECT_ID>.iam.gserviceaccount.com --role=$role
+done
+
+# Image
+gcloud artifacts repositories create techsupport --repository-format=docker --location=<REGION>
+gcloud auth configure-docker <REGION>-docker.pkg.dev
+docker build --platform linux/amd64 --build-arg NODE_VERSION=$(cat .node-version) \
+  -t <REGION>-docker.pkg.dev/<PROJECT_ID>/techsupport/app:<TAG> .
+docker push <REGION>-docker.pkg.dev/<PROJECT_ID>/techsupport/app:<TAG>
+
+# Service. --allow-unauthenticated: Cloud Run lets the request in, the app's Entra login decides.
+gcloud run deploy techsupport --region=<REGION> \
+  --image=<REGION>-docker.pkg.dev/<PROJECT_ID>/techsupport/app:<TAG> \
+  --service-account=techsupport-run@<PROJECT_ID>.iam.gserviceaccount.com \
+  --add-cloudsql-instances=<PROJECT_ID>:<REGION>:<INSTANCE> \
+  --allow-unauthenticated --max-instances=2 \
+  --set-env-vars=ENTRA_TENANT_ID=<TENANT_ID>,ENTRA_CLIENT_ID=<CLIENT_ID>,ENTRA_ALLOWED_GROUP_ID=<GROUP_OBJECT_ID>,PUBLIC_URL=<PUBLIC_URL>,GOOGLE_CLOUD_PROJECT=<PROJECT_ID>,GOOGLE_CLOUD_LOCATION=<VERTEX_REGION> \
+  --set-secrets=ENTRA_CLIENT_SECRET=entra-client-secret:latest,SESSION_SECRET=session-secret:latest,DATABASE_URL=database-url:latest
+gcloud run services describe techsupport --region=<REGION> --format='value(status.url)'   # = <PUBLIC_URL> if no custom domain
+
+# Check
+curl -s <PUBLIC_URL>/api/health                                  # 200 {"status":"ok",...}
+curl -s -o /dev/null -w '%{http_code}\n' <PUBLIC_URL>/api/reports/2026-10   # 401
+```
+
+Entra app registration (portal, by an admin): platform **Web**, redirect URI
+`<PUBLIC_URL>/api/auth/callback`; a client secret (into `entra-client-secret`);
+Token configuration → add the **groups** claim to the ID token. A user whose
+token has no `groups` claim (group overage) is refused, so prefer "Groups
+assigned to the application" and assign `<GROUP_OBJECT_ID>` to the app. If the
+first deploy is what reveals the URL, redeploy with `PUBLIC_URL` set and add the
+redirect URI afterwards.
+
+Open for the real deploy (roadmap 5.5): support report configs
+(`config/support-report/*.json`, gitignored) are not in the image and need a
+mounted secret; scheduled capture from GitHub Actions needs a route to Cloud SQL
+(e.g. the Auth Proxy in the workflow) before the `DATABASE_URL` secret can point
+at it.
 
 ## GitHub Actions
 

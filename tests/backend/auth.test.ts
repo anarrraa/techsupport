@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { once } from 'node:events';
 import { spawnSync } from 'node:child_process';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { generateKeyPair, SignJWT } from 'jose';
 import { assertExposure, authConfig, finishLogin, readSession, signCookie, startLogin, verifyCookie, type AuthConfig, type LoginDeps } from '../../src/backend/auth.ts';
 import { createApp } from '../../src/backend/server.ts';
@@ -178,5 +181,18 @@ test('without auth config the app behaves as before: no login routes, API open o
 	await withServer(createApp(store, async () => ({})), async (url) => {
 		assert.equal((await fetch(`${url}/api/reports/2026-10`)).status, 200);
 		assert.equal((await fetch(`${url}/api/auth/login`, { redirect: 'manual' })).status, 404);
+	});
+});
+
+test('the built frontend is served without a session; SPA routes fall back to index.html, /api does not', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'frontend-dist-'));
+	await writeFile(join(dir, 'index.html'), '<!doctype html><div id="root"></div>');
+	await withServer(createApp(store, async () => ({}), undefined, config, undefined, dir), async (url) => {
+		for (const path of ['/', '/dashboard', '/index.html']) {
+			const response = await fetch(`${url}${path}`);
+			assert.equal(response.status, 200, path);
+			assert.match(await response.text(), /id="root"/);
+		}
+		assert.equal((await fetch(`${url}/api/unknown`)).status, 401);
 	});
 });

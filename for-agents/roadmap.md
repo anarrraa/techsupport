@@ -78,6 +78,7 @@ Open decisions (record answers here):
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
 | Unit tests | Pass | `npm test`: 190 tests, 189 passed, 0 failed, 1 opt-in database check skipped on 2026-11-06 after the phase 3 review fixes; frontend 14 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
+| Container + auth (local) | Pass | 2026-11-07: `docker build` (node 22.19.0-slim, 215 MB, user `node`); with a throwaway pgvector DB and fake auth env `/api/health` 200, `/api/monthly-report` and `/api/reports/2026-10` 401 without cookie, `/dashboard` 200; no auth env on `0.0.0.0` → exit 1. Not deployed; no real Entra login yet (5.5) |
 | Docs chat live (Vertex + pgvector) | Pass with one miss | 2026-11-06: real `documents/` indexed into a throwaway pgvector DB with the user's GCP project (gcloud default); 6/7 known questions answered and cited correctly; logs counts-only. Re-checked after the review fixes the same day: index 2762 new then 0, 2 answers cited, no-answer question returned empty sources. Not yet on a shared database |
 | Type checking | Pass | `npm run typecheck` exit 0 (root and frontend) on 2026-11-06 after the phase 3 review fixes |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-06; frontend `npm run build` exit 0 the same day |
@@ -663,8 +664,9 @@ Scope and reports: `plan/phase-5-hosting-auth/`. Requirements:
       Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.2.md`.
 - [x] 5.3 Frontend: 401 → `/api/auth/login`; signed-in name + sign-out in the header.
       Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.3.md`.
-- [ ] 5.4 Container: Dockerfile + `.dockerignore`, Express serves `frontend/dist`;
+- [x] 5.4 Container: Dockerfile + `.dockerignore`, Express serves `frontend/dist`;
       `docker build`/`run` proof; README "Deploy (Cloud Run)" runbook (not executed).
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.4.md`.
 - [ ] 5.5 Deploy with the user's project, tenant and group; staff log in; a
       scheduled run's snapshot appears. Waits on the user.
 

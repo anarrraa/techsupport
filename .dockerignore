@@ -1,0 +1,17 @@
+# Secrets and private data: never in the build context.
+.env
+.env.*
+gcp-sa.json
+documents/
+config/*.json
+config/**/*.json
+.escalation-state/
+# Rebuilt inside the image.
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+src/backend/generated/
+.git/
+*.log
+packages/*.zip

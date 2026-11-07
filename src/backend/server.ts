@@ -1,4 +1,5 @@
 import express from 'express';
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generatePDF, generateExcel } from '../monthly-report/export.ts';
@@ -66,7 +67,7 @@ export function createApp(store: ReportStore = {
 	search: searchDocChunks,
 	answer,
 	clients: docClients,
-}, auth: AuthConfig | null = null, loginDeps?: LoginDeps) {
+}, auth: AuthConfig | null = null, loginDeps?: LoginDeps, frontendDir = 'frontend/dist') {
 	const app = express();
 	const upload = express.raw({ type: () => true, limit: '10mb' });
 
@@ -235,6 +236,11 @@ export function createApp(store: ReportStore = {
 			team: [], trend: [],
 		});
 	});
+	// The built frontend (container image). Its files are public, as the repo is; only /api needs a session.
+	if (existsSync(frontendDir)) {
+		app.use(express.static(frontendDir));
+		app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile('index.html', { root: frontendDir }));
+	}
 	// JSON errors, logging the status only. Known input problems and body-parser 4xx (size, encoding) are the client's;
 	// anything else is a server fault whose details are never echoed.
 	app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
