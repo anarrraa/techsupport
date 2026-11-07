@@ -658,8 +658,9 @@ Scope and reports: `plan/phase-5-hosting-auth/`. Requirements:
 - [x] 5.1 PRD `prd-hosting-auth.md` (auth code + PKCE, group check, signed
       session cookie, fail-closed startup, env, out of scope).
       Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.1.md`.
-- [ ] 5.2 Backend auth: login/callback/logout/me, session guard on `/api`,
+- [x] 5.2 Backend auth: login/callback/logout/me, session guard on `/api`,
       fail-closed startup; tests with a local signing key, no network.
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.2.md`.
 - [ ] 5.3 Frontend: 401 → `/api/auth/login`; signed-in name + sign-out in the header.
 - [ ] 5.4 Container: Dockerfile + `.dockerignore`, Express serves `frontend/dist`;
       `docker build`/`run` proof; README "Deploy (Cloud Run)" runbook (not executed).

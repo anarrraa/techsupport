@@ -9,6 +9,7 @@ import { aggregateMonth, monthRange, MonthlyReportLimitError, type SnapshotRow }
 import { assertSupportRows, buildSupportReport, suggestPeriod, SupportInputError, type ClientConfig } from '../support-report/support-report.ts';
 import { readRows } from '../support-report/input.ts';
 import { renderSupportReportPdf } from '../support-report/pdf.ts';
+import { assertExposure, AuthError, authConfig, finishLogin, LOGIN_COOKIE, logoutUrl, readCookie, readSession, SESSION_COOKIE, startLogin, type AuthConfig, type LoginDeps } from './auth.ts';
 
 interface ReportStore {
 	check(): Promise<unknown>;
@@ -65,9 +66,49 @@ export function createApp(store: ReportStore = {
 	search: searchDocChunks,
 	answer,
 	clients: docClients,
-}) {
+}, auth: AuthConfig | null = null, loginDeps?: LoginDeps) {
 	const app = express();
 	const upload = express.raw({ type: () => true, limit: '10mb' });
+
+	const health = async (_req: express.Request, res: express.Response) => {
+		try {
+			await store.check();
+			res.json({ status: 'ok', database: 'connected' });
+		} catch {
+			res.status(503).json({ status: 'unavailable', database: 'unavailable' });
+		}
+	};
+	app.get(['/health', '/api/health'], health);
+
+	// No auth config means loopback-only dev (assertExposure); with it, every other /api route needs a session.
+	if (auth) {
+		app.get('/api/auth/login', (_req, res) => {
+			const login = startLogin(auth);
+			res.setHeader('Set-Cookie', login.cookie);
+			res.redirect(302, login.url);
+		});
+		app.get('/api/auth/callback', async (req, res, next) => {
+			try {
+				const session = await finishLogin(auth, req.query, readCookie(req.headers.cookie, LOGIN_COOKIE), loginDeps);
+				res.setHeader('Set-Cookie', [session.cookie, `${LOGIN_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`]);
+				res.redirect(302, '/');
+			} catch (error) { next(error); }
+		});
+		app.get('/api/auth/logout', (_req, res) => {
+			res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`);
+			res.redirect(302, logoutUrl(auth));
+		});
+		app.use('/api', (req, res, next) => {
+			const session = readSession(auth, req.headers.cookie);
+			if (!session) {
+				res.status(401).json({ error: 'Sign in required' });
+				return;
+			}
+			res.locals.user = session;
+			next();
+		});
+		app.get('/api/auth/me', (_req, res) => { res.json(res.locals.user); });
+	}
 
 	app.get('/api/chat/clients', async (_req, res, next) => {
 		try { res.json(await chat.clients()); } catch (error) { next(error); }
@@ -124,15 +165,6 @@ export function createApp(store: ReportStore = {
 			res.setHeader('Content-Disposition', `attachment; filename="support-report-${label}.pdf"; filename*=UTF-8''${rfc5987(`${built.group} ${label}.pdf`)}`);
 			res.send(pdf);
 		} catch (error) { next(error); }
-	});
-
-	app.get('/health', async (_req, res) => {
-		try {
-			await store.check();
-			res.json({ status: 'ok', database: 'connected' });
-		} catch {
-			res.status(503).json({ status: 'unavailable', database: 'unavailable' });
-		}
 	});
 
 	app.get(['/api/reports/:month', '/api/reports/:month/export'], async (req, res) => {
@@ -208,7 +240,7 @@ export function createApp(store: ReportStore = {
 	app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
 		const parserStatus = Number((error as { status?: unknown } | null)?.status);
 		const chatBody = req.path === '/api/chat';
-		const [status, message] = error instanceof HttpError ? [error.status, error.message]
+		const [status, message] = error instanceof HttpError || error instanceof AuthError ? [error.status, error.message]
 			: error instanceof SupportInputError ? [400, error.message]
 			: parserStatus === 413 ? [413, chatBody ? 'Request body too large' : 'The file is larger than 10 MB']
 			: parserStatus >= 400 && parserStatus < 500 ? [parserStatus, chatBody ? 'Invalid request body' : 'The upload could not be read']
@@ -219,11 +251,11 @@ export function createApp(store: ReportStore = {
 	return app;
 }
 
-export const app = createApp();
-
 if (import.meta.main) {
-	// No authentication: keep the API on localhost until authorization exists.
-	const port = Number(process.env.BACKEND_PORT ?? 3001);
+	// Cloud Run sets PORT. Without auth env the server refuses any non-loopback host (prd-hosting-auth.md).
+	const port = Number(process.env.PORT ?? process.env.BACKEND_PORT ?? 3001);
 	const host = process.env.BACKEND_HOST ?? '127.0.0.1';
-	app.listen(port, host, () => console.log(`Backend listening on http://${host}:${port}`));
+	const auth = authConfig();
+	assertExposure(host, auth);
+	createApp(undefined, undefined, undefined, auth).listen(port, host, () => console.log(`Backend listening on http://${host}:${port}${auth ? ' (Entra login)' : ''}`));
 }

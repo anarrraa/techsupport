@@ -70,6 +70,21 @@ CI secrets `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`,
 The docs chat (`src/docs-chat/vertex.ts`) reads the same two locally, with ADC;
 `GOOGLE_CLOUD_LOCATION` defaults to `us-central1`.
 
+## Hosting and staff login (`src/backend/auth.ts`, `prd-hosting-auth.md`)
+
+Read by the backend at startup, not by `config.ts`. Set all six or none; none is
+only allowed on a loopback `BACKEND_HOST` (fail closed).
+
+| Var | Default | Purpose |
+| --- | --- | --- |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | none | Entra app registration |
+| `ENTRA_CLIENT_SECRET` | none | secret; Secret Manager in Cloud Run |
+| `ENTRA_ALLOWED_GROUP_ID` | none | the one group allowed in (`groups` claim) |
+| `SESSION_SECRET` | none; ≥ 32 chars | HMAC key for the session cookie |
+| `PUBLIC_URL` | none; https origin | redirect URI = `<PUBLIC_URL>/api/auth/callback` |
+| `BACKEND_HOST` | `127.0.0.1` | bind address; container `0.0.0.0` |
+| `PORT` / `BACKEND_PORT` | 3001 | Cloud Run sets `PORT` |
+
 ## Not in `.env.example` (read by `config.ts`)
 
 `HTTP_TIMEOUT_MS`, `HTTP_MAX_RETRIES`, `JIRA_PAGE_SIZE`, `JIRA_MAX_RESULTS`,

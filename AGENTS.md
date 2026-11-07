@@ -67,7 +67,8 @@ the priority.
   `src/monthly-report/export.ts` and `src/support-report/pdf.ts`; exceljs only in
   `src/monthly-report/export.ts` and `src/support-report/input.ts`; `@google/genai`
   only in `src/docs-chat/vertex.ts`; Prisma only in
-  `src/backend/db.ts`.
+  `src/backend/db.ts`; `jose` only in `src/backend/auth.ts` (framework-free; express
+  wiring stays in `server.ts`).
 - Do not claim an integration works without an executed external check.
 - Do not inspect or print `.env` or `gcp-sa.json`; use `.env.example` for variable
   names and documentation.
