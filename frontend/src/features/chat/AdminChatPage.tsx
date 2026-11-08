@@ -39,7 +39,8 @@ export function AdminChatPage() {
         onError: (error) =>
           setMessages((m) => [
             ...m,
-            message("assistant", error instanceof ReportRequestError && error.status < 500 ? error.message : t("state.error")),
+            message("assistant", !(error instanceof ReportRequestError) || error.status >= 500 ? t("state.error")
+              : error.status === 401 ? t("auth.expired") : error.message),
           ]),
       },
     );

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { archiveMonths, askChat, fetchChatClients, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError, supportErrorText } from '../../../src/shared/utils/report-requests.ts';
+import { archiveMonths, askChat, fetchChatClients, fetchMe, withLogin, authProblems, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError, supportErrorText } from '../../../src/shared/utils/report-requests.ts';
 import type { MonthlyReport } from '../../../src/types/report.ts';
 
 test('archive reads exactly 12 UTC months newest first across a year boundary', () => {
@@ -95,11 +95,88 @@ test('chat failures reject without echoing a server error body', async () => {
 });
 
 test('support upload errors lead with the localized text and keep the 4xx server detail', () => {
-  const text = { invalid: 'INVALID:', tooLarge: 'TOO_LARGE', generic: 'GENERIC' };
+  const text = { invalid: 'INVALID:', tooLarge: 'TOO_LARGE', expired: 'EXPIRED', generic: 'GENERIC' };
   assert.equal(supportErrorText(new ReportRequestError(400, 'Missing required columns: System'), text), 'INVALID: Missing required columns: System');
   assert.equal(supportErrorText(new ReportRequestError(413), text), 'TOO_LARGE');
+  assert.equal(supportErrorText(new ReportRequestError(401, 'Sign in required'), text), 'EXPIRED');
   assert.equal(supportErrorText(new ReportRequestError(500, 'PRIVATE'), text), 'GENERIC');
   assert.equal(supportErrorText(new ReportRequestError(404, 'Unknown config'), text), 'GENERIC');
   assert.equal(supportErrorText(new ReportRequestError(400), text), 'GENERIC');
   assert.equal(supportErrorText(new TypeError('Failed to fetch'), text), 'GENERIC');
+});
+
+/** In-memory sessionStorage stand-in. */
+function memoryStore() {
+  const map = new Map<string, string>();
+  return { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => void map.set(k, v), removeItem: (k: string) => void map.delete(k), map };
+}
+
+function recordProblems() {
+  const seen: string[] = [];
+  const listen = (e: Event) => seen.push(e.type);
+  authProblems.addEventListener('expired', listen);
+  authProblems.addEventListener('failed', listen);
+  return { seen, stop: () => { authProblems.removeEventListener('expired', listen); authProblems.removeEventListener('failed', listen); } };
+}
+
+test('a 401 on a GET starts Entra login; other statuses do not', async () => {
+  const logins: number[] = [];
+  for (const status of [401, 403, 404, 500, 200]) {
+    const fetcher = withLogin((async () => new Response(null, { status })) as typeof fetch, { login: () => logins.push(status), storage: memoryStore });
+    assert.equal((await fetcher('/api/reports/2026-10')).status, status);
+  }
+  assert.deepEqual(logins, [401]);
+});
+
+test('a second 401 within a minute of a login reports "failed" instead of looping against Entra', async () => {
+  const store = memoryStore();
+  let now = 1_000_000;
+  const logins: number[] = [];
+  const problems = recordProblems();
+  const fetcher = withLogin((async () => new Response(null, { status: 401 })) as typeof fetch, { login: () => logins.push(now), storage: () => store, now: () => now });
+  try {
+    await fetcher('/api/auth/me');
+    now += 30_000;
+    await fetcher('/api/auth/me');
+    assert.deepEqual([logins.length, problems.seen], [1, ['failed']]);
+    now += 31_000;
+    await fetcher('/api/auth/me');
+    assert.equal(logins.length, 2);
+  } finally { problems.stop(); }
+});
+
+test('without sessionStorage there is no loop guard, so no auto-redirect', async () => {
+  const problems = recordProblems();
+  let logins = 0;
+  try {
+    await withLogin((async () => new Response(null, { status: 401 })) as typeof fetch, { login: () => logins++, storage: () => null })('/api/x');
+    assert.deepEqual([logins, problems.seen], [0, ['failed']]);
+  } finally { problems.stop(); }
+});
+
+test('a 401 on a POST reports "expired" and keeps the page (the question or file is not lost)', async () => {
+  const problems = recordProblems();
+  let logins = 0;
+  try {
+    const fetcher = withLogin((async () => new Response(null, { status: 401 })) as typeof fetch, { login: () => logins++, storage: memoryStore });
+    assert.equal((await fetcher('/api/chat', { method: 'POST' })).status, 401);
+    assert.deepEqual([logins, problems.seen], [0, ['expired']]);
+  } finally { problems.stop(); }
+});
+
+test('a signed-in /api/auth/me clears the loop guard', async () => {
+  const store = memoryStore();
+  store.setItem('loginAt', '1');
+  await fetchMe((async () => Response.json({ name: 'Staff One' })) as typeof fetch, () => store);
+  assert.equal(store.map.has('loginAt'), false);
+});
+
+test('the signed-in name comes from /api/auth/me; no auth routes (localhost dev) means no user', async () => {
+  const me = (status: number) => (async (url: string | URL | Request) => {
+    assert.equal(String(url), '/api/auth/me');
+    return status === 200 ? Response.json({ name: 'Staff One' }) : new Response(null, { status });
+  }) as typeof fetch;
+  assert.deepEqual(await fetchMe(me(200)), { name: 'Staff One' });
+  assert.equal(await fetchMe(me(404)), null);
+  await assert.rejects(fetchMe(me(503)), (e) => e instanceof ReportRequestError && e.status === 503);
 });

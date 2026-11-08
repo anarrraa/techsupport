@@ -1,9 +1,9 @@
 # Phase 5 — Hosting and auth
 
-Kind: code + user decision. Needs a PRD update first: Entra login is out of scope today.
+Kind: code + user decision. Requirements: `../../prd-hosting-auth.md` (decided 2026-11-07).
+Items: roadmap "Hosting + auth (phase 5) — code items" (5.1-5.5).
 
-Scope: choose host (recommended: Cloud Run + Cloud SQL Postgres in the Vertex
-GCP project); Entra group login; deploy backend + frontend + DB; scheduled
+Scope: Cloud Run + Cloud SQL Postgres (pgvector); Entra one-group login; deploy backend + frontend + DB; scheduled
 capture writes to it.
 
 Done when: staff log in to the hosted app and a scheduled run's snapshot appears.

@@ -22,6 +22,7 @@ consult the roadmap and code for current status.
 | [prd-teams-bot-escalation.md](prd-teams-bot-escalation.md) | Bot and escalation requirements |
 | [prd-monthly-dashboard.md](prd-monthly-dashboard.md) | Approved monthly snapshot/report scope |
 | [prd-docs-chat.md](prd-docs-chat.md) | Documentation chat (pgvector RAG, Vertex) |
+| [prd-hosting-auth.md](prd-hosting-auth.md) | Cloud Run hosting and Entra staff login |
 | [plan/](plan/README.md) | Per-phase scope and agent completion reports |
 | [CONTEXT.md](CONTEXT.md) | Project vocabulary |
 

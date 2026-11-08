@@ -56,7 +56,7 @@ those run alongside the code phases.
 | 2 | Restructure: backend feature folders, frontend `features/`, shared types | Code | Same test counts pass after each move | 2.1-2.3 |
 | 3 | Documentation chat (pgvector RAG, Vertex) | Code + user GCP | Real questions answered with correct sources | 3.1-3.6, `prd-docs-chat.md` |
 | 4 | Bot production: catalog publish, Graph consent, GitHub OIDC, escalation directory, seeded state, two-person staged run, Low L5 answer, fortnight of window data | Human | V2 milestone 2 all checked | V2 milestones 1-2, TODO.md |
-| 5 | Hosting + auth: PRD for Entra login; host chosen; deploy app + DB; scheduled capture writes to it | Code + user decision | Staff log in to the hosted app; a scheduled run's snapshot appears | Needs a PRD update first (auth is out of scope today) |
+| 5 | Hosting + auth: PRD for Entra login; host chosen; deploy app + DB; scheduled capture writes to it | Code + user decision | Staff log in to the hosted app; a scheduled run's snapshot appears | 5.1-5.5, `prd-hosting-auth.md` |
 | 6 | Reporting acceptance: browser/keyboard check, real client export through the UI, staff side-by-side review, `Time to first response` format | Human + code fixes | Support staff sign off one month's reports | "Internal reporting completion", "Client support report generator" |
 
 Order: 0 → 2 → 3 → 5 → 6 for code; 1 and 4 run in parallel as soon as the
@@ -65,10 +65,11 @@ or reports beyond localhost.
 
 Open decisions (record answers here):
 
-- Host for phase 5. Recommendation: Cloud Run + Cloud SQL Postgres (supports
-  pgvector) in the same GCP project as Vertex, so one set of credentials. Not
-  yet chosen.
-- Entra group that may log in.
+- Host for phase 5: **decided 2026-11-07** — Cloud Run (one container, Express
+  serves API + frontend) + Cloud SQL Postgres with pgvector; Entra ID OIDC login
+  restricted to one group. `prd-hosting-auth.md`.
+- Still open (user supplies at deploy): GCP project and region, Entra tenant,
+  app registration (client id/secret), and the allowed group's id.
 
 ## Evidence snapshot
 
@@ -76,7 +77,8 @@ Open decisions (record answers here):
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 190 tests, 189 passed, 0 failed, 1 opt-in database check skipped on 2026-11-06 after the phase 3 review fixes, and again on 2026-11-07 at `a469bdb` (Node 26 / npm 11, not the pinned toolchain; `npm ci`, typecheck and build also exit 0); frontend 14 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
+| Unit tests | Pass | `npm test`: 207 tests, 206 passed, 0 failed, 1 opt-in database check skipped on 2026-11-08 on `main` after merging phase 5 (Node 26 / npm 11, not the pinned toolchain; `npm ci`, typecheck and build also exit 0); frontend 21 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
+| Container + auth (local) | Pass | 2026-11-08 after the phase 5 review: `docker build` (node 22.19.0-slim, user `node`; Node < 22.18 fails the build); with a throwaway pgvector DB and fake auth env `/api/health` 200 (no DB), `/health` 200, `/api/monthly-report` and `/api/reports/2026-10` 401 without cookie, `/dashboard` 200, same-origin POST logout clears the cookie, cross-site 403; no auth env on `0.0.0.0` → exit 1. Root tests 207/206/1 skip, frontend 21. Not deployed; no real Entra login yet (5.5) |
 | Docs chat live (Vertex + pgvector) | Pass with one miss | 2026-11-06: real `documents/` indexed into a throwaway pgvector DB with the user's GCP project (gcloud default); 6/7 known questions answered and cited correctly; logs counts-only. Re-checked after the review fixes the same day: index 2762 new then 0, 2 answers cited, no-answer question returned empty sources. Not yet on a shared database |
 | Type checking | Pass | `npm run typecheck` exit 0 (root and frontend) on 2026-11-06 after the phase 3 review fixes |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-06; frontend `npm run build` exit 0 the same day |
@@ -748,6 +750,25 @@ with `npm test`, `npm run typecheck`, `npm run build` (and the frontend's
       2026-11-06, user's GCP project (gcloud default), throwaway pgvector DB: 279 files → 2762 chunks
       (289 s), second run `new 0`; 6 of 7 questions correct with correct citations, one cross-lingual
       retrieval miss. Report: `plan/phase-3-docs-chat/reports/2026-11-06-3.6.md`; phase: `plan/phase-3-docs-chat/REPORT.md`.
+
+## Hosting + auth (phase 5) — code items
+
+Scope and reports: `plan/phase-5-hosting-auth/`. Requirements:
+`prd-hosting-auth.md`. Code only; the phase closes after a real deploy.
+
+- [x] 5.1 PRD `prd-hosting-auth.md` (auth code + PKCE, group check, signed
+      session cookie, fail-closed startup, env, out of scope).
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.1.md`.
+- [x] 5.2 Backend auth: login/callback/logout/me, session guard on `/api`,
+      fail-closed startup; tests with a local signing key, no network.
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.2.md`.
+- [x] 5.3 Frontend: 401 → `/api/auth/login`; signed-in name + sign-out in the header.
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.3.md`.
+- [x] 5.4 Container: Dockerfile + `.dockerignore`, Express serves `frontend/dist`;
+      `docker build`/`run` proof; README "Deploy (Cloud Run)" runbook (not executed).
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.4.md`.
+- [ ] 5.5 Deploy with the user's project, tenant and group; staff log in; a
+      scheduled run's snapshot appears. Waits on the user.
 
 ## Post-MVP direction
 

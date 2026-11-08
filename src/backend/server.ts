@@ -1,4 +1,5 @@
 import express from 'express';
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generatePDF, generateExcel } from '../monthly-report/export.ts';
@@ -9,6 +10,7 @@ import { aggregateMonth, monthRange, MonthlyReportLimitError, type SnapshotRow }
 import { assertSupportRows, buildSupportReport, suggestPeriod, SupportInputError, type ClientConfig } from '../support-report/support-report.ts';
 import { readRows } from '../support-report/input.ts';
 import { renderSupportReportPdf } from '../support-report/pdf.ts';
+import { assertExposure, AuthError, authConfig, cookie, finishLogin, LOGIN_COOKIE, logoutUrl, readCookie, readSession, SESSION_COOKIE, startLogin, type AuthConfig, type LoginDeps } from './auth.ts';
 
 interface ReportStore {
 	check(): Promise<unknown>;
@@ -42,6 +44,10 @@ class HttpError extends Error {
 // RFC 5987 attr-char excludes ' ( ) * which encodeURIComponent leaves as-is.
 const rfc5987 = (value: string) => encodeURIComponent(value).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const signInPage = (message: string) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign-in</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem"><p>${escapeHtml(message)}</p><p><a href="/api/auth/login">Sign in again · Дахин нэвтрэх</a></p></body></html>`;
+
 // Parse the uploaded export in memory; nothing is stored. The file is the user's own, so read errors are shown.
 async function uploadedRows(req: express.Request) {
 	if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Upload an .xlsx or .csv file');
@@ -65,9 +71,61 @@ export function createApp(store: ReportStore = {
 	search: searchDocChunks,
 	answer,
 	clients: docClients,
-}) {
+}, auth: AuthConfig | null = null, loginDeps?: LoginDeps, frontendDir = 'frontend/dist') {
 	const app = express();
 	const upload = express.raw({ type: () => true, limit: '10mb' });
+
+	// Probes use /health (checks the database). /api/health is open to anyone, so it never touches the small DB pool.
+	app.get('/health', async (_req, res) => {
+		try {
+			await store.check();
+			res.json({ status: 'ok', database: 'connected' });
+		} catch {
+			res.status(503).json({ status: 'unavailable', database: 'unavailable' });
+		}
+	});
+	app.get('/api/health', (_req, res) => { res.json({ status: 'ok' }); });
+
+	// No auth config means loopback-only dev (assertExposure); with it, every other /api route needs a session.
+	if (auth) {
+		app.get('/api/auth/login', (_req, res) => {
+			const login = startLogin(auth);
+			res.setHeader('Set-Cookie', login.cookie);
+			res.redirect(302, login.url);
+		});
+		// A top-level navigation from Entra: failures get a page with a way back, not bare JSON. The login cookie is spent either way.
+		app.get('/api/auth/callback', async (req, res) => {
+			try {
+				const session = await finishLogin(auth, req.query, readCookie(req.headers.cookie, LOGIN_COOKIE), loginDeps);
+				res.setHeader('Set-Cookie', [session.cookie, cookie(LOGIN_COOKIE, '', 0)]);
+				res.redirect(302, '/');
+			} catch (error) {
+				const [status, message] = error instanceof AuthError ? [error.status, error.message] : [502, 'Sign-in failed; try again'];
+				console.error(`sign-in failed: ${status}`);
+				res.setHeader('Set-Cookie', cookie(LOGIN_COOKIE, '', 0));
+				res.status(status).type('html').send(signInPage(message));
+			}
+		});
+		// POST from our own page only: a cross-site form must not be able to sign staff out.
+		app.post('/api/auth/logout', (req, res) => {
+			if (req.headers.origin !== auth.publicUrl) {
+				res.status(403).json({ error: 'Cross-origin sign-out refused' });
+				return;
+			}
+			res.setHeader('Set-Cookie', cookie(SESSION_COOKIE, '', 0));
+			res.redirect(303, logoutUrl(auth));
+		});
+		app.use('/api', (req, res, next) => {
+			const session = readSession(auth, req.headers.cookie);
+			if (!session) {
+				res.status(401).json({ error: 'Sign in required' });
+				return;
+			}
+			res.locals.user = session;
+			next();
+		});
+		app.get('/api/auth/me', (_req, res) => { res.json(res.locals.user); });
+	}
 
 	app.get('/api/chat/clients', async (_req, res, next) => {
 		try { res.json(await chat.clients()); } catch (error) { next(error); }
@@ -124,15 +182,6 @@ export function createApp(store: ReportStore = {
 			res.setHeader('Content-Disposition', `attachment; filename="support-report-${label}.pdf"; filename*=UTF-8''${rfc5987(`${built.group} ${label}.pdf`)}`);
 			res.send(pdf);
 		} catch (error) { next(error); }
-	});
-
-	app.get('/health', async (_req, res) => {
-		try {
-			await store.check();
-			res.json({ status: 'ok', database: 'connected' });
-		} catch {
-			res.status(503).json({ status: 'unavailable', database: 'unavailable' });
-		}
 	});
 
 	app.get(['/api/reports/:month', '/api/reports/:month/export'], async (req, res) => {
@@ -203,6 +252,11 @@ export function createApp(store: ReportStore = {
 			team: [], trend: [],
 		});
 	});
+	// The built frontend (container image). Its files are public, as the repo is; only /api needs a session.
+	if (existsSync(frontendDir)) {
+		app.use(express.static(frontendDir));
+		app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile('index.html', { root: frontendDir }));
+	}
 	// JSON errors, logging the status only. Known input problems and body-parser 4xx (size, encoding) are the client's;
 	// anything else is a server fault whose details are never echoed.
 	app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -219,11 +273,14 @@ export function createApp(store: ReportStore = {
 	return app;
 }
 
-export const app = createApp();
+/** The image sets only PORT (Cloud Run); BACKEND_PORT wins locally so a stray PORT can't move the Vite proxy target. */
+export const listenPort = (env: Record<string, string | undefined> = process.env) => Number(env.BACKEND_PORT ?? env.PORT ?? 3001);
 
 if (import.meta.main) {
-	// No authentication: keep the API on localhost until authorization exists.
-	const port = Number(process.env.BACKEND_PORT ?? 3001);
+	// Without auth env the server refuses any non-loopback host (prd-hosting-auth.md).
+	const port = listenPort();
 	const host = process.env.BACKEND_HOST ?? '127.0.0.1';
-	app.listen(port, host, () => console.log(`Backend listening on http://${host}:${port}`));
+	const auth = authConfig();
+	assertExposure(host, auth);
+	createApp(undefined, undefined, undefined, auth).listen(port, host, () => console.log(`Backend listening on http://${host}:${port}${auth ? ' (Entra login)' : ''}`));
 }
