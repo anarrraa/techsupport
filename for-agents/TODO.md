@@ -120,7 +120,10 @@ reading order and non-negotiable invariants before touching any of this.
       **Do not commit it.** This repository is public and the file names real
       people; it is gitignored for that reason.
       Done 2026-09-08 (roadmap "Recipient identifiers", secret set); every run
-      since writes it. Checked 2026-11-07.
+      since writes it. Checked 2026-11-07. Not a claim the directory is
+      complete: delivering runs still warn 1-2 breached requests with no
+      participant in the directory — open question in roadmap V2 milestone 2
+      ("Verify the private escalation directory contains all intended object ids").
 - [x] Prove the transport from this codebase. Done 2026-09-08:
       `Direct message delivered`. Recorded in the evidence snapshot.
 - [x] Stage the first live run to two people only: set the

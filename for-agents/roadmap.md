@@ -80,7 +80,7 @@ Open decisions (record answers here):
 | Docs chat live (Vertex + pgvector) | Pass with one miss | 2026-11-06: real `documents/` indexed into a throwaway pgvector DB with the user's GCP project (gcloud default); 6/7 known questions answered and cited correctly; logs counts-only. Re-checked after the review fixes the same day: index 2762 new then 0, 2 answers cited, no-answer question returned empty sources. Not yet on a shared database |
 | Type checking | Pass | `npm run typecheck` exit 0 (root and frontend) on 2026-11-06 after the phase 3 review fixes |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-06; frontend `npm run build` exit 0 the same day |
-| GitHub CI | **Fail** on `main` | 2026-11-07: run [42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976) on `a9cffcf` failed at `npm ci` — lockfile missing `react@19.3.1`, `react-dom@19.3.1`, `scheduler@0.28.0`. Fix `a469bdb` is local, not pushed. The reminder workflow runs the same `npm ci`, so the next scheduled run (Mon 2026-11-09) fails until it is pushed. Last green CI: `37286379216` on `a6b529a` (2026-10-05) |
+| GitHub CI | **Fail** on `main` | 2026-11-07: run [42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976) on `a9cffcf` failed at `npm ci` — lockfile missing `react@19.3.1`, `react-dom@19.3.1`, `scheduler@0.28.0`. Fix `a469bdb` is local, not pushed. The reminder workflow runs the same `npm ci`, so the next scheduled run (Mon 2026-11-09) fails until it is pushed. Last green CI on `main`: `36397371778` on `eed6029` (2026-09-28) |
 | **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
 | Scheduled run verified in production | Pass | The dry-run immediately after reported `Scanned 26; 17 due, 9 not breached, 0 outside calendar, 0 awaiting window`, `0 request(s) crossed an escalation level` — the seed held — and `2 direct message(s) to 2 recipient(s)` with `11 withheld` by the rollout gate |
@@ -232,16 +232,15 @@ document or CI logs.
       exclude a paused cycle, with tests. The application must not second-guess
       Jira's clock (`AGENTS.md`).
 - [ ] Confirm JSM First Response goals match `for-agents/sla-matrix.md`.
-  - Evidence 2026-11-07: not checked — no Jira credentials on this machine (the
-    main checkout's `.env` holds only `DATABASE_URL`) and Actions logs carry no
-    goal durations by design. Needs the user to put Jira credentials in `.env`
-    for a read-only aggregate pass, or a JSM admin to read the SLA goals.
+  - Evidence 2026-11-07: not checked — no Jira credentials were available to
+    this agent, and Actions logs carry no goal durations by design. Jira
+    read-only pass needs the user, or a JSM admin to read the SLA goals.
     [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [ ] Confirm the JSM calendar is Mon-Fri 09:00-18:00 with correct holidays.
   - Evidence 2026-11-07: indirect only. Across 84 scheduled runs, due requests
     were never `outside calendar` at 13:37-15:48 local and always were at
     18:49-23:07 local. Opening hour, 18:00 close, and holidays unconfirmed; same
-    blocker as above (user credentials or JSM admin).
+    blocker as above (user or JSM admin).
 - [x] Confirm `JIRA_FIRST_RESPONSE_SLA_NAME` exactly matches the production metric.
   - Confirmed 2026-08-20 through `GET /rest/api/3/field`, which lists SLA metrics
     without needing agent permission. The instance defines `Time to first
@@ -252,10 +251,12 @@ document or CI logs.
   - Confirmed 2026-08-26: agent access granted on DC project. `GET
     /rest/servicedeskapi/request/DC-844/sla` returns 200 OK with full SLA data
     including `elapsedTime` (working-hours elapsed time from JSM).
-- [x] Confirm the Teams webhook accepts the payload and renders escaped text.
+- [ ] Confirm the Teams webhook accepts the payload and renders escaped text.
   - The webhook is now optional; a bot-only deployment skips this check.
-  - N/A 2026-11-07: `TEAMS_WEBHOOK_URL` is empty in all 88 runs since
-    2026-09-09; the deployment is bot-only. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
+  - Evidence 2026-11-07: `TEAMS_WEBHOOK_URL` is empty in all 88 runs since
+    2026-09-09; the deployment is bot-only. N/A if the user accepts bot-only
+    delivery for the MVP (see MVP definition of done); left unchecked until
+    that decision. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [x] Confirm required GitHub secrets and variables are configured.
   - Configured 2026-09-08. The repository had **none** of either, so the nightly
     schedule could never have worked regardless of the webhook break.
@@ -294,7 +295,7 @@ document or CI logs.
   - Evidence 2026-11-07: open; needs a Jira write or a Jira reader (user / Jira
     admin). `paused` cannot exist until the pause workflow above is fixed.
 - [ ] Run a dry-run and compare aggregate selection with Jira.
-  - Evidence 2026-11-07: open; no Jira credentials on this machine (user).
+  - Evidence 2026-11-07: open; no Jira credentials available to this agent (user).
 - [ ] Run one controlled live delivery and verify Teams content and links.
   - Evidence 2026-11-07: delivery done (bot, 2026-09-08 local; dispatch
     [34329397461](https://github.com/anarrraa/techsupport/actions/runs/34329397461) delivered 5; 22 scheduled runs
@@ -339,9 +340,13 @@ The MVP is done only when all of the following are true:
   - Evidence 2026-11-07: succeeded through the personal bot (see Milestone 4);
     the channel webhook was never configured. Whether bot delivery satisfies
     the MVP item is the user's call — left unchecked rather than guessed.
-- [x] Scheduled execution has been observed without duplicate 15-minute posts.
-      2026-11-07: 84 scheduled runs, at most one in-window run per weekday, runs
-      at least four hours apart in one concurrency group. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
+- [ ] Scheduled execution has been observed without duplicate 15-minute posts.
+  - Evidence 2026-11-07: vacuous for the channel — no channel post was ever
+    made (webhook unset, `messageCount 0` in every run). Bot direct messages do
+    repeat a level to pilot recipients while the allowlist withholds sibling
+    legs (V2 milestone 2 note). 84 scheduled runs, at most one in-window run per
+    weekday, at least four hours apart. Left unchecked pending the same
+    bot-vs-webhook decision as above. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-07-evidence.md).
 - [ ] Production Jira SLA goals, calendar, metric name, and priority mapping are
   confirmed.
 - [ ] No secret, token, ticket content, or personal data is present in Git history
