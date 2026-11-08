@@ -7,11 +7,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateKeyPair, SignJWT } from 'jose';
 import { assertExposure, authConfig, finishLogin, readSession, signCookie, startLogin, verifyCookie, type AuthConfig, type LoginDeps } from '../../src/backend/auth.ts';
-import { createApp } from '../../src/backend/server.ts';
+import { createApp, listenPort } from '../../src/backend/server.ts';
 
 // Synthetic values only: no real tenant, app, or group.
 const config: AuthConfig = {
-	tenantId: 'tenant-test', clientId: 'client-test', clientSecret: 'secret-test',
+	tenantId: '00000000-0000-4000-8000-000000000001', clientId: 'client-test', clientSecret: 'secret-test',
 	allowedGroupId: 'group-allowed', sessionSecret: 'x'.repeat(32), publicUrl: 'https://app.example.test',
 };
 const ENV = {
@@ -55,6 +55,9 @@ test('auth config: none set is dev mode, partial or weak config fails naming the
 	assert.throws(() => authConfig({ ENTRA_TENANT_ID: 't' }), /missing ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET, ENTRA_ALLOWED_GROUP_ID, SESSION_SECRET, PUBLIC_URL/);
 	assert.throws(() => authConfig({ ...ENV, SESSION_SECRET: 'short' }), /SESSION_SECRET/);
 	assert.throws(() => authConfig({ ...ENV, PUBLIC_URL: 'http://app.example.test' }), /PUBLIC_URL/);
+	for (const tenant of ['contoso.onmicrosoft.com', 'common', 'organizations']) {
+		assert.throws(() => authConfig({ ...ENV, ENTRA_TENANT_ID: tenant }), /ENTRA_TENANT_ID must be the tenant GUID/);
+	}
 });
 
 test('without auth the server may only listen on loopback', () => {
@@ -140,8 +143,8 @@ const store = { check: async () => {}, read: async () => [] };
 test('with auth on, /api needs a session: none, tampered or expired → 401; health stays open', async () => {
 	await withServer(createApp(store, async () => ({}), undefined, config), async (url) => {
 		for (const path of ['/health', '/api/health']) assert.equal((await fetch(`${url}${path}`)).status, 200);
-		const valid = `session=${signCookie(config.sessionSecret, { name: 'Staff One' }, 60)}`;
-		const expired = `session=${signCookie(config.sessionSecret, { name: 'Staff One' }, -1)}`;
+		const valid = `session=${signCookie(config.sessionSecret, { typ: 'session', name: 'Staff One' }, 60)}`;
+		const expired = `session=${signCookie(config.sessionSecret, { typ: 'session', name: 'Staff One' }, -1)}`;
 		for (const cookie of [undefined, `${valid}x`, expired]) {
 			const response = await fetch(`${url}/api/reports/2026-10`, { headers: cookie ? { cookie } : {} });
 			assert.deepEqual([response.status, await response.json()], [401, { error: 'Sign in required' }]);
@@ -152,28 +155,39 @@ test('with auth on, /api needs a session: none, tampered or expired → 401; hea
 	});
 });
 
-test('the HTTP callback answers 403 for a user outside the group and sets no session', async () => {
+test('the HTTP callback answers a non-member with a 403 page and a retry link, clears the login cookie, sets no session', async () => {
 	const flow = login(later(() => idToken({ nonce: flow.nonce, groups: ['other'] })));
 	await withServer(createApp(store, async () => ({}), undefined, config, flow.deps), async (url) => {
 		const response = await fetch(`${url}/api/auth/callback?code=c&state=${flow.state}`, { headers: { cookie: `login=${flow.cookie}` }, redirect: 'manual' });
 		assert.equal(response.status, 403);
-		assert.equal(response.headers.get('set-cookie'), null);
+		assert.match(response.headers.get('content-type')!, /^text\/html/);
+		const page = await response.text();
+		assert.match(page, /not in the group/);
+		assert.match(page, /href="\/api\/auth\/login"/);
+		assert.deepEqual(response.headers.getSetCookie(), ['login=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax']);
 	});
 });
 
-test('login redirects to Entra; callback sets the session and logout clears it', async () => {
+test('login redirects to Entra; callback sets the session; same-origin POST logout clears it, cross-site or GET does not', async () => {
 	const flow = login(later(() => idToken({ name: 'Staff One', nonce: flow.nonce, groups: [config.allowedGroupId] })));
 	await withServer(createApp(store, async () => ({}), undefined, config, flow.deps), async (url) => {
 		const start = await fetch(`${url}/api/auth/login`, { redirect: 'manual' });
 		assert.equal(start.status, 302);
-		assert.match(start.headers.get('location')!, /^https:\/\/login\.microsoftonline\.com\/tenant-test\/oauth2\/v2\.0\/authorize\?/);
+		assert.match(start.headers.get('location')!, /^https:\/\/login\.microsoftonline\.com\/00000000-0000-4000-8000-000000000001\/oauth2\/v2\.0\/authorize\?/);
 		const done = await fetch(`${url}/api/auth/callback?code=c&state=${flow.state}`, { headers: { cookie: `login=${flow.cookie}` }, redirect: 'manual' });
 		assert.equal(done.status, 302);
 		assert.equal(done.headers.get('location'), '/');
 		assert.match(done.headers.getSetCookie()[0], /^session=/);
-		const out = await fetch(`${url}/api/auth/logout`, { redirect: 'manual' });
-		assert.match(out.headers.get('set-cookie')!, /^session=; Max-Age=0/);
-		assert.match(out.headers.get('location')!, /\/oauth2\/v2\.0\/logout\?post_logout_redirect_uri=https%3A%2F%2Fapp\.example\.test$/);
+		assert.equal((await fetch(`${url}/api/auth/logout`, { redirect: 'manual' })).status, 401, 'GET logout is gone');
+		const out = await fetch(`${url}/api/auth/logout`, { method: 'POST', headers: { origin: config.publicUrl }, redirect: 'manual' });
+		assert.equal(out.status, 303);
+		assert.equal(out.headers.get('set-cookie'), 'session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax');
+		assert.match(out.headers.get('location')!, /\/oauth2\/v2\.0\/logout\?post_logout_redirect_uri=https%3A%2F%2Fapp\.example\.test%2F$/);
+		for (const origin of ['https://evil.example', undefined]) {
+			const refused = await fetch(`${url}/api/auth/logout`, { method: 'POST', headers: origin ? { origin } : {}, redirect: 'manual' });
+			assert.equal(refused.status, 403, String(origin));
+			assert.equal(refused.headers.get('set-cookie'), null);
+		}
 	});
 });
 
@@ -195,4 +209,47 @@ test('the built frontend is served without a session; SPA routes fall back to in
 		}
 		assert.equal((await fetch(`${url}/api/unknown`)).status, 401);
 	});
+});
+
+test('the login and session cookies cannot stand in for each other', async () => {
+	const flow = login(later(() => idToken({ nonce: flow.nonce, groups: [config.allowedGroupId] })));
+	assert.equal(readSession(config, `session=${flow.cookie}`, NOW), null);
+	const session = signCookie(config.sessionSecret, { typ: 'session', name: 'A', state: flow.state, nonce: flow.nonce, verifier: 'v' }, 60, NOW);
+	await assert.rejects(finishLogin(config, { code: 'c', state: flow.state }, session, flow.deps), (e: { status?: number }) => e.status === 400);
+	assert.equal(readSession(config, `session=${signCookie(config.sessionSecret, { name: 'A' }, 60, NOW)}`, NOW), null);
+});
+
+test('only RS256 id tokens are accepted', async () => {
+	const { SignJWT: Sign } = await import('jose');
+	const hmac = new TextEncoder().encode('k'.repeat(32));
+	const flow = login(later(() => new Sign({ nonce: flow.nonce, groups: [config.allowedGroupId] })
+		.setProtectedHeader({ alg: 'HS256' }).setIssuer(`https://login.microsoftonline.com/${config.tenantId}/v2.0`)
+		.setAudience(config.clientId).setExpirationTime(NOW / 1000 + 600).sign(hmac)));
+	flow.deps.keys = async () => hmac as never;
+	await assert.rejects(finishLogin(config, { code: 'c', state: flow.state }, flow.cookie, flow.deps), (e: { status?: number }) => e.status === 401);
+});
+
+test('/api/health never touches the database; /health reports it', async () => {
+	let checks = 0;
+	const down = { check: async () => { checks++; throw new Error('db down'); }, read: async () => [] };
+	await withServer(createApp(down, async () => ({}), undefined, config), async (url) => {
+		assert.deepEqual([(await fetch(`${url}/api/health`)).status, checks], [200, 0]);
+		assert.deepEqual([(await fetch(`${url}/health`)).status, checks], [503, 1]);
+	});
+});
+
+test('a failed token request shows the sign-in page, not an internal error', async () => {
+	const flow = login('');
+	flow.deps.fetch = (async () => { throw new Error('network down'); }) as typeof fetch;
+	await withServer(createApp(store, async () => ({}), undefined, config, flow.deps), async (url) => {
+		const response = await fetch(`${url}/api/auth/callback?code=c&state=${flow.state}`, { headers: { cookie: `login=${flow.cookie}` } });
+		assert.equal(response.status, 502);
+		assert.match(await response.text(), /Sign-in failed; try again[\s\S]*\/api\/auth\/login/);
+	});
+});
+
+test('BACKEND_PORT wins over a stray PORT; the image sets only PORT', () => {
+	assert.equal(listenPort({ BACKEND_PORT: '3001', PORT: '8080' }), 3001);
+	assert.equal(listenPort({ PORT: '8080' }), 8080);
+	assert.equal(listenPort({}), 3001);
 });

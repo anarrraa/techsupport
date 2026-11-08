@@ -18,7 +18,7 @@ export function SupportReportForm() {
   const [busy, setBusy] = useState<'period' | number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const config = configs?.find(c => c.id === configId) ?? configs?.[0];
-  const reason = (e: unknown) => supportErrorText(e, { invalid: t('support.invalid'), tooLarge: t('support.tooLarge'), generic: t('state.error') });
+  const reason = (e: unknown) => supportErrorText(e, { invalid: t('support.invalid'), tooLarge: t('support.tooLarge'), expired: t('auth.expired'), generic: t('state.error') });
 
   async function pick(next: File | null) {
     latest.current = next;

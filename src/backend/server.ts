@@ -10,7 +10,7 @@ import { aggregateMonth, monthRange, MonthlyReportLimitError, type SnapshotRow }
 import { assertSupportRows, buildSupportReport, suggestPeriod, SupportInputError, type ClientConfig } from '../support-report/support-report.ts';
 import { readRows } from '../support-report/input.ts';
 import { renderSupportReportPdf } from '../support-report/pdf.ts';
-import { assertExposure, AuthError, authConfig, finishLogin, LOGIN_COOKIE, logoutUrl, readCookie, readSession, SESSION_COOKIE, startLogin, type AuthConfig, type LoginDeps } from './auth.ts';
+import { assertExposure, AuthError, authConfig, cookie, finishLogin, LOGIN_COOKIE, logoutUrl, readCookie, readSession, SESSION_COOKIE, startLogin, type AuthConfig, type LoginDeps } from './auth.ts';
 
 interface ReportStore {
 	check(): Promise<unknown>;
@@ -44,6 +44,10 @@ class HttpError extends Error {
 // RFC 5987 attr-char excludes ' ( ) * which encodeURIComponent leaves as-is.
 const rfc5987 = (value: string) => encodeURIComponent(value).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const signInPage = (message: string) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign-in</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem"><p>${escapeHtml(message)}</p><p><a href="/api/auth/login">Sign in again · Дахин нэвтрэх</a></p></body></html>`;
+
 // Parse the uploaded export in memory; nothing is stored. The file is the user's own, so read errors are shown.
 async function uploadedRows(req: express.Request) {
 	if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw new HttpError(400, 'Upload an .xlsx or .csv file');
@@ -71,15 +75,16 @@ export function createApp(store: ReportStore = {
 	const app = express();
 	const upload = express.raw({ type: () => true, limit: '10mb' });
 
-	const health = async (_req: express.Request, res: express.Response) => {
+	// Probes use /health (checks the database). /api/health is open to anyone, so it never touches the small DB pool.
+	app.get('/health', async (_req, res) => {
 		try {
 			await store.check();
 			res.json({ status: 'ok', database: 'connected' });
 		} catch {
 			res.status(503).json({ status: 'unavailable', database: 'unavailable' });
 		}
-	};
-	app.get(['/health', '/api/health'], health);
+	});
+	app.get('/api/health', (_req, res) => { res.json({ status: 'ok' }); });
 
 	// No auth config means loopback-only dev (assertExposure); with it, every other /api route needs a session.
 	if (auth) {
@@ -88,16 +93,27 @@ export function createApp(store: ReportStore = {
 			res.setHeader('Set-Cookie', login.cookie);
 			res.redirect(302, login.url);
 		});
-		app.get('/api/auth/callback', async (req, res, next) => {
+		// A top-level navigation from Entra: failures get a page with a way back, not bare JSON. The login cookie is spent either way.
+		app.get('/api/auth/callback', async (req, res) => {
 			try {
 				const session = await finishLogin(auth, req.query, readCookie(req.headers.cookie, LOGIN_COOKIE), loginDeps);
-				res.setHeader('Set-Cookie', [session.cookie, `${LOGIN_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`]);
+				res.setHeader('Set-Cookie', [session.cookie, cookie(LOGIN_COOKIE, '', 0)]);
 				res.redirect(302, '/');
-			} catch (error) { next(error); }
+			} catch (error) {
+				const [status, message] = error instanceof AuthError ? [error.status, error.message] : [502, 'Sign-in failed; try again'];
+				console.error(`sign-in failed: ${status}`);
+				res.setHeader('Set-Cookie', cookie(LOGIN_COOKIE, '', 0));
+				res.status(status).type('html').send(signInPage(message));
+			}
 		});
-		app.get('/api/auth/logout', (_req, res) => {
-			res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`);
-			res.redirect(302, logoutUrl(auth));
+		// POST from our own page only: a cross-site form must not be able to sign staff out.
+		app.post('/api/auth/logout', (req, res) => {
+			if (req.headers.origin !== auth.publicUrl) {
+				res.status(403).json({ error: 'Cross-origin sign-out refused' });
+				return;
+			}
+			res.setHeader('Set-Cookie', cookie(SESSION_COOKIE, '', 0));
+			res.redirect(303, logoutUrl(auth));
 		});
 		app.use('/api', (req, res, next) => {
 			const session = readSession(auth, req.headers.cookie);
@@ -246,7 +262,7 @@ export function createApp(store: ReportStore = {
 	app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
 		const parserStatus = Number((error as { status?: unknown } | null)?.status);
 		const chatBody = req.path === '/api/chat';
-		const [status, message] = error instanceof HttpError || error instanceof AuthError ? [error.status, error.message]
+		const [status, message] = error instanceof HttpError ? [error.status, error.message]
 			: error instanceof SupportInputError ? [400, error.message]
 			: parserStatus === 413 ? [413, chatBody ? 'Request body too large' : 'The file is larger than 10 MB']
 			: parserStatus >= 400 && parserStatus < 500 ? [parserStatus, chatBody ? 'Invalid request body' : 'The upload could not be read']
@@ -257,9 +273,12 @@ export function createApp(store: ReportStore = {
 	return app;
 }
 
+/** The image sets only PORT (Cloud Run); BACKEND_PORT wins locally so a stray PORT can't move the Vite proxy target. */
+export const listenPort = (env: Record<string, string | undefined> = process.env) => Number(env.BACKEND_PORT ?? env.PORT ?? 3001);
+
 if (import.meta.main) {
-	// Cloud Run sets PORT. Without auth env the server refuses any non-loopback host (prd-hosting-auth.md).
-	const port = Number(process.env.PORT ?? process.env.BACKEND_PORT ?? 3001);
+	// Without auth env the server refuses any non-loopback host (prd-hosting-auth.md).
+	const port = listenPort();
 	const host = process.env.BACKEND_HOST ?? '127.0.0.1';
 	const auth = authConfig();
 	assertExposure(host, auth);

@@ -1,9 +1,12 @@
 # Cloud Run image: Express serves the API and the built frontend (for-agents/prd-hosting-auth.md).
 # Build with the pinned toolchain: docker build --build-arg NODE_VERSION=$(cat .node-version) .
+# The default mirrors .node-version; keep them in step (the build fails below 22.18).
 ARG NODE_VERSION=22.19.0
 
 FROM node:${NODE_VERSION}-slim AS build
 WORKDIR /app
+# The server runs .ts directly (type stripping, Node >= 22.18); fail here rather than at container start.
+RUN node -e "const [a,b]=process.versions.node.split('.').map(Number); if (a<22||(a===22&&b<18)) { console.error('NODE_VERSION must be >= 22.18 (type stripping); got '+process.versions.node); process.exit(1); }"
 COPY package.json package-lock.json prisma.config.ts ./
 COPY prisma ./prisma
 # postinstall runs prisma generate into src/backend/generated.

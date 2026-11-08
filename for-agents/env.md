@@ -77,13 +77,13 @@ only allowed on a loopback `BACKEND_HOST` (fail closed).
 
 | Var | Default | Purpose |
 | --- | --- | --- |
-| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | none | Entra app registration |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | none; tenant is a GUID | Entra app registration |
 | `ENTRA_CLIENT_SECRET` | none | secret; Secret Manager in Cloud Run |
 | `ENTRA_ALLOWED_GROUP_ID` | none | the one group allowed in (`groups` claim) |
 | `SESSION_SECRET` | none; ≥ 32 chars | HMAC key for the session cookie |
 | `PUBLIC_URL` | none; https origin | redirect URI = `<PUBLIC_URL>/api/auth/callback` |
 | `BACKEND_HOST` | `127.0.0.1` | bind address; container `0.0.0.0` |
-| `PORT` / `BACKEND_PORT` | 3001 | Cloud Run sets `PORT` |
+| `BACKEND_PORT` / `PORT` | 3001 | `BACKEND_PORT` wins; the image sets only `PORT` |
 
 ## Not in `.env.example` (read by `config.ts`)
 

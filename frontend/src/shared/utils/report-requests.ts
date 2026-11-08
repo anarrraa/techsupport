@@ -7,11 +7,46 @@ export class ReportRequestError extends Error {
   constructor(status: number, message = `Report request failed (${status})`) { super(message); this.status = status; }
 }
 
-/** A 401 means no or an expired session: send the browser to Entra login instead of showing an error. */
-export function withLogin(fetcher: typeof fetch, login = () => window.location.assign('/api/auth/login')): typeof fetch {
+export const SIGN_IN_URL = '/api/auth/login';
+const LOGIN_AT = 'loginAt';
+const LOOP_MS = 60_000;
+
+/** `expired`: a POST hit 401 (redirecting would lose the question or file). `failed`: login just ran and still no session. */
+export const authProblems = new EventTarget();
+export type AuthProblem = 'expired' | 'failed';
+
+type LoginStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+// Private mode or no window (tests): null, and then we never auto-redirect, since nothing could stop a loop.
+function sessionStore(): LoginStore | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A 401 on a GET sends the browser to Entra login, at most once a minute: if the cookie is dropped (blocked cookies,
+ * host mismatch), silent SSO would otherwise loop against Entra forever. Every other 401 is reported, not redirected.
+ */
+export function withLogin(fetcher: typeof fetch, {
+  login = () => window.location.assign(SIGN_IN_URL), storage = sessionStore, now = Date.now,
+}: { login?: () => void; storage?: () => LoginStore | null; now?: () => number } = {}): typeof fetch {
   return async (input, init) => {
     const response = await fetcher(input, init);
-    if (response.status === 401) login();
+    if (response.status !== 401) return response;
+    const store = storage();
+    const report = (problem: AuthProblem) => authProblems.dispatchEvent(new Event(problem));
+    try {
+      if ((init?.method ?? 'GET').toUpperCase() !== 'GET') report('expired');
+      else if (!store || now() - Number(store.getItem(LOGIN_AT) ?? 0) < LOOP_MS) report('failed');
+      else {
+        store.setItem(LOGIN_AT, String(now()));
+        login();
+      }
+    } catch {
+      report('failed');
+    }
     return response;
   };
 }
@@ -19,10 +54,15 @@ export function withLogin(fetcher: typeof fetch, login = () => window.location.a
 const apiFetch: typeof fetch = (input, init) => withLogin(fetch)(input, init);
 
 /** The signed-in staff member; null when the server runs without login (localhost dev has no auth routes). */
-export async function fetchMe(fetcher: typeof fetch = apiFetch): Promise<{ name: string } | null> {
+export async function fetchMe(fetcher: typeof fetch = apiFetch, storage = sessionStore): Promise<{ name: string } | null> {
   const response = await fetcher('/api/auth/me', { signal: AbortSignal.timeout(15_000) });
   if (response.status === 404) return null;
   if (!response.ok) throw new ReportRequestError(response.status);
+  try {
+    storage()?.removeItem(LOGIN_AT); // signed in: the next 401 may redirect again
+  } catch {
+    // Storage unavailable: nothing to clear.
+  }
   return response.json();
 }
 
@@ -58,9 +98,10 @@ export async function loadArchive(read = fetchReport, now = new Date(), active =
 }
 
 /** Localized lead for a rejected upload; the server's 400 reason (column names, ticket keys) follows as-is. */
-export function supportErrorText(e: unknown, text: { invalid: string; tooLarge: string; generic: string }): string {
+export function supportErrorText(e: unknown, text: { invalid: string; tooLarge: string; expired: string; generic: string }): string {
   if (!(e instanceof ReportRequestError)) return text.generic;
   if (e.status === 413) return text.tooLarge;
+  if (e.status === 401) return text.expired;
   // Other 4xx (stale config 404, ...) and a 400 without a server reason are not the file's fault.
   const hasReason = e.message !== new ReportRequestError(e.status).message;
   return e.status === 400 && hasReason ? `${text.invalid} ${e.message}` : text.generic;

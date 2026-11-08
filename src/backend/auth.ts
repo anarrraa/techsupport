@@ -38,6 +38,8 @@ export function authConfig(env: Record<string, string | undefined> = process.env
 	if (missing.length === entries.length) return null;
 	if (missing.length) throw new Error(`Auth is partially configured; missing ${missing.join(', ')}`);
 	const config = Object.fromEntries(entries) as unknown as AuthConfig;
+	// iss always carries the tenant GUID, so a domain or `common` would refuse every login without saying why.
+	if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.tenantId)) throw new Error('ENTRA_TENANT_ID must be the tenant GUID');
 	if (config.sessionSecret.length < 32) throw new Error('SESSION_SECRET must be at least 32 characters');
 	if (!/^https:\/\/[^/]+$/.test(config.publicUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(config.publicUrl)) {
 		throw new Error('PUBLIC_URL must be an https origin without a path');
@@ -92,11 +94,12 @@ export function cookie(name: string, value: string, seconds: number): string {
 const authority = (config: AuthConfig) => `https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}`;
 const redirectUri = (config: AuthConfig) => `${config.publicUrl}/api/auth/callback`;
 
-interface LoginState { state: string; nonce: string; verifier: string }
+// `typ` keeps the two cookies (same key, same format) from ever standing in for each other.
+interface LoginState { typ: 'login'; state: string; nonce: string; verifier: string }
 
 /** Authorize URL plus the signed short-lived cookie that carries state, nonce and the PKCE verifier to the callback. */
 export function startLogin(config: AuthConfig, now = Date.now()): { url: string; cookie: string } {
-	const login: LoginState = { state: b64(randomBytes(16)), nonce: b64(randomBytes(16)), verifier: b64(randomBytes(32)) };
+	const login: LoginState = { typ: 'login', state: b64(randomBytes(16)), nonce: b64(randomBytes(16)), verifier: b64(randomBytes(32)) };
 	const query = new URLSearchParams({
 		client_id: config.clientId,
 		response_type: 'code',
@@ -140,7 +143,7 @@ export async function finishLogin(
 ): Promise<{ cookie: string; name: string }> {
 	const login = verifyCookie<LoginState>(config.sessionSecret, loginCookie, deps.now);
 	if (typeof query.error === 'string') throw new AuthError(401, 'Sign-in was cancelled or refused');
-	if (!login || typeof query.state !== 'string' || query.state !== login.state) throw new AuthError(400, 'Sign-in expired; start again');
+	if (login?.typ !== 'login' || typeof query.state !== 'string' || query.state !== login.state) throw new AuthError(400, 'Sign-in expired; start again');
 	if (typeof query.code !== 'string' || !query.code) throw new AuthError(400, 'Missing authorization code');
 
 	const response = await deps.fetch(`${authority(config)}/oauth2/v2.0/token`, {
@@ -165,6 +168,7 @@ export async function finishLogin(
 		({ payload: claims } = await jwtVerify(idToken, deps.keys, {
 			issuer: `https://login.microsoftonline.com/${config.tenantId}/v2.0`,
 			audience: config.clientId,
+			algorithms: ['RS256'],
 			currentDate: new Date(deps.now),
 		}));
 	} catch {
@@ -176,14 +180,14 @@ export async function finishLogin(
 		throw new AuthError(403, 'Your account is not in the group allowed to use this app');
 	}
 	const name = typeof claims.name === 'string' && claims.name ? claims.name : 'Staff';
-	return { name, cookie: cookie(SESSION_COOKIE, signCookie(config.sessionSecret, { name }, SESSION_SECONDS, deps.now), SESSION_SECONDS) };
+	return { name, cookie: cookie(SESSION_COOKIE, signCookie(config.sessionSecret, { typ: 'session', name }, SESSION_SECONDS, deps.now), SESSION_SECONDS) };
 }
 
 export function readSession(config: AuthConfig, cookieHeader: string | undefined, now = Date.now()): { name: string } | null {
-	const session = verifyCookie<{ name?: unknown }>(config.sessionSecret, readCookie(cookieHeader, SESSION_COOKIE), now);
-	return session && typeof session.name === 'string' ? { name: session.name } : null;
+	const session = verifyCookie<{ typ?: unknown; name?: unknown }>(config.sessionSecret, readCookie(cookieHeader, SESSION_COOKIE), now);
+	return session?.typ === 'session' && typeof session.name === 'string' ? { name: session.name } : null;
 }
 
 export function logoutUrl(config: AuthConfig): string {
-	return `${authority(config)}/oauth2/v2.0/logout?${new URLSearchParams({ post_logout_redirect_uri: config.publicUrl })}`;
+	return `${authority(config)}/oauth2/v2.0/logout?${new URLSearchParams({ post_logout_redirect_uri: `${config.publicUrl}/` })}`;
 }

@@ -420,13 +420,15 @@ gcloud run deploy techsupport --region=<REGION> \
 gcloud run services describe techsupport --region=<REGION> --format='value(status.url)'   # = <PUBLIC_URL> if no custom domain
 
 # Check
-curl -s <PUBLIC_URL>/api/health                                  # 200 {"status":"ok",...}
+curl -s <PUBLIC_URL>/api/health                                  # 200 {"status":"ok"} (no DB; /health checks the DB)
 curl -s -o /dev/null -w '%{http_code}\n' <PUBLIC_URL>/api/reports/2026-10   # 401
 ```
 
-Entra app registration (portal, by an admin): platform **Web**, redirect URI
-`<PUBLIC_URL>/api/auth/callback`; a client secret (into `entra-client-secret`);
-Token configuration → add the **groups** claim to the ID token. A user whose
+Entra app registration (portal, by an admin): platform **Web**, redirect URIs
+`<PUBLIC_URL>/api/auth/callback` (sign-in) and `<PUBLIC_URL>/` (return after
+sign-out); a client secret (into `entra-client-secret`);
+Token configuration → add the **groups** claim to the ID token.
+`<TENANT_ID>` must be the directory (tenant) GUID, not a domain. A user whose
 token has no `groups` claim (group overage) is refused, so prefer "Groups
 assigned to the application" and assign `<GROUP_OBJECT_ID>` to the app. If the
 first deploy is what reveals the URL, redeploy with `PUBLIC_URL` set and add the

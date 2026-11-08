@@ -3,11 +3,21 @@ import { Languages, LogOut, Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/shared/i18n";
-import { fetchMe } from "@/shared/utils/report-requests";
+import { authProblems, fetchMe, SIGN_IN_URL, type AuthProblem } from "@/shared/utils/report-requests";
 
 export function Header({ title, onMenu }: { title: string; onMenu: (button: HTMLButtonElement) => void }) {
   const { t, locale, setLocale } = useI18n();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => fetchMe(), staleTime: Infinity });
+  const [problem, setProblem] = useState<AuthProblem | null>(null);
+  useEffect(() => {
+    const listen = (e: Event) => setProblem(e.type as AuthProblem);
+    authProblems.addEventListener("expired", listen);
+    authProblems.addEventListener("failed", listen);
+    return () => {
+      authProblems.removeEventListener("expired", listen);
+      authProblems.removeEventListener("failed", listen);
+    };
+  }, []);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
 
   useEffect(() => {
@@ -38,15 +48,23 @@ export function Header({ title, onMenu }: { title: string; onMenu: (button: HTML
       <Button variant="ghost" size="icon" className="size-11" onClick={() => setDark(!dark)} aria-label={t("theme.toggle")}>
         {dark ? <Sun /> : <Moon />}
       </Button>
-      {me && (
+      {problem ? (
+        <p role="alert" className="flex items-center gap-2 text-sm">
+          <span className="hidden md:inline">{t(problem === "expired" ? "auth.expired" : "auth.failed")}</span>
+          <Button asChild size="sm" className="min-h-11">
+            <a href={SIGN_IN_URL}>{t("auth.signIn")}</a>
+          </Button>
+        </p>
+      ) : me && (
         <>
           <span className="hidden max-w-48 truncate text-sm text-muted-foreground sm:inline">{me.name}</span>
-          <Button asChild variant="ghost" size="sm" className="min-h-11">
-            <a href="/api/auth/logout">
+          {/* POST: a cross-site link cannot sign staff out (the server also checks Origin). */}
+          <form method="post" action="/api/auth/logout">
+            <Button type="submit" variant="ghost" size="sm" className="min-h-11">
               <LogOut />
               {t("auth.signOut")}
-            </a>
-          </Button>
+            </Button>
+          </form>
         </>
       )}
     </header>
