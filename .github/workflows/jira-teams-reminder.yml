@@ -130,7 +130,8 @@ jobs:
           TEAMS_APP_EXTERNAL_ID: ${{ vars.TEAMS_APP_EXTERNAL_ID }}
           GRAPH_CLIENT_ID: ${{ vars.GRAPH_CLIENT_ID }}
           ESCALATION_SEED_ONLY: ${{ inputs.seed_only || 'false' }}
-          TEAMS_BOT_RECIPIENT_ALLOWLIST: ${{ vars.TEAMS_BOT_RECIPIENT_ALLOWLIST }}
+          # A secret, not a variable: the step log echoes env, and only secrets are masked.
+          TEAMS_BOT_RECIPIENT_ALLOWLIST: ${{ secrets.TEAMS_BOT_RECIPIENT_ALLOWLIST }}
           TEAMS_MAX_MESSAGE_CHARS: ${{ vars.TEAMS_MAX_MESSAGE_CHARS }}
           HTTP_TIMEOUT_MS: ${{ vars.HTTP_TIMEOUT_MS }}
           HTTP_MAX_RETRIES: ${{ vars.HTTP_MAX_RETRIES }}

@@ -53,7 +53,7 @@ Not in CI → the code default applies in production.
 | `TEAMS_BOT_SERVICE_URL` | `https://smba.trafficmanager.net/teams` | v | Bot Connector region |
 | `TEAMS_APP_EXTERNAL_ID` | = app id | v | catalog lookup |
 | `GRAPH_CLIENT_ID` / `GRAPH_CLIENT_SECRET` | = app id / = app password | v / — | Graph creds |
-| `TEAMS_BOT_RECIPIENT_ALLOWLIST` | none (no gate) | v | comma list: email, handle or oid |
+| `TEAMS_BOT_RECIPIENT_ALLOWLIST` | none (no gate) | s | comma list: email, handle or oid; a secret so the log echo masks it |
 
 ## Escalation
 

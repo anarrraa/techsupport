@@ -1,6 +1,6 @@
 # TODO
 
-Last updated: 2026-11-07
+Last updated: 2026-11-16
 
 This tracks actionable next steps across the MVP and the proposed V2
 (personal Teams bot + contract escalation). See `AGENTS.md` for required
@@ -31,13 +31,16 @@ reading order and non-negotiable invariants before touching any of this.
       Roadmap evidence snapshot, [report](plan/phase-4-bot-production/reports/2026-11-07-evidence.md).
 - [ ] Decide on an external trigger calling `workflow_dispatch` at 09:00 and
       14:00 Ulaanbaatar (user). Added 2026-11-07 from the measurement above.
-- [ ] Push `a469bdb` (user). CI on `main` `a9cffcf` fails at `npm ci`; the
-      reminder workflow runs the same step, so the Mon 2026-11-09 scheduled run
-      fails until the lockfile fix is on `main`. Added 2026-11-07.
+- [x] Push `a469bdb` (user). On `main`; CI run `42498322105` on `02c38bd`
+      passed 2026-11-08 and every scheduled run since succeeded.
 - [ ] Stop printing a staff email in every reminder run log (user, `.github/`
       change). The step's `env:` echo shows the `TEAMS_BOT_RECIPIENT_ALLOWLIST`
       repository variable; carry it as a secret or as object ids, then delete
       the old run logs (public repository). Found 2026-11-07.
+      2026-11-16: still leaking (run `43440552277`). Workflow now reads
+      `secrets.TEAMS_BOT_RECIPIENT_ALLOWLIST` (local, not pushed). Remaining,
+      in order: create the secret, push, delete the variable, delete old logs.
+      Never delete the variable first — an empty allowlist means no gate.
 
 - [x] Deploy. PR #2 and #3 merged 2026-09-08; escalation state seeded in the
       Actions cache (run `34203911077`, 0 messages sent); a dry-run on `main`

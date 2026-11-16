@@ -1,6 +1,6 @@
 # MVP completion roadmap
 
-Last reviewed: 2026-11-07
+Last reviewed: 2026-11-16
 
 ## Goal
 
@@ -82,13 +82,13 @@ Open decisions (record answers here):
 | Docs chat live (Vertex + pgvector) | Pass with one miss | 2026-11-06: real `documents/` indexed into a throwaway pgvector DB with the user's GCP project (gcloud default); 6/7 known questions answered and cited correctly; logs counts-only. Re-checked after the review fixes the same day: index 2762 new then 0, 2 answers cited, no-answer question returned empty sources. Not yet on a shared database |
 | Type checking | Pass | `npm run typecheck` exit 0 (root and frontend) on 2026-11-06 after the phase 3 review fixes |
 | Production build | Pass | `npm run build` produced `dist/server.mjs` on 2026-11-06; frontend `npm run build` exit 0 the same day |
-| GitHub CI | **Fail** on `main` | 2026-11-07: run [42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976) on `a9cffcf` failed at `npm ci` — lockfile missing `react@19.3.1`, `react-dom@19.3.1`, `scheduler@0.28.0`. Fix `a469bdb` is local, not pushed. The reminder workflow runs the same `npm ci`, so the next scheduled run (Mon 2026-11-09) fails until it is pushed. Last green CI on `main`: `36397371778` on `eed6029` (2026-09-28) |
+| GitHub CI | Pass on `main` | 2026-11-16: run [42498322105](https://github.com/anarrraa/techsupport/actions/runs/42498322105) on `02c38bd` (push, 2026-11-08) passed; the lockfile fix `a469bdb` is on `main`. Before: [42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976) on `a9cffcf` failed at `npm ci` (lockfile missing `react@19.3.1`, `react-dom@19.3.1`, `scheduler@0.28.0`) |
 | **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
 | Scheduled run verified in production | Pass | The dry-run immediately after reported `Scanned 26; 17 due, 9 not breached, 0 outside calendar, 0 awaiting window`, `0 request(s) crossed an escalation level` — the seed held — and `2 direct message(s) to 2 recipient(s)` with `11 withheld` by the rollout gate |
-| Production logs are aggregate-only | **Fail** 2026-11-07 | App output is aggregate-only in all 88 runs since 2026-09-09 (fixed templates; no ticket-key pattern, Cyrillic, or `@` in it). But the reminder step's `env:` echo prints the `TEAMS_BOT_RECIPIENT_ALLOWLIST` *variable*, and one of its two entries is a staff email in plaintext — in every run, public repository. Fix: carry it as a secret or as object ids (`.github/` change) and delete the old run logs — user. Earlier check, superseded: the run log above contains no ticket key, no assignee or participant name, no email, and no object id. Checked against two ticket-key prefixes, two assignee display names, a recipient's work address, a Cyrillic summary fragment, and a recipient object id |
+| Production logs are aggregate-only | **Fail** 2026-11-16 | Still leaking in run `43440552277` (2026-11-13). Workflow switched to `secrets.TEAMS_BOT_RECIPIENT_ALLOWLIST` locally 2026-11-16; not pushed, secret not yet created (user). App output is aggregate-only in all 88 runs since 2026-09-09 (fixed templates; no ticket-key pattern, Cyrillic, or `@` in it). But the reminder step's `env:` echo prints the `TEAMS_BOT_RECIPIENT_ALLOWLIST` *variable*, and one of its two entries is a staff email in plaintext — in every run, public repository. Fix: carry it as a secret or as object ids (`.github/` change) and delete the old run logs — user. Earlier check, superseded: the run log above contains no ticket key, no assignee or participant name, no email, and no object id. Checked against two ticket-key prefixes, two assignee display names, a recipient's work address, a Cyrillic summary fragment, and a recipient object id |
 | Scheduled reminder workflow (before) | Was failing | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/shared/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; confirmed 2026-11-07 — see "Scheduled runs observed" |
-| Scheduled runs observed | Pass 2026-11-07 | 84 consecutive `schedule` runs 2026-09-10 → 2026-11-06, all `success`, two per weekday. First [34442164854](https://github.com/anarrraa/techsupport/actions/runs/34442164854), first in-window delivery [35566617736](https://github.com/anarrraa/techsupport/actions/runs/35566617736), latest [42229509047](https://github.com/anarrraa/techsupport/actions/runs/42229509047). 22 in-window runs delivered 74 direct-message legs, 0 failed; 42 zero-due runs sent nothing |
+| Scheduled runs observed | Pass 2026-11-16 | 94 consecutive `schedule` runs 2026-09-10 → 2026-11-13, all `success`, two per weekday (plus two `workflow_dispatch` runs on 2026-11-09, both `success`). First [34442164854](https://github.com/anarrraa/techsupport/actions/runs/34442164854), first in-window delivery [35566617736](https://github.com/anarrraa/techsupport/actions/runs/35566617736), latest [43440552277](https://github.com/anarrraa/techsupport/actions/runs/43440552277). Delivery counts last tallied 2026-11-07: 22 in-window runs delivered 74 direct-message legs, 0 failed; 42 zero-due runs sent nothing |
 | Escalation state cache chain | Pass 2026-11-07 | 90 consecutive runs, [34204079955](https://github.com/anarrraa/techsupport/actions/runs/34204079955) → [42229509047](https://github.com/anarrraa/techsupport/actions/runs/42229509047), each restored the previous run's `escalation-state-<id>` and saved its own; zero misses |
 | Dry-run dispatch 2026-11-07 | Not dispatched | Dry runs also save a new escalation-state cache entry (`Save escalation state` is `if: always()`; dispatch dry runs `34204079955` and `34208522918` did). Not allowed in this evidence pass |
 | Scoped JQL correctness | Pass | On 2026-08-26 `JIRA_JQL` set to `project = DC AND statusCategory != Done AND assignee is not EMPTY` |
@@ -326,14 +326,15 @@ document or CI logs.
 The MVP is done only when all of the following are true:
 
 - [ ] Milestones 1 through 4 are complete.
-- [ ] `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` pass locally
+- [x] `npm ci`, `npm test`, `npm run typecheck`, and `npm run build` pass locally
   and in GitHub Actions.
-  - Evidence 2026-11-07: local pass (190 tests, 189 pass, 1 skipped) on Node 26 /
-    npm 11, not the pinned toolchain. CI on `main` `a9cffcf`
-    ([42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976)) **failed** at `npm ci` (lockfile out
-    of sync); the fix `a469bdb` is not pushed. The reminder workflow runs the
-    same `npm ci`, so the next scheduled run (Mon 2026-11-09) will fail until it
-    is pushed — user.
+  - Evidence 2026-11-16: CI [42498322105](https://github.com/anarrraa/techsupport/actions/runs/42498322105) on `main`
+    `02c38bd` passed (2026-11-08), and the 10 scheduled reminder runs since,
+    which run the same `npm ci`, all succeeded. Local: all four exit 0 on
+    2026-11-08 (207 tests, 206 pass, 1 opt-in skip), Node 26 / npm 11 rather
+    than the pinned toolchain. Earlier failure [42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976) was the
+    lockfile, fixed by `a469bdb`.
+    [Report](plan/phase-1-mvp-acceptance/reports/2026-11-16-evidence.md).
 - [ ] Dry-run and ordinary operational logs contain aggregate counts only.
   - Evidence 2026-11-07: app output is aggregate-only in all 88 runs; the
     workflow `env:` echo of the allowlist variable is not (see Milestone 3).
