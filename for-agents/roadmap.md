@@ -86,7 +86,7 @@ Open decisions (record answers here):
 | **Deployed to `main`** | Pass | PR #2 merged an earlier snapshot 2026-09-08 03:35 UTC; PR #3 merged the remaining 18 commits at 08:15 UTC. `main` now carries the twice-daily schedule, participant routing, and the trace tool |
 | Escalation state seeded in the Actions cache | Pass | Run `34203911077` (`seed_only=true`) wrote the directory from the secret, recorded 7 crossed levels (L2:2 L3:3 L5:2), delivered **0** messages, and saved `escalation-state-34203911077` |
 | Scheduled run verified in production | Pass | The dry-run immediately after reported `Scanned 26; 17 due, 9 not breached, 0 outside calendar, 0 awaiting window`, `0 request(s) crossed an escalation level` — the seed held — and `2 direct message(s) to 2 recipient(s)` with `11 withheld` by the rollout gate |
-| Production logs are aggregate-only | **Fail** 2026-11-16 | Still leaking in run `43440552277` (2026-11-13). Workflow switched to `secrets.TEAMS_BOT_RECIPIENT_ALLOWLIST` locally 2026-11-16; not pushed, secret not yet created (user). App output is aggregate-only in all 88 runs since 2026-09-09 (fixed templates; no ticket-key pattern, Cyrillic, or `@` in it). But the reminder step's `env:` echo prints the `TEAMS_BOT_RECIPIENT_ALLOWLIST` *variable*, and one of its two entries is a staff email in plaintext — in every run, public repository. Fix: carry it as a secret or as object ids (`.github/` change) and delete the old run logs — user. Earlier check, superseded: the run log above contains no ticket key, no assignee or participant name, no email, and no object id. Checked against two ticket-key prefixes, two assignee display names, a recipient's work address, a Cyrillic summary fragment, and a recipient object id |
+| Production logs are aggregate-only | Pass 2026-11-16 | Fixed: the reminder step's `env:` echo printed the `TEAMS_BOT_RECIPIENT_ALLOWLIST` *variable*, with a staff email in plaintext, in every run since 2026-09-09 (public repository). `d07445a` reads it from a secret; first run after, [43826030990](https://github.com/anarrraa/techsupport/actions/runs/43826030990), shows `***` and still withheld 5 recipients. Variable deleted; logs of all 653 earlier reminder runs deleted (`GET .../runs/<id>/logs` → 404). App output itself was aggregate-only throughout (fixed templates; no ticket-key pattern, Cyrillic, or `@`) |
 | Scheduled reminder workflow (before) | Was failing | Runs `34075035131` (2026-09-07), `34005624863` (2026-09-06) and `33938369442` (2026-09-05) all exited 1 with `Missing required env var: TEAMS_WEBHOOK_URL`. The variable had been removed from the workflow env while `src/shared/config.ts` still required it. Fixed on `feat/teams-bot-escalation`; confirmed 2026-11-07 — see "Scheduled runs observed" |
 | Scheduled runs observed | Pass 2026-11-16 | 94 consecutive `schedule` runs 2026-09-10 → 2026-11-13, all `success`, two per weekday (plus two `workflow_dispatch` runs on 2026-11-09, both `success`). First [34442164854](https://github.com/anarrraa/techsupport/actions/runs/34442164854), first in-window delivery [35566617736](https://github.com/anarrraa/techsupport/actions/runs/35566617736), latest [43440552277](https://github.com/anarrraa/techsupport/actions/runs/43440552277). Delivery counts last tallied 2026-11-07: 22 in-window runs delivered 74 direct-message legs, 0 failed; 42 zero-due runs sent nothing |
 | Escalation state cache chain | Pass 2026-11-07 | 90 consecutive runs, [34204079955](https://github.com/anarrraa/techsupport/actions/runs/34204079955) → [42229509047](https://github.com/anarrraa/techsupport/actions/runs/42229509047), each restored the previous run's `escalation-state-<id>` and saved its own; zero misses |
@@ -335,9 +335,11 @@ The MVP is done only when all of the following are true:
     than the pinned toolchain. Earlier failure [42360929976](https://github.com/anarrraa/techsupport/actions/runs/42360929976) was the
     lockfile, fixed by `a469bdb`.
     [Report](plan/phase-1-mvp-acceptance/reports/2026-11-16-evidence.md).
-- [ ] Dry-run and ordinary operational logs contain aggregate counts only.
-  - Evidence 2026-11-07: app output is aggregate-only in all 88 runs; the
-    workflow `env:` echo of the allowlist variable is not (see Milestone 3).
+- [x] Dry-run and ordinary operational logs contain aggregate counts only.
+  - Evidence 2026-11-16: app output aggregate-only in every run; the allowlist
+    echo is masked since `d07445a` and earlier logs are deleted (evidence
+    snapshot, "Production logs").
+    [Report](plan/phase-1-mvp-acceptance/reports/2026-11-16-evidence.md).
 - [ ] All external calls and retry waits are bounded.
 - [ ] A controlled Jira-to-Teams delivery has succeeded.
   - Evidence 2026-11-07: succeeded through the personal bot (see Milestone 4);
@@ -354,9 +356,10 @@ The MVP is done only when all of the following are true:
   confirmed.
 - [ ] No secret, token, ticket content, or personal data is present in Git history
   or GitHub Actions logs.
-  - Evidence 2026-11-07: **fails** — a staff email from the allowlist variable
-    is printed in every reminder run log since 2026-09-09 (public repository).
-    Git history not re-audited in this pass.
+  - Evidence 2026-11-16: Actions logs fixed — the allowlist email is masked
+    since `d07445a` and all earlier reminder run logs are deleted. Still
+    unchecked: Git history not re-audited, and `TEAMS_BOT_APP_PASSWORD` (pasted
+    into a chat transcript) is not rotated.
 
 ## V2 milestone 1: personal Teams bot delivery path
 

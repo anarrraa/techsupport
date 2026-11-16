@@ -33,14 +33,12 @@ reading order and non-negotiable invariants before touching any of this.
       14:00 Ulaanbaatar (user). Added 2026-11-07 from the measurement above.
 - [x] Push `a469bdb` (user). On `main`; CI run `42498322105` on `02c38bd`
       passed 2026-11-08 and every scheduled run since succeeded.
-- [ ] Stop printing a staff email in every reminder run log (user, `.github/`
-      change). The step's `env:` echo shows the `TEAMS_BOT_RECIPIENT_ALLOWLIST`
-      repository variable; carry it as a secret or as object ids, then delete
-      the old run logs (public repository). Found 2026-11-07.
-      2026-11-16: still leaking (run `43440552277`). Workflow now reads
-      `secrets.TEAMS_BOT_RECIPIENT_ALLOWLIST` (local, not pushed). Remaining,
-      in order: create the secret, push, delete the variable, delete old logs.
-      Never delete the variable first — an empty allowlist means no gate.
+- [x] Stop printing a staff email in every reminder run log. Found
+      2026-11-07, fixed 2026-11-16: workflow reads
+      `secrets.TEAMS_BOT_RECIPIENT_ALLOWLIST` (`d07445a`), the variable is
+      deleted, and the logs of all 653 earlier reminder runs are deleted (API
+      404). First masked run `43826030990` still withheld 5 recipients, so the
+      gate held. [Report](plan/phase-1-mvp-acceptance/reports/2026-11-16-evidence.md).
 
 - [x] Deploy. PR #2 and #3 merged 2026-09-08; escalation state seeded in the
       Actions cache (run `34203911077`, 0 messages sent); a dry-run on `main`
