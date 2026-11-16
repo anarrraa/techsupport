@@ -79,7 +79,7 @@ only allowed on a loopback `BACKEND_HOST` (fail closed).
 | --- | --- | --- |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | none; tenant is a GUID | Entra app registration |
 | `ENTRA_CLIENT_SECRET` | none | secret; Secret Manager in Cloud Run |
-| `ENTRA_ALLOWED_GROUP_ID` | none | the one group allowed in (`groups` claim) |
+| `SUPERADMIN_EMAIL` | none | manages the team list in the app; always allowed in |
 | `SESSION_SECRET` | none; ≥ 32 chars | HMAC key for the session cookie |
 | `PUBLIC_URL` | none; https origin | redirect URI = `<PUBLIC_URL>/api/auth/callback` |
 | `BACKEND_HOST` | `127.0.0.1` | bind address; container `0.0.0.0` |

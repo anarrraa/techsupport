@@ -86,3 +86,10 @@
 - Closed mobile drawer uses `invisible` (keeps links out of Tab order) instead of `inert` (React 18 has no typed `inert` prop and
   `lg` must stay interactive). Slide-out animation is lost on close; slide-in stays.
 - Support upload 4xx: frontend shows a localized lead (`support.invalid`) + the server detail unchanged (column names stay as in the export). 6.1 checked.
+
+## Team list login + level reminder wording — decisions (2026-11-09)
+
+- Web app sign-in: in-app team list (`StaffMember`) + `SUPERADMIN_EMAIL` instead of an Entra group. Superadmin = env var, not a row,
+  cannot be removed. Member emails only in the DB (repo is public): the superadmin adds the team on the Team page after first login.
+- Email = lowercased `preferred_username`; safe because the issuer pins our tenant. Membership re-checked per request (one indexed lookup).
+- Escalation DM header: "🚨 <n>-р түвшний сануулга" (user found "Эскалаци — L2" odd). Teams manifest text left as is (needs re-upload).

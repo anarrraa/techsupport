@@ -3,18 +3,25 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generatePDF, generateExcel } from '../monthly-report/export.ts';
-import { db, docClients, monthSnapshots, searchDocChunks } from './db.ts';
+import { db, docClients, monthSnapshots, searchDocChunks, staffMembers } from './db.ts';
 import { answerQuestion, MAX_QUESTION_CHARS, type ChatDeps } from '../docs-chat/chat.ts';
 import { answer, embed } from '../docs-chat/vertex.ts';
 import { aggregateMonth, monthRange, MonthlyReportLimitError, type SnapshotRow } from '../monthly-report/monthly-report.ts';
 import { assertSupportRows, buildSupportReport, suggestPeriod, SupportInputError, type ClientConfig } from '../support-report/support-report.ts';
 import { readRows } from '../support-report/input.ts';
 import { renderSupportReportPdf } from '../support-report/pdf.ts';
-import { assertExposure, AuthError, authConfig, cookie, finishLogin, LOGIN_COOKIE, logoutUrl, readCookie, readSession, SESSION_COOKIE, startLogin, type AuthConfig, type LoginDeps } from './auth.ts';
+import { assertExposure, AuthError, authConfig, cookie, finishLogin, LOGIN_COOKIE, logoutUrl, normalizeEmail, readCookie, readSession, SESSION_COOKIE, startLogin, type AuthConfig, type LoginDeps } from './auth.ts';
 
 interface ReportStore {
 	check(): Promise<unknown>;
 	read(start: Date, end: Date): Promise<SnapshotRow[]>;
+}
+
+interface MemberStore {
+	has(email: string): Promise<boolean>;
+	list(): Promise<string[]>;
+	add(email: string): Promise<void>;
+	remove(email: string): Promise<void>;
 }
 
 export const MAX_SUPPORT_ROWS = 20_000;
@@ -71,7 +78,7 @@ export function createApp(store: ReportStore = {
 	search: searchDocChunks,
 	answer,
 	clients: docClients,
-}, auth: AuthConfig | null = null, loginDeps?: LoginDeps, frontendDir = 'frontend/dist') {
+}, auth: AuthConfig | null = null, loginDeps?: LoginDeps, frontendDir = 'frontend/dist', members: MemberStore = staffMembers) {
 	const app = express();
 	const upload = express.raw({ type: () => true, limit: '10mb' });
 
@@ -86,7 +93,10 @@ export function createApp(store: ReportStore = {
 	});
 	app.get('/api/health', (_req, res) => { res.json({ status: 'ok' }); });
 
-	// No auth config means loopback-only dev (assertExposure); with it, every other /api route needs a session.
+	// No auth config means loopback-only dev (assertExposure); with it, every other /api route needs a session
+	// of a current team member. Checked per request, so removing someone takes effect at once.
+	const isMember = async (email: string) => email === auth?.superadminEmail || await members.has(email);
+	const isSuperadmin = (res: express.Response) => !auth || res.locals.user?.email === auth.superadminEmail;
 	if (auth) {
 		app.get('/api/auth/login', (_req, res) => {
 			const login = startLogin(auth);
@@ -97,6 +107,7 @@ export function createApp(store: ReportStore = {
 		app.get('/api/auth/callback', async (req, res) => {
 			try {
 				const session = await finishLogin(auth, req.query, readCookie(req.headers.cookie, LOGIN_COOKIE), loginDeps);
+				if (!await isMember(session.email)) throw new AuthError(403, 'Your account is not on the Tech Success team; ask the admin to add you');
 				res.setHeader('Set-Cookie', [session.cookie, cookie(LOGIN_COOKIE, '', 0)]);
 				res.redirect(302, '/');
 			} catch (error) {
@@ -115,17 +126,51 @@ export function createApp(store: ReportStore = {
 			res.setHeader('Set-Cookie', cookie(SESSION_COOKIE, '', 0));
 			res.redirect(303, logoutUrl(auth));
 		});
-		app.use('/api', (req, res, next) => {
+		app.use('/api', async (req, res, next) => {
 			const session = readSession(auth, req.headers.cookie);
 			if (!session) {
 				res.status(401).json({ error: 'Sign in required' });
 				return;
 			}
+			try {
+				if (!await isMember(session.email)) {
+					res.setHeader('Set-Cookie', cookie(SESSION_COOKIE, '', 0));
+					res.status(403).json({ error: 'Your account is no longer on the Tech Success team' });
+					return;
+				}
+			} catch (error) {
+				next(error);
+				return;
+			}
 			res.locals.user = session;
 			next();
 		});
-		app.get('/api/auth/me', (_req, res) => { res.json(res.locals.user); });
+		app.get('/api/auth/me', (_req, res) => { res.json({ ...res.locals.user, superadmin: isSuperadmin(res) }); });
 	}
+
+	// Team list for every member; only the superadmin changes it. Without auth (loopback dev) the developer is the admin.
+	app.get('/api/members', async (_req, res, next) => {
+		try { res.json({ superadmin: auth?.superadminEmail ?? null, members: await members.list() }); } catch (error) { next(error); }
+	});
+	app.post('/api/members', express.json({ limit: '1kb' }), async (req, res, next) => {
+		try {
+			if (!isSuperadmin(res)) throw new HttpError(403, 'Only the admin can change the team');
+			const email = normalizeEmail((req.body ?? {}).email);
+			if (!email) throw new HttpError(400, 'email must be an email address');
+			await members.add(email);
+			res.status(201).json({ email });
+		} catch (error) { next(error); }
+	});
+	app.delete('/api/members/:email', async (req, res, next) => {
+		try {
+			if (!isSuperadmin(res)) throw new HttpError(403, 'Only the admin can change the team');
+			const email = normalizeEmail(req.params.email);
+			if (!email) throw new HttpError(400, 'email must be an email address');
+			if (email === auth?.superadminEmail) throw new HttpError(400, 'The admin cannot be removed');
+			await members.remove(email);
+			res.status(204).end();
+		} catch (error) { next(error); }
+	});
 
 	app.get('/api/chat/clients', async (_req, res, next) => {
 		try { res.json(await chat.clients()); } catch (error) { next(error); }

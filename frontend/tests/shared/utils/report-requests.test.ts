@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { archiveMonths, askChat, fetchChatClients, fetchMe, withLogin, authProblems, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError, supportErrorText } from '../../../src/shared/utils/report-requests.ts';
+import { addMember, fetchTeam, removeMember, archiveMonths, askChat, fetchChatClients, fetchMe, withLogin, authProblems, fetchReport, fetchExport, fetchSupportConfigs, fetchSupportPeriod, fetchSupportReport, loadArchive, ReportRequestError, supportErrorText } from '../../../src/shared/utils/report-requests.ts';
 import type { MonthlyReport } from '../../../src/types/report.ts';
 
 test('archive reads exactly 12 UTC months newest first across a year boundary', () => {
@@ -179,4 +179,19 @@ test('the signed-in name comes from /api/auth/me; no auth routes (localhost dev)
   assert.deepEqual(await fetchMe(me(200)), { name: 'Staff One' });
   assert.equal(await fetchMe(me(404)), null);
   await assert.rejects(fetchMe(me(503)), (e) => e instanceof ReportRequestError && e.status === 503);
+});
+
+test('team requests: list, add as JSON, remove with the email encoded; 4xx reason surfaces', async () => {
+  const calls: [string, RequestInit | undefined][] = [];
+  const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push([String(url), init]);
+    if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+    if (init?.method === 'POST') return Response.json({ error: 'Only the admin can change the team' }, { status: 403 });
+    return Response.json({ superadmin: 'admin@example.test', members: ['a@example.test'] });
+  }) as typeof fetch;
+  assert.deepEqual(await fetchTeam(fetcher), { superadmin: 'admin@example.test', members: ['a@example.test'] });
+  await assert.rejects(addMember('b@example.test', fetcher), (e: ReportRequestError) => e.status === 403 && e.message === 'Only the admin can change the team');
+  assert.equal(calls[1][1]?.body, JSON.stringify({ email: 'b@example.test' }));
+  await removeMember('a+x@example.test', fetcher);
+  assert.equal(calls[2][0], '/api/members/a%2Bx%40example.test');
 });

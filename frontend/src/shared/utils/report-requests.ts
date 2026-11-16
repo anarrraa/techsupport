@@ -54,7 +54,9 @@ export function withLogin(fetcher: typeof fetch, {
 const apiFetch: typeof fetch = (input, init) => withLogin(fetch)(input, init);
 
 /** The signed-in staff member; null when the server runs without login (localhost dev has no auth routes). */
-export async function fetchMe(fetcher: typeof fetch = apiFetch, storage = sessionStore): Promise<{ name: string } | null> {
+export type Me = { name: string; email: string; superadmin: boolean };
+
+export async function fetchMe(fetcher: typeof fetch = apiFetch, storage = sessionStore): Promise<Me | null> {
   const response = await fetcher('/api/auth/me', { signal: AbortSignal.timeout(15_000) });
   if (response.status === 404) return null;
   if (!response.ok) throw new ReportRequestError(response.status);
@@ -146,4 +148,20 @@ export async function askChat(question: string, locale: Locale, client?: string,
     signal: AbortSignal.timeout(60_000),
   });
   return (await supportResponse(response)).json();
+}
+
+export type Team = { superadmin: string | null; members: string[] };
+
+export async function fetchTeam(fetcher: typeof fetch = apiFetch): Promise<Team> {
+  return (await supportResponse(await fetcher('/api/members', { signal: AbortSignal.timeout(15_000) }))).json();
+}
+
+export async function addMember(email: string, fetcher: typeof fetch = apiFetch): Promise<void> {
+  await supportResponse(await fetcher('/api/members', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }), signal: AbortSignal.timeout(15_000),
+  }));
+}
+
+export async function removeMember(email: string, fetcher: typeof fetch = apiFetch): Promise<void> {
+  await supportResponse(await fetcher(`/api/members/${encodeURIComponent(email)}`, { method: 'DELETE', signal: AbortSignal.timeout(15_000) }));
 }

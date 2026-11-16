@@ -14,6 +14,7 @@ link to the roadmap items instead.
 | [phase-4-bot-production](phase-4-bot-production/) | Personal bot + escalation in production |
 | [phase-5-hosting-auth](phase-5-hosting-auth/) | Hosting and Entra login |
 | [phase-6-reporting-acceptance](phase-6-reporting-acceptance/) | Staff sign-off on dashboard and reports |
+| [phase-7-multi-project](phase-7-multi-project/) | DC + SHT + APUT in one reminder run |
 
 ## Reports (required)
 

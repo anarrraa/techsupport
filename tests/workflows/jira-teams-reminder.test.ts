@@ -284,7 +284,7 @@ test('escalates a crossed level once and records it', async () => {
 	assert.ok(first.sent.some((message) => message.entraObjectId === LEAD));
 	assert.match(
 		first.sent.find((message) => message.entraObjectId === LEAD)?.text ?? '',
-		/Эскалаци — L2/,
+		/2-р түвшний сануулга/,
 	);
 
 	const second = await run({ config: config({ bot: true }), tickets, state: first.saved ?? {} });

@@ -9,14 +9,14 @@ import { generateKeyPair, SignJWT } from 'jose';
 import { assertExposure, authConfig, finishLogin, readSession, signCookie, startLogin, verifyCookie, type AuthConfig, type LoginDeps } from '../../src/backend/auth.ts';
 import { createApp, listenPort } from '../../src/backend/server.ts';
 
-// Synthetic values only: no real tenant, app, or group.
+// Synthetic values only: no real tenant, app, or person.
 const config: AuthConfig = {
 	tenantId: '00000000-0000-4000-8000-000000000001', clientId: 'client-test', clientSecret: 'secret-test',
-	allowedGroupId: 'group-allowed', sessionSecret: 'x'.repeat(32), publicUrl: 'https://app.example.test',
+	superadminEmail: 'admin@example.test', sessionSecret: 'x'.repeat(32), publicUrl: 'https://app.example.test',
 };
 const ENV = {
 	ENTRA_TENANT_ID: config.tenantId, ENTRA_CLIENT_ID: config.clientId, ENTRA_CLIENT_SECRET: config.clientSecret,
-	ENTRA_ALLOWED_GROUP_ID: config.allowedGroupId, SESSION_SECRET: config.sessionSecret, PUBLIC_URL: config.publicUrl,
+	SUPERADMIN_EMAIL: 'Admin@Example.test ', SESSION_SECRET: config.sessionSecret, PUBLIC_URL: config.publicUrl,
 };
 const NOW = Date.parse('2026-11-07T00:00:00Z');
 const { privateKey, publicKey } = await generateKeyPair('RS256');
@@ -52,8 +52,9 @@ function login(token: Promise<string> | string) {
 test('auth config: none set is dev mode, partial or weak config fails naming the variables', () => {
 	assert.equal(authConfig({}), null);
 	assert.deepEqual(authConfig(ENV), config);
-	assert.throws(() => authConfig({ ENTRA_TENANT_ID: 't' }), /missing ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET, ENTRA_ALLOWED_GROUP_ID, SESSION_SECRET, PUBLIC_URL/);
+	assert.throws(() => authConfig({ ENTRA_TENANT_ID: 't' }), /missing ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET, SUPERADMIN_EMAIL, SESSION_SECRET, PUBLIC_URL/);
 	assert.throws(() => authConfig({ ...ENV, SESSION_SECRET: 'short' }), /SESSION_SECRET/);
+	assert.throws(() => authConfig({ ...ENV, SUPERADMIN_EMAIL: 'admin' }), /SUPERADMIN_EMAIL/);
 	assert.throws(() => authConfig({ ...ENV, PUBLIC_URL: 'http://app.example.test' }), /PUBLIC_URL/);
 	for (const tenant of ['contoso.onmicrosoft.com', 'common', 'organizations']) {
 		assert.throws(() => authConfig({ ...ENV, ENTRA_TENANT_ID: tenant }), /ENTRA_TENANT_ID must be the tenant GUID/);
@@ -97,26 +98,27 @@ test('login uses PKCE S256, a random state and nonce, and a short HttpOnly Secur
 	assert.notEqual(new URL(startLogin(config, NOW).url).searchParams.get('state'), url.searchParams.get('state'));
 });
 
-test('a group member gets an 8-hour session; the code is redeemed with the PKCE verifier', async () => {
-	const flow = login(later(() => idToken({ name: 'Staff One', nonce: flow.nonce, groups: ['other', config.allowedGroupId] })));
+test('a staff sign-in gets an 8-hour session carrying the lowercased email; the code is redeemed with the PKCE verifier', async () => {
+	const flow = login(later(() => idToken({ name: 'Staff One', nonce: flow.nonce, preferred_username: 'Staff.One@Example.test' })));
 	const session = await finishLogin(config, { code: 'c', state: flow.state }, flow.cookie, flow.deps);
 	assert.equal(session.name, 'Staff One');
 	assert.match(session.cookie, /^session=[^;]+; Max-Age=28800; Path=\/; HttpOnly; Secure; SameSite=Lax$/);
 	assert.equal(flow.sent[0].get('code_verifier')?.length, 43);
 	assert.equal(flow.sent[0].get('grant_type'), 'authorization_code');
-	assert.deepEqual(readSession(config, session.cookie.split(';')[0], NOW), { name: 'Staff One' });
+	assert.deepEqual(readSession(config, session.cookie.split(';')[0], NOW), { name: 'Staff One', email: 'staff.one@example.test' });
+	assert.equal(session.email, 'staff.one@example.test');
 	assert.equal(readSession(config, session.cookie.split(';')[0], NOW + 28_801_000), null);
 });
 
-test('wrong group, missing groups (overage), bad nonce, issuer, audience, expiry and state are refused', async () => {
+test('no email, bad nonce, issuer, audience, expiry and state are refused', async () => {
 	const cases: [Record<string, unknown> | null, Parameters<typeof idToken>[1], number, string?][] = [
-		[{ groups: ['other'] }, {}, 403],
-		[{ _claim_names: { groups: 'src1' } }, {}, 403],
-		[{ groups: [config.allowedGroupId], nonce: 'wrong' }, {}, 401],
-		[{ groups: [config.allowedGroupId] }, { issuer: 'https://login.microsoftonline.com/other/v2.0' }, 401],
-		[{ groups: [config.allowedGroupId] }, { audience: 'other-app' }, 401],
-		[{ groups: [config.allowedGroupId] }, { expires: NOW / 1000 - 600 }, 401],
-		[{ groups: [config.allowedGroupId] }, {}, 400, 'bad-state'],
+		[{}, {}, 403],
+		[{ preferred_username: 'not-an-email' }, {}, 403],
+		[{ preferred_username: 'staff@example.test', nonce: 'wrong' }, {}, 401],
+		[{ preferred_username: 'staff@example.test' }, { issuer: 'https://login.microsoftonline.com/other/v2.0' }, 401],
+		[{ preferred_username: 'staff@example.test' }, { audience: 'other-app' }, 401],
+		[{ preferred_username: 'staff@example.test' }, { expires: NOW / 1000 - 600 }, 401],
+		[{ preferred_username: 'staff@example.test' }, {}, 400, 'bad-state'],
 	];
 	for (const [claims, overrides, status, state] of cases) {
 		const flow = login(later(() => idToken({ nonce: flow.nonce, ...claims }, overrides)));
@@ -140,37 +142,50 @@ async function withServer(app: ReturnType<typeof createApp>, run: (url: string) 
 
 const store = { check: async () => {}, read: async () => [] };
 
+/** In-memory team; starts with one member. */
+function team(...emails: string[]) {
+	const set = new Set(emails.length ? emails : ['staff@example.test']);
+	return {
+		set,
+		has: async (email: string) => set.has(email),
+		list: async () => [...set].sort(),
+		add: async (email: string) => { set.add(email); },
+		remove: async (email: string) => { set.delete(email); },
+	};
+}
+const sessionFor = (email: string, seconds = 60) => `session=${signCookie(config.sessionSecret, { typ: 'session', name: 'Staff One', email }, seconds)}`;
+
 test('with auth on, /api needs a session: none, tampered or expired → 401; health stays open', async () => {
-	await withServer(createApp(store, async () => ({}), undefined, config), async (url) => {
+	await withServer(createApp(store, async () => ({}), undefined, config, undefined, undefined, team()), async (url) => {
 		for (const path of ['/health', '/api/health']) assert.equal((await fetch(`${url}${path}`)).status, 200);
-		const valid = `session=${signCookie(config.sessionSecret, { typ: 'session', name: 'Staff One' }, 60)}`;
-		const expired = `session=${signCookie(config.sessionSecret, { typ: 'session', name: 'Staff One' }, -1)}`;
+		const valid = sessionFor('staff@example.test');
+		const expired = sessionFor('staff@example.test', -1);
 		for (const cookie of [undefined, `${valid}x`, expired]) {
 			const response = await fetch(`${url}/api/reports/2026-10`, { headers: cookie ? { cookie } : {} });
 			assert.deepEqual([response.status, await response.json()], [401, { error: 'Sign in required' }]);
 		}
 		assert.equal((await fetch(`${url}/api/chat`, { method: 'POST' })).status, 401);
 		assert.equal((await fetch(`${url}/api/reports/2026-10`, { headers: { cookie: valid } })).status, 200);
-		assert.deepEqual(await (await fetch(`${url}/api/auth/me`, { headers: { cookie: valid } })).json(), { name: 'Staff One' });
+		assert.deepEqual(await (await fetch(`${url}/api/auth/me`, { headers: { cookie: valid } })).json(), { name: 'Staff One', email: 'staff@example.test', superadmin: false });
 	});
 });
 
 test('the HTTP callback answers a non-member with a 403 page and a retry link, clears the login cookie, sets no session', async () => {
-	const flow = login(later(() => idToken({ nonce: flow.nonce, groups: ['other'] })));
-	await withServer(createApp(store, async () => ({}), undefined, config, flow.deps), async (url) => {
+	const flow = login(later(() => idToken({ nonce: flow.nonce, preferred_username: 'outsider@example.test' })));
+	await withServer(createApp(store, async () => ({}), undefined, config, flow.deps, undefined, team()), async (url) => {
 		const response = await fetch(`${url}/api/auth/callback?code=c&state=${flow.state}`, { headers: { cookie: `login=${flow.cookie}` }, redirect: 'manual' });
 		assert.equal(response.status, 403);
 		assert.match(response.headers.get('content-type')!, /^text\/html/);
 		const page = await response.text();
-		assert.match(page, /not in the group/);
+		assert.match(page, /not on the Tech Success team/);
 		assert.match(page, /href="\/api\/auth\/login"/);
 		assert.deepEqual(response.headers.getSetCookie(), ['login=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax']);
 	});
 });
 
 test('login redirects to Entra; callback sets the session; same-origin POST logout clears it, cross-site or GET does not', async () => {
-	const flow = login(later(() => idToken({ name: 'Staff One', nonce: flow.nonce, groups: [config.allowedGroupId] })));
-	await withServer(createApp(store, async () => ({}), undefined, config, flow.deps), async (url) => {
+	const flow = login(later(() => idToken({ name: 'Staff One', nonce: flow.nonce, preferred_username: 'staff@example.test' })));
+	await withServer(createApp(store, async () => ({}), undefined, config, flow.deps, undefined, team()), async (url) => {
 		const start = await fetch(`${url}/api/auth/login`, { redirect: 'manual' });
 		assert.equal(start.status, 302);
 		assert.match(start.headers.get('location')!, /^https:\/\/login\.microsoftonline\.com\/00000000-0000-4000-8000-000000000001\/oauth2\/v2\.0\/authorize\?/);
@@ -191,10 +206,45 @@ test('login redirects to Entra; callback sets the session; same-origin POST logo
 	});
 });
 
+test('removing a member ends their session on the next request', async () => {
+	const members = team();
+	await withServer(createApp(store, async () => ({}), undefined, config, undefined, undefined, members), async (url) => {
+		const cookie = sessionFor('staff@example.test');
+		assert.equal((await fetch(`${url}/api/reports/2026-10`, { headers: { cookie } })).status, 200);
+		members.set.delete('staff@example.test');
+		const response = await fetch(`${url}/api/reports/2026-10`, { headers: { cookie } });
+		assert.equal(response.status, 403);
+		assert.equal(response.headers.get('set-cookie'), 'session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax');
+	});
+});
+
+test('only the superadmin adds and removes members; the superadmin is always in and cannot be removed', async () => {
+	const members = team();
+	await withServer(createApp(store, async () => ({}), undefined, config, undefined, undefined, members), async (url) => {
+		const admin = { cookie: sessionFor('admin@example.test'), 'content-type': 'application/json' };
+		const staff = { cookie: sessionFor('staff@example.test'), 'content-type': 'application/json' };
+		assert.equal(((await (await fetch(`${url}/api/auth/me`, { headers: admin })).json()) as { superadmin: boolean }).superadmin, true);
+		assert.deepEqual(await (await fetch(`${url}/api/members`, { headers: staff })).json(), { superadmin: 'admin@example.test', members: ['staff@example.test'] });
+		assert.equal((await fetch(`${url}/api/members`, { method: 'POST', headers: staff, body: JSON.stringify({ email: 'new@example.test' }) })).status, 403);
+		assert.equal((await fetch(`${url}/api/members/staff%40example.test`, { method: 'DELETE', headers: staff })).status, 403);
+		assert.equal((await fetch(`${url}/api/members`, { method: 'POST', headers: admin, body: JSON.stringify({ email: 'nope' }) })).status, 400);
+		assert.equal((await fetch(`${url}/api/members`, { method: 'POST', headers: admin, body: JSON.stringify({ email: ' New@Example.test ' }) })).status, 201);
+		assert.equal((await fetch(`${url}/api/members/admin%40example.test`, { method: 'DELETE', headers: admin })).status, 400);
+		assert.equal((await fetch(`${url}/api/members/staff%40example.test`, { method: 'DELETE', headers: admin })).status, 204);
+		assert.deepEqual([...members.set], ['new@example.test']);
+	});
+});
+
 test('without auth config the app behaves as before: no login routes, API open on loopback', async () => {
 	await withServer(createApp(store, async () => ({})), async (url) => {
 		assert.equal((await fetch(`${url}/api/reports/2026-10`)).status, 200);
 		assert.equal((await fetch(`${url}/api/auth/login`, { redirect: 'manual' })).status, 404);
+	});
+	const members = team();
+	await withServer(createApp(store, async () => ({}), undefined, null, undefined, undefined, members), async (url) => {
+		const added = await fetch(`${url}/api/members`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'dev@example.test' }) });
+		assert.equal(added.status, 201, 'loopback dev manages the team');
+		assert.ok(members.set.has('dev@example.test'));
 	});
 });
 
@@ -212,7 +262,7 @@ test('the built frontend is served without a session; SPA routes fall back to in
 });
 
 test('the login and session cookies cannot stand in for each other', async () => {
-	const flow = login(later(() => idToken({ nonce: flow.nonce, groups: [config.allowedGroupId] })));
+	const flow = login(later(() => idToken({ nonce: flow.nonce, preferred_username: 'staff@example.test' })));
 	assert.equal(readSession(config, `session=${flow.cookie}`, NOW), null);
 	const session = signCookie(config.sessionSecret, { typ: 'session', name: 'A', state: flow.state, nonce: flow.nonce, verifier: 'v' }, 60, NOW);
 	await assert.rejects(finishLogin(config, { code: 'c', state: flow.state }, session, flow.deps), (e: { status?: number }) => e.status === 400);
@@ -222,7 +272,7 @@ test('the login and session cookies cannot stand in for each other', async () =>
 test('only RS256 id tokens are accepted', async () => {
 	const { SignJWT: Sign } = await import('jose');
 	const hmac = new TextEncoder().encode('k'.repeat(32));
-	const flow = login(later(() => new Sign({ nonce: flow.nonce, groups: [config.allowedGroupId] })
+	const flow = login(later(() => new Sign({ nonce: flow.nonce, preferred_username: 'staff@example.test' })
 		.setProtectedHeader({ alg: 'HS256' }).setIssuer(`https://login.microsoftonline.com/${config.tenantId}/v2.0`)
 		.setAudience(config.clientId).setExpirationTime(NOW / 1000 + 600).sign(hmac)));
 	flow.deps.keys = async () => hmac as never;

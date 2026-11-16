@@ -14,9 +14,9 @@ need them on a hosted URL, and nobody outside the team may reach them.
 
 - Host: Google Cloud Run, one container. Express serves the API and the built
   frontend (`frontend/dist`). Database: Cloud SQL for PostgreSQL with pgvector.
-- Login: Microsoft Entra ID OpenID Connect for staff, restricted to **one** Entra
-  group.
-- The GCP project, region, tenant id, client id/secret, and allowed group id are
+- Login: Microsoft Entra ID OpenID Connect for staff, restricted to the Tech
+  Success team list kept in the app (changed 2026-11-09, replacing the Entra group).
+- The GCP project, region, tenant id, client id/secret, and superadmin email are
   supplied by the user at deploy time. No code, doc, or test guesses them.
 
 ## Requirements
@@ -26,13 +26,19 @@ need them on a hosted URL, and nobody outside the team may reach them.
 2. The id token is verified with the tenant's v2.0 JWKS: RS256 signature only, `iss`
    (`https://login.microsoftonline.com/<tenant>/v2.0`), `aud` (client id), `exp`,
    and `nonce`.
-3. The token's `groups` claim must contain `ENTRA_ALLOWED_GROUP_ID`; otherwise
-   403. A token without a `groups` claim (including group overage) is refused
-   the same way: fail closed, never call Graph to guess.
+3. The id token's `preferred_username` (lowercased) must be `SUPERADMIN_EMAIL`
+   or an email in the `StaffMember` table; otherwise 403 and no session. A token
+   without a usable email is refused the same way. Membership is checked again
+   on every `/api` request, so a removed member is out at once (403, cookie cleared).
+   The issuer check pins our tenant, so the name is one of our own accounts.
+3a. Team page: every member sees the list; only the superadmin adds or removes
+   (`GET/POST /api/members`, `DELETE /api/members/:email`). The superadmin is not
+   a table row and cannot be removed. Member emails live only in the database,
+   never in the repo (it is public).
 4. Session: a signed (HMAC-SHA256) cookie, `HttpOnly; Secure; SameSite=Lax;
    Path=/`, with an expiry and a type (`session`; the short-lived login cookie is
    `login`) inside the signed payload (8 hours) and a matching `Max-Age`. It
-   carries the display name only. No server-side session store.
+   carries the display name and email only. No server-side session store.
 5. Logout is a same-origin `POST /api/auth/logout` (the `Origin` header must equal
    `PUBLIC_URL`, else 403): it clears the cookie and sends the browser to the
    Entra logout endpoint, which returns to `<PUBLIC_URL>/`.
@@ -68,7 +74,7 @@ need them on a hosted URL, and nobody outside the team may reach them.
 | `ENTRA_TENANT_ID` | when exposed | tenant (directory) id, a GUID |
 | `ENTRA_CLIENT_ID` | when exposed | app registration (client) id |
 | `ENTRA_CLIENT_SECRET` | when exposed | client secret (Secret Manager in Cloud Run) |
-| `ENTRA_ALLOWED_GROUP_ID` | when exposed | object id of the one group that may log in |
+| `SUPERADMIN_EMAIL` | when exposed | the one account that manages the team list; always allowed in |
 | `SESSION_SECRET` | when exposed | HMAC key, at least 32 characters (Secret Manager) |
 | `PUBLIC_URL` | when exposed | https origin of the app; redirect URI is `<PUBLIC_URL>/api/auth/callback` |
 | `BACKEND_HOST` | no | bind address; default `127.0.0.1`, container sets `0.0.0.0` |
@@ -76,15 +82,12 @@ need them on a hosted URL, and nobody outside the team may reach them.
 | `DATABASE_URL` | yes | Cloud SQL connection string |
 
 The Entra app registration needs two Web redirect URIs,
-`<PUBLIC_URL>/api/auth/callback` (sign-in) and `<PUBLIC_URL>/` (after sign-out),
-and the `groups` claim in the id token
-(Token configuration → groups claim; "Groups assigned to the application" keeps
-the claim small enough to avoid overage).
+`<PUBLIC_URL>/api/auth/callback` (sign-in) and `<PUBLIC_URL>/` (after sign-out).
+No groups claim is needed.
 
 ## Out of scope
 
-- Client (customer) login, and any role or permission beyond "member of the one
-  group".
+- Client (customer) login, and any role beyond "team member" and "superadmin".
 - Deploy automation (CI deploy, Terraform) until the user picks the GCP project.
   The README carries a manual runbook with placeholders; nothing is deployed by
   an agent.

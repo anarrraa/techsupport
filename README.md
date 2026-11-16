@@ -416,7 +416,7 @@ gcloud run deploy techsupport --region=<REGION> \
   --service-account=techsupport-run@<PROJECT_ID>.iam.gserviceaccount.com \
   --add-cloudsql-instances=<PROJECT_ID>:<REGION>:<INSTANCE> \
   --allow-unauthenticated --max-instances=2 \
-  --set-env-vars=ENTRA_TENANT_ID=<TENANT_ID>,ENTRA_CLIENT_ID=<CLIENT_ID>,ENTRA_ALLOWED_GROUP_ID=<GROUP_OBJECT_ID>,PUBLIC_URL=<PUBLIC_URL>,GOOGLE_CLOUD_PROJECT=<PROJECT_ID>,GOOGLE_CLOUD_LOCATION=<VERTEX_REGION> \
+  --set-env-vars=ENTRA_TENANT_ID=<TENANT_ID>,ENTRA_CLIENT_ID=<CLIENT_ID>,SUPERADMIN_EMAIL=<ADMIN_EMAIL>,PUBLIC_URL=<PUBLIC_URL>,GOOGLE_CLOUD_PROJECT=<PROJECT_ID>,GOOGLE_CLOUD_LOCATION=<VERTEX_REGION> \
   --set-secrets=ENTRA_CLIENT_SECRET=entra-client-secret:latest,SESSION_SECRET=session-secret:latest,DATABASE_URL=database-url:latest
 gcloud run services describe techsupport --region=<REGION> --format='value(status.url)'   # = <PUBLIC_URL> if no custom domain
 
@@ -427,11 +427,9 @@ curl -s -o /dev/null -w '%{http_code}\n' <PUBLIC_URL>/api/reports/2026-10   # 40
 
 Entra app registration (portal, by an admin): platform **Web**, redirect URIs
 `<PUBLIC_URL>/api/auth/callback` (sign-in) and `<PUBLIC_URL>/` (return after
-sign-out); a client secret (into `entra-client-secret`);
-Token configuration → add the **groups** claim to the ID token.
-`<TENANT_ID>` must be the directory (tenant) GUID, not a domain. A user whose
-token has no `groups` claim (group overage) is refused, so prefer "Groups
-assigned to the application" and assign `<GROUP_OBJECT_ID>` to the app. If the
+sign-out); a client secret (into `entra-client-secret`). No groups claim is needed:
+who may sign in is the team list on the app's **Team** page, which `<ADMIN_EMAIL>`
+fills after the first login. `<TENANT_ID>` must be the directory (tenant) GUID, not a domain. If the
 first deploy is what reveals the URL, redeploy with `PUBLIC_URL` set and add the
 redirect URI afterwards.
 

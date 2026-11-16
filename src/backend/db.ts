@@ -74,6 +74,13 @@ export async function docClients(): Promise<string[]> {
 	return rows.map((row) => row.client);
 }
 
+export const staffMembers = {
+	has: async (email: string) => (await db().staffMember.count({ where: { email } })) > 0,
+	list: async () => (await db().staffMember.findMany({ orderBy: { email: 'asc' }, select: { email: true } })).map((row) => row.email),
+	add: async (email: string) => { await db().staffMember.upsert({ where: { email }, create: { email }, update: {} }); },
+	remove: async (email: string) => { await db().staffMember.deleteMany({ where: { email } }); },
+};
+
 export async function disconnect(): Promise<void> {
 	await client?.$disconnect();
 	client = undefined;

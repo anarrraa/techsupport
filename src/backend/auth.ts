@@ -6,7 +6,7 @@ export interface AuthConfig {
 	tenantId: string;
 	clientId: string;
 	clientSecret: string;
-	allowedGroupId: string;
+	superadminEmail: string;
 	sessionSecret: string;
 	publicUrl: string;
 }
@@ -21,7 +21,7 @@ const VARS = {
 	tenantId: 'ENTRA_TENANT_ID',
 	clientId: 'ENTRA_CLIENT_ID',
 	clientSecret: 'ENTRA_CLIENT_SECRET',
-	allowedGroupId: 'ENTRA_ALLOWED_GROUP_ID',
+	superadminEmail: 'SUPERADMIN_EMAIL',
 	sessionSecret: 'SESSION_SECRET',
 	publicUrl: 'PUBLIC_URL',
 } as const;
@@ -40,11 +40,19 @@ export function authConfig(env: Record<string, string | undefined> = process.env
 	const config = Object.fromEntries(entries) as unknown as AuthConfig;
 	// iss always carries the tenant GUID, so a domain or `common` would refuse every login without saying why.
 	if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.tenantId)) throw new Error('ENTRA_TENANT_ID must be the tenant GUID');
+	config.superadminEmail = normalizeEmail(config.superadminEmail) ?? '';
+	if (!config.superadminEmail) throw new Error('SUPERADMIN_EMAIL must be an email address');
 	if (config.sessionSecret.length < 32) throw new Error('SESSION_SECRET must be at least 32 characters');
 	if (!/^https:\/\/[^/]+$/.test(config.publicUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(config.publicUrl)) {
 		throw new Error('PUBLIC_URL must be an https origin without a path');
 	}
 	return config;
+}
+
+/** Lowercased address, or null when it is not one. */
+export function normalizeEmail(value: unknown): string | null {
+	const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
+	return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : null;
 }
 
 const isLoopback = (host: string) => host === 'localhost' || host === '::1' || /^127\.\d+\.\d+\.\d+$/.test(host);
@@ -132,15 +140,15 @@ export function entraKeys(config: AuthConfig): JWTVerifyGetKey {
 }
 
 /**
- * Callback: check state, redeem the code with the PKCE verifier, verify the id token, require the group.
- * Returns the session cookie. 400/401 = the login itself is bad, 403 = a real user outside the group.
+ * Callback: check state, redeem the code with the PKCE verifier, verify the id token, read the staff email.
+ * Returns the session cookie; the caller decides membership before setting it. 400/401 = the login itself is bad.
  */
 export async function finishLogin(
 	config: AuthConfig,
 	query: { code?: unknown; state?: unknown; error?: unknown },
 	loginCookie: string | undefined,
 	deps: LoginDeps = { fetch, keys: entraKeys(config), now: Date.now() },
-): Promise<{ cookie: string; name: string }> {
+): Promise<{ cookie: string; name: string; email: string }> {
 	const login = verifyCookie<LoginState>(config.sessionSecret, loginCookie, deps.now);
 	if (typeof query.error === 'string') throw new AuthError(401, 'Sign-in was cancelled or refused');
 	if (login?.typ !== 'login' || typeof query.state !== 'string' || query.state !== login.state) throw new AuthError(400, 'Sign-in expired; start again');
@@ -175,17 +183,17 @@ export async function finishLogin(
 		throw new AuthError(401, 'Invalid id token');
 	}
 	if (claims.nonce !== login.nonce) throw new AuthError(401, 'Invalid id token');
-	// No `groups` (overage or claim not configured) is a refusal, never a Graph lookup.
-	if (!Array.isArray(claims.groups) || !claims.groups.includes(config.allowedGroupId)) {
-		throw new AuthError(403, 'Your account is not in the group allowed to use this app');
-	}
+	// The issuer pins our tenant, so preferred_username is one of our own sign-in names.
+	const email = normalizeEmail(claims.preferred_username);
+	if (!email) throw new AuthError(403, 'Your account has no email address');
 	const name = typeof claims.name === 'string' && claims.name ? claims.name : 'Staff';
-	return { name, cookie: cookie(SESSION_COOKIE, signCookie(config.sessionSecret, { typ: 'session', name }, SESSION_SECONDS, deps.now), SESSION_SECONDS) };
+	return { name, email, cookie: cookie(SESSION_COOKIE, signCookie(config.sessionSecret, { typ: 'session', name, email }, SESSION_SECONDS, deps.now), SESSION_SECONDS) };
 }
 
-export function readSession(config: AuthConfig, cookieHeader: string | undefined, now = Date.now()): { name: string } | null {
-	const session = verifyCookie<{ typ?: unknown; name?: unknown }>(config.sessionSecret, readCookie(cookieHeader, SESSION_COOKIE), now);
-	return session?.typ === 'session' && typeof session.name === 'string' ? { name: session.name } : null;
+export function readSession(config: AuthConfig, cookieHeader: string | undefined, now = Date.now()): { name: string; email: string } | null {
+	const session = verifyCookie<{ typ?: unknown; name?: unknown; email?: unknown }>(config.sessionSecret, readCookie(cookieHeader, SESSION_COOKIE), now);
+	return session?.typ === 'session' && typeof session.name === 'string' && typeof session.email === 'string'
+		? { name: session.name, email: session.email } : null;
 }
 
 export function logoutUrl(config: AuthConfig): string {

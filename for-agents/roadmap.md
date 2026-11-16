@@ -51,13 +51,14 @@ those run alongside the code phases.
 
 | # | Phase | Kind | Done when | Detail |
 | --- | --- | --- | --- | --- |
-| 0 | Clean slate: gitignore `documents/`, commit current work, rotate `TEAMS_BOT_APP_PASSWORD`, remove stray root files `f`/`fd` | User | Clean `git status`, password rotated | "Restructure + documentation chat", TODO.md |
+| 0 | Clean slate: gitignore `documents/`, commit current work, rotate `TEAMS_BOT_APP_PASSWORD` (`f`/`fd` removed 2026-11-16) | User | Clean `git status`, password rotated | "Restructure + documentation chat", TODO.md |
 | 1 | MVP production acceptance: JSM goals/calendar/metric confirmed, controlled live delivery, 4 scheduled runs observed | Human | MVP definition of done all checked | Milestones 3-4 |
 | 2 | Restructure: backend feature folders, frontend `features/`, shared types | Code | Same test counts pass after each move | 2.1-2.3 |
 | 3 | Documentation chat (pgvector RAG, Vertex) | Code + user GCP | Real questions answered with correct sources | 3.1-3.6, `prd-docs-chat.md` |
 | 4 | Bot production: catalog publish, Graph consent, GitHub OIDC, escalation directory, seeded state, two-person staged run, Low L5 answer, fortnight of window data | Human | V2 milestone 2 all checked | V2 milestones 1-2, TODO.md |
 | 5 | Hosting + auth: PRD for Entra login; host chosen; deploy app + DB; scheduled capture writes to it | Code + user decision | Staff log in to the hosted app; a scheduled run's snapshot appears | 5.1-5.5, `prd-hosting-auth.md` |
 | 6 | Reporting acceptance: browser/keyboard check, real client export through the UI, staff side-by-side review, `Time to first response` format | Human + code fixes | Support staff sign off one month's reports | "Internal reporting completion", "Client support report generator" |
+| 7 | Multi-project reminders: DC + SHT (Shunkhlai) + APUT (APU) in one run | Human + small code | One scheduled run covers all three with no guessed contact or threshold | `plan/phase-7-multi-project/` |
 
 Order: 0 → 2 → 3 → 5 → 6 for code; 1 and 4 run in parallel as soon as the
 people they wait on are available. Phase 5 must precede any exposure of chat
@@ -68,8 +69,9 @@ Open decisions (record answers here):
 - Host for phase 5: **decided 2026-11-07** — Cloud Run (one container, Express
   serves API + frontend) + Cloud SQL Postgres with pgvector; Entra ID OIDC login
   restricted to one group. `prd-hosting-auth.md`.
+  2026-11-09: the group is replaced by an in-app team list managed by a superadmin.
 - Still open (user supplies at deploy): GCP project and region, Entra tenant,
-  app registration (client id/secret), and the allowed group's id.
+  app registration (client id/secret), and the superadmin email.
 
 ## Evidence snapshot
 
@@ -77,7 +79,7 @@ Open decisions (record answers here):
 | --- | --- | --- |
 | Toolchain matches pins | Pass | `scripts/verify-toolchain.mjs` exit 0 with Node 22.19.0 and npm 10.9.3 on 2026-08-20 |
 | Clean local install | Pass | `npm ci` installed 337 packages on 2026-08-20 |
-| Unit tests | Pass | `npm test`: 207 tests, 206 passed, 0 failed, 1 opt-in database check skipped on 2026-11-08 on `main` after merging phase 5 (Node 26 / npm 11, not the pinned toolchain; `npm ci`, typecheck and build also exit 0); frontend 21 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
+| Unit tests | Pass | `npm test`: 209 tests, 208 passed, 0 failed, 1 opt-in database check skipped on 2026-11-16 on `main` (`d07445a` + the team-list change, 5.4a); typecheck and build exit 0; on 2026-11-09 frontend 22 passed. The database check last passed against disposable PostgreSQL 16 on 2026-11-04 |
 | Container + auth (local) | Pass | 2026-11-08 after the phase 5 review: `docker build` (node 22.19.0-slim, user `node`; Node < 22.18 fails the build); with a throwaway pgvector DB and fake auth env `/api/health` 200 (no DB), `/health` 200, `/api/monthly-report` and `/api/reports/2026-10` 401 without cookie, `/dashboard` 200, same-origin POST logout clears the cookie, cross-site 403; no auth env on `0.0.0.0` → exit 1. Root tests 207/206/1 skip, frontend 21. Not deployed; no real Entra login yet (5.5) |
 | Docs chat live (Vertex + pgvector) | Pass with one miss | 2026-11-06: real `documents/` indexed into a throwaway pgvector DB with the user's GCP project (gcloud default); 6/7 known questions answered and cited correctly; logs counts-only. Re-checked after the review fixes the same day: index 2762 new then 0, 2 answers cited, no-answer question returned empty sources. Not yet on a shared database |
 | Type checking | Pass | `npm run typecheck` exit 0 (root and frontend) on 2026-11-06 after the phase 3 review fixes |
@@ -771,7 +773,10 @@ Scope and reports: `plan/phase-5-hosting-auth/`. Requirements:
 - [x] 5.4 Container: Dockerfile + `.dockerignore`, Express serves `frontend/dist`;
       `docker build`/`run` proof; README "Deploy (Cloud Run)" runbook (not executed).
       Report: `plan/phase-5-hosting-auth/reports/2026-11-07-5.4.md`.
-- [ ] 5.5 Deploy with the user's project, tenant and group; staff log in; a
+- [x] 5.4a Team list replaces the Entra group: `SUPERADMIN_EMAIL` + `StaffMember`
+      table, checked at login and on every request; Team page to add/remove.
+      Report: `plan/phase-5-hosting-auth/reports/2026-11-09-5.4a.md`.
+- [ ] 5.5 Deploy with the user's project, tenant and superadmin email; staff log in; a
       scheduled run's snapshot appears. Waits on the user.
 
 ## Post-MVP direction

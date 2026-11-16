@@ -38,6 +38,12 @@ model SLASnapshot {
   @@index([capturedAt])
 }
 
+/// Staff allowed into the web app; the superadmin (SUPERADMIN_EMAIL) adds and removes them. Lowercase email.
+model StaffMember {
+  email   String   @id
+  addedAt DateTime @default(now())
+}
+
 /// A frozen month's aggregate, so a closed month stops moving.
 model MonthlyReport {
   month       String   @id // YYYY-MM, UTC

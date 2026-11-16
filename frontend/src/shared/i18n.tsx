@@ -77,7 +77,14 @@ const en = {
   "metric.resolutionBreaches": "Resolution breaches",
   "chart.title": "Requests and breaches by priority",
   "reports.snapshots": "snapshots",
-  "teams.unavailable": "Per-assignee figures are not collected: the dashboard stores no people, only JSM SLA counts.",
+  "teams.title": "Tech Success team",
+  "teams.lead": "Only the people on this list can sign in to the app.",
+  "teams.admin": "Admin",
+  "teams.email": "Work email",
+  "teams.add": "Add",
+  "teams.remove": "Remove",
+  "teams.readOnly": "Only the admin can change the team.",
+  "teams.empty": "No members yet. Add the first one above.",
   "state.empty": "No snapshots for this month yet.",
 };
 
@@ -159,7 +166,14 @@ const mn: Record<Key, string> = {
   "metric.resolutionBreaches": "Шийдвэрлэлтийн зөрчил",
   "chart.title": "Ач холбогдлоор хүсэлт ба зөрчил",
   "reports.snapshots": "хэмжилт",
-  "teams.unavailable": "Хариуцагч тус бүрийн үзүүлэлт цуглуулдаггүй: самбар хүний мэдээлэл хадгалахгүй, зөвхөн JSM SLA тоо.",
+  "teams.title": "Tech Success баг",
+  "teams.lead": "Зөвхөн энэ жагсаалтад байгаа хүмүүс апп руу нэвтэрнэ.",
+  "teams.admin": "Админ",
+  "teams.email": "Ажлын имэйл",
+  "teams.add": "Нэмэх",
+  "teams.remove": "Хасах",
+  "teams.readOnly": "Багийн бүрэлдэхүүнийг зөвхөн админ өөрчилнө.",
+  "teams.empty": "Гишүүн алга. Дээрээс эхний гишүүнийг нэмнэ үү.",
   "state.empty": "Энэ сард хэмжилт хараахан алга.",
 };
 

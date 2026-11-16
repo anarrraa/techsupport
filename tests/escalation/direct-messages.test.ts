@@ -110,7 +110,7 @@ test('escalates to the configured contact and records the level to persist', () 
 	const [message] = plan.messages as [(typeof plan.messages)[number]];
 	assert.equal(message.entraObjectId, LEAD);
 	assert.deepEqual(message.records, [{ ticketKey: 'DC-1', level: 3 }]);
-	assert.match(message.messages.join('\n'), /Эскалаци — L3/);
+	assert.match(message.messages.join('\n'), /3-р түвшний сануулга/);
 });
 
 test('notifies assignee and developer contact in parallel off-hours and names the on-call engineer', () => {
@@ -223,7 +223,7 @@ test('the level-1 leg of an escalation is not dressed as a first-response remind
 	});
 	const leg = plan.messages.find((message) => message.level === 1);
 	const text = leg?.messages.join('\n') ?? '';
-	assert.match(text, /Эскалаци — L1/);
+	assert.match(text, /1-р түвшний сануулга/);
 	assert.doesNotMatch(text, /анхны хариу SLA хугацаа хэтэрсэн/);
 	assert.doesNotMatch(text, /гэрээний хугацаа/);
 });
