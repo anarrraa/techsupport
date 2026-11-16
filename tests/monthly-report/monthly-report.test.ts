@@ -104,7 +104,7 @@ function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 		assignee: 'Synthetic Developer',
 		assigneeAccountId: 'synthetic-account',
 		participants: [{ accountId: 'synthetic-account', displayName: 'Synthetic Developer' }],
-		comments: [{ authorAccountId: null, authorDisplayName: 'x', createdEpochMillis: 0, body: 'comment' }],
+		comments: [{ authorDisplayName: 'x', authorIsVendor: false, createdEpochMillis: 0 }],
 		url: 'https://jira.invalid/browse/SYNTHETIC-1',
 		firstResponseSla,
 		resolutionSla: null,

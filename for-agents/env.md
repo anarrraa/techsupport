@@ -23,8 +23,6 @@ Not in CI → the code default applies in production.
 | `JIRA_SLA_PAGE_SIZE` | 50 (1–100) | v | SLA page |
 | `JIRA_MAX_SLA_PAGES` | 10 (1–100) | v | SLA page cap |
 | `JIRA_SLA_CONCURRENCY` | 5 (1–20) | v | parallel SLA calls |
-| `JIRA_COMMENT_LIMIT` | 6 (0–50) | v | comments kept |
-| `JIRA_COMMENT_CHARS` | 600 (50–5000) | v | per-comment cap |
 
 ## Reminder
 
@@ -37,8 +35,6 @@ Not in CI → the code default applies in production.
 | `REMINDER_DELIVERY_WINDOW_MINUTES` | = repeat; must be ≤ repeat | v | see gotchas |
 | `REMINDER_USE_LLM_INTRO` | false | v | model intro (aggregate counts) |
 | `REMINDER_INTRO_TIMEOUT_MS` | 10000 | — | |
-| `REMINDER_USE_LLM_DIGEST` | false | v | model digest — **see gotchas before enabling** |
-| `REMINDER_DIGEST_TIMEOUT_MS` | 20000 | v | |
 | `TEAMS_MAX_MESSAGE_CHARS` | 12000 (1000–25000) | v | message chunking |
 | `HTTP_TIMEOUT_MS` | 10000 (1000–120000) | v | per request |
 | `HTTP_MAX_RETRIES` | 2 (0–5) | v | 429/5xx only |

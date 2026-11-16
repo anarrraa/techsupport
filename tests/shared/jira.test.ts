@@ -307,6 +307,45 @@ test('treats an absent or malformed participants field as nobody', async () => {
 	assert.deepEqual(result.tickets[0]?.participants, []);
 });
 
+test('keeps public comment authorship and time, newest-last, and never the body', async () => {
+	const fetchImpl: typeof fetch = async (input, init) => {
+		const url = String(input);
+		if (url.endsWith('/rest/api/3/search/jql')) {
+			assert.ok((JSON.parse(String(init?.body)) as { fields: string[] }).fields.includes('comment'));
+			const comment = (author: object, created: string, extra: object = {}) => ({
+				author,
+				created,
+				body: { type: 'doc', content: [{ type: 'text', text: 'Client secret text' }] },
+				...extra,
+			});
+			const withComments = {
+				...issue('SUP-1'),
+				fields: {
+					...issue('SUP-1').fields,
+					comment: {
+						comments: [
+							comment({ displayName: 'Client', accountType: 'customer' }, '2026-08-03T02:00:00.000+0800'),
+							comment({ displayName: 'Vendor Dev', accountType: 'atlassian' }, '2026-08-02T10:00:00.000+0800'),
+							comment({ displayName: 'Vendor Dev', accountType: 'atlassian' }, '2026-08-03T03:00:00.000+0800', { jsdPublic: false }),
+							comment({ displayName: 'Automation', accountType: 'app' }, '2026-08-03T04:00:00.000+0800'),
+							comment({ displayName: 'Undated', accountType: 'customer' }, 'not a date'),
+						],
+					},
+				},
+			};
+			return Response.json({ issues: [withComments], isLast: true });
+		}
+		return Response.json(slaPage(metric('First response')));
+	};
+
+	const result = await fetchTickets(config(), fetchImpl, async () => {});
+	assert.deepEqual(result.tickets[0]?.comments, [
+		{ authorDisplayName: 'Vendor Dev', authorIsVendor: true, createdEpochMillis: Date.parse('2026-08-02T02:00:00.000Z') },
+		{ authorDisplayName: 'Client', authorIsVendor: false, createdEpochMillis: Date.parse('2026-08-02T18:00:00.000Z') },
+	]);
+	assert.ok(!JSON.stringify(result).includes('Client secret text'));
+});
+
 function config(): JiraConfig {
 	return {
 		baseUrl: 'https://example.atlassian.net',

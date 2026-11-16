@@ -31,20 +31,19 @@ export interface JiraAgent {
 }
 
 /**
- * One Jira comment, flattened to plain text at the boundary.
- *
- * The body arrives as an Atlassian Document Format tree; nothing downstream
- * should have to know that, so the flattening happens here alongside the
- * `accountType` filter. `authorAccountId` is what maps the author onto the
- * escalation directory, which is the only way this code decides whether a
- * comment came from us or from the client.
+ * Who wrote a public comment, and when. The body is never kept: the reminder
+ * only says which side spoke last, and comment text is client-authored content
+ * that has no business in a log or a model prompt.
  */
 export interface JiraComment {
-	authorAccountId: string | null;
 	authorDisplayName: string;
+	/**
+	 * Vendor staff by Jira's own `accountType`, the same answer `participants`
+	 * trusts. Not the escalation directory: that holds escalation contacts, not
+	 * everyone who works a request.
+	 */
+	authorIsVendor: boolean;
 	createdEpochMillis: number;
-	/** Plain text, already length-bounded. Still untrusted, client-authored content. */
-	body: string;
 }
 
 export interface JiraTicket {
@@ -64,10 +63,7 @@ export interface JiraTicket {
 	 * rather than being left for every caller to remember.
 	 */
 	participants: JiraAgent[];
-	/**
-	 * Newest-last, bounded to the most recent few. Empty when the search did not
-	 * ask for them, which every consumer must degrade to rather than fail on.
-	 */
+	/** Public comments, newest-last. Empty is normal and renders as "no comment yet". */
 	comments: JiraComment[];
 	url: string;
 	firstResponseSla: SlaCycle | null;
@@ -105,7 +101,7 @@ export async function fetchTickets(
 		assignee: issue.fields.assignee?.displayName ?? 'Unassigned',
 		assigneeAccountId: issue.fields.assignee?.accountId ?? null,
 		participants: agentParticipants(issue, config.participantsField),
-		comments: [],
+		comments: publicComments(issue),
 		url: buildTicketUrl(ticketBaseUrl, issue.key),
 		firstResponseSla: slas[index]?.firstResponse ?? null,
 		resolutionSla: slas[index]?.resolution ?? null,
@@ -136,6 +132,30 @@ function agentParticipants(issue: JiraIssue, field: string): JiraAgent[] {
 		agents.push({ accountId: value.accountId, displayName: value.displayName ?? 'Unknown' });
 	}
 	return agents;
+}
+
+/**
+ * Newest-last. Internal notes are skipped because the client never saw them, so
+ * they cannot put the ball on the client's side; automation (`app`) is skipped
+ * because a bot's acknowledgement is neither side replying. A comment with no
+ * parseable date is dropped rather than defaulted to now, which would make it
+ * look like the latest word.
+ */
+function publicComments(issue: JiraIssue): JiraComment[] {
+	const raw = issue.fields.comment?.comments;
+	if (!Array.isArray(raw)) return [];
+	const comments: JiraComment[] = [];
+	for (const value of raw) {
+		const createdEpochMillis = Date.parse(value?.created ?? '');
+		if (!Number.isFinite(createdEpochMillis)) continue;
+		if (value.jsdPublic === false || value.author?.accountType === 'app') continue;
+		comments.push({
+			authorDisplayName: value.author?.displayName ?? 'Unknown',
+			authorIsVendor: value.author?.accountType === 'atlassian',
+			createdEpochMillis,
+		});
+	}
+	return comments.sort((a, b) => a.createdEpochMillis - b.createdEpochMillis);
 }
 
 function canonicalTicketBaseUrl(value: string): URL {
@@ -182,7 +202,7 @@ async function fetchIssuePages(
 				body: JSON.stringify({
 					jql: config.jql,
 					maxResults,
-					fields: ['summary', 'status', 'priority', 'assignee', config.participantsField],
+					fields: ['summary', 'status', 'priority', 'assignee', 'comment', config.participantsField],
 					...(nextPageToken ? { nextPageToken } : {}),
 				}),
 			},
@@ -341,6 +361,7 @@ interface JiraIssue {
 		status?: { name?: string };
 		priority?: { name?: string };
 		assignee?: { displayName?: string; accountId?: string };
+		comment?: { comments?: Array<{ author?: JiraUser; created?: string; jsdPublic?: boolean }> };
 		[customField: string]: unknown;
 	};
 }

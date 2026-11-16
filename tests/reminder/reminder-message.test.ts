@@ -212,6 +212,32 @@ test('an escalation message quotes the resolution clock, not the first-response 
 	assert.doesNotMatch(reminder, /шийдэгдээгүй/);
 });
 
+test('a digest line under each ticket says which side spoke last', () => {
+	const at = (hoursAgo: number) => NOW.getTime() - hoursAgo * 3_600_000;
+	const vendor = (name: string, hoursAgo: number) => ({ authorDisplayName: name, authorIsVendor: true, createdEpochMillis: at(hoursAgo) });
+	const client = (hoursAgo: number) => ({ authorDisplayName: 'Client', authorIsVendor: false, createdEpochMillis: at(hoursAgo) });
+	const render = (comments: JiraTicket['comments']) =>
+		buildReminderMessages([ticket({ comments })], NOW, 12_000).join('\n').split('\n').at(-1);
+
+	assert.equal(render([]), '  ↳ Хараахан ямар ч тайлбар бичигдээгүй байна.');
+	assert.equal(
+		render([client(5), vendor('Dorj *Lead*', 3)]),
+		'  ↳ 3 цагийн өмнө Dorj \\*Lead\\* хариулсан, үйлчлүүлэгчийн хариуг хүлээж байна.',
+	);
+	assert.equal(
+		render([vendor('Dorj', 50), client(0.5)]),
+		'  ↳ Үйлчлүүлэгч 30 минутын өмнө бичсэн · ⏳ Бид хариу өгөх ээлжтэй · сүүлд Dorj хариулсан',
+	);
+	assert.equal(render([client(49)]), '  ↳ Үйлчлүүлэгч 2 өдрийн өмнө бичсэн · ⏳ Бид хариу өгөх ээлжтэй');
+});
+
+test('drops the digest line before compacting the ticket row', () => {
+	const row = buildReminderMessages([ticket()], NOW, 12_000)[0]?.split('\n').at(-2) ?? '';
+	const header = buildReminderMessages([ticket()], NOW, 12_000)[0]?.split('\n').slice(0, -2).join('\n') ?? '';
+	const [message] = buildReminderMessages([ticket()], NOW, header.length + 1 + row.length);
+	assert.equal(message?.split('\n').at(-1), row);
+});
+
 function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
 	return {
 		key: 'SUP-1',

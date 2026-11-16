@@ -5,17 +5,13 @@ the traps around them.
 
 ## Open issues found in code (2026-10-13, not fixed)
 
-- **No LLM digest path.** `src/escalation/ticket-digest.ts` is imported nowhere
-  (no workflow call, no test); its header names `src/agents/digest-writer.ts`,
-  which does not exist. Deleting it needs user OK (phase 2 REPORT, "Left open").
-- **ADR 0001 precondition is now triggered.** `for-agents/adr/0001-reminder-intro-sandbox-tools.md`
-  says: the first time request-derived text reaches a model, the default sandbox
-  (shell + unrestricted network) must be narrowed *before* that ships. The digest
-  sends summaries and client comments. Do not enable `REMINDER_USE_LLM_DIGEST`
-  until this is resolved.
-- `for-agents/CONTEXT.md` lists "digest" as an *Avoid* word for **Reminder**; the new module
-  uses "Ticket Digest" for a different thing (per-request line). Don't rename
-  either without updating `for-agents/CONTEXT.md`.
+- **The digest line is deterministic on purpose.** The `↳` line under each
+  ticket (`renderDigestLine`, `src/reminder/reminder-message.ts`) says which side
+  spoke last from comment authorship and time. A model-written version (PR #4)
+  was dropped 2026-11-16: it sent summaries and client comments to Gemini, which
+  `AGENTS.md` forbids, and ADR 0001's sandbox precondition was never met.
+- `for-agents/CONTEXT.md` lists "digest" as an *Avoid* word for **Reminder**; the
+  `↳` line is a different thing. Don't rename either without updating it.
 
 ## SLA / time
 
@@ -62,8 +58,8 @@ the traps around them.
 
 - Participants are filtered to `accountType: 'atlassian'` at the Jira boundary
   (`src/shared/jira.ts`) so clients are never told they owe a reply. Comment
-  authors are **not** filtered — the digest needs client comments.
-- Who "owns" a request comes from directory `jiraAccountId`, never a model.
+  authors are **not** filtered (the digest line needs client comments), but
+  internal notes (`jsdPublic: false`) and automation (`accountType: 'app'`) are.
 - The run journal goes to public CI logs: counts only. `npm run trace` prints
   names and must never be wired into the workflow (`scripts/trace-run.ts`).
 - This repo is **public**. `config/escalation.json`, `.env*`, `gcp-sa.json`,
@@ -85,6 +81,3 @@ the traps around them.
   other version (it did locally on Node 26); CI runs it first.
 - Flue is `1.0.0-beta`; its bundled docs disagree with shipped code (ADR 0001).
   Check `node_modules/@flue/*` source, not docs.
-- `JIRA_COMMENT_CHARS` (default 600, `src/shared/config.ts`) caps at the Jira
-  boundary, then the digest clips again to 400 (`DIGEST_COMMENT_CHARS`,
-  `src/escalation/ticket-digest.ts`). Raising the env var alone won't give the model more.

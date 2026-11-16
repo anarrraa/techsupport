@@ -31,8 +31,8 @@ negative once breached). Two metrics per ticket: first response
 (`JIRA_FIRST_RESPONSE_SLA_NAME`) and resolution (`JIRA_RESOLUTION_SLA_NAME`).
 
 `JiraTicket` (`src/shared/jira.ts:58`): `participants` = vendor-only
-(`accountType 'atlassian'`); `comments` = last `JIRA_COMMENT_LIMIT`, ADF
-flattened, each with `authorIsVendor`.
+(`accountType 'atlassian'`); `comments` = public, non-automation comments,
+newest-last, author name + `authorIsVendor` + time only (the body is never kept).
 
 Priority → severity: Highest→critical, High→high, Medium→medium,
 Low/Lowest→low (`src/escalation/escalation.ts:16`).
@@ -53,8 +53,8 @@ Graph cannot post chat messages app-only; Bot Connector does the send
 
 Channel transport: Teams Incoming Webhook POST (`src/shared/teams-webhook.ts:4`).
 
-Optional model: Gemini 2.5 Flash on Vertex (`src/reminder/reminder-intro.ts:38`,
-`src/escalation/ticket-digest.ts:180`) via Google WIF in CI.
+Optional model: Gemini 2.5 Flash on Vertex (`src/reminder/reminder-intro.ts:38`)
+via Google WIF in CI, aggregate counts only.
 
 All HTTP goes through `fetchOk` (`src/shared/http.ts:28`): per-attempt timeout,
 retries only 429/500/502/503/504 (`:79`), honors `Retry-After` up to 60s.

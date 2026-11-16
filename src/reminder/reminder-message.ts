@@ -130,6 +130,10 @@ function groupByAssignee(tickets: JiraTicket[]): Map<string, JiraTicket[]> {
 type Clock = 'firstResponse' | 'resolution';
 
 function renderTicket(ticket: JiraTicket, now: Date, clock: Clock): string {
+	return `${renderTicketRow(ticket, now, clock)}\n${renderDigestLine(ticket, now)}`;
+}
+
+function renderTicketRow(ticket: JiraTicket, now: Date, clock: Clock): string {
 	const summary = cleanField(ticket.summary, 180);
 	const priority = cleanField(ticket.priority, 30);
 	const status = cleanField(ticket.status, 80);
@@ -146,6 +150,31 @@ function renderTicket(ticket: JiraTicket, now: Date, clock: Clock): string {
 		: line;
 }
 
+/**
+ * The indented second line: which side spoke last, how long ago, and who last
+ * answered for us. Built from comment authorship and time only, never comment
+ * text, so no client wording and no model is involved. The age is wall-clock
+ * time since the comment, not an SLA figure; Jira owns those.
+ */
+function renderDigestLine(ticket: JiraTicket, now: Date): string {
+	const newest = ticket.comments.at(-1);
+	if (!newest) return '  ↳ Хараахан ямар ч тайлбар бичигдээгүй байна.';
+	const age = formatAge(now.getTime() - newest.createdEpochMillis);
+	if (newest.authorIsVendor) {
+		return `  ↳ ${age} өмнө ${cleanField(newest.authorDisplayName, 100)} хариулсан, үйлчлүүлэгчийн хариуг хүлээж байна.`;
+	}
+	const lastVendor = ticket.comments.findLast((comment) => comment.authorIsVendor);
+	const owner = lastVendor ? ` · сүүлд ${cleanField(lastVendor.authorDisplayName, 100)} хариулсан` : '';
+	return `  ↳ Үйлчлүүлэгч ${age} өмнө бичсэн · ⏳ Бид хариу өгөх ээлжтэй${owner}`;
+}
+
+function formatAge(millis: number): string {
+	const minutes = Math.max(0, Math.floor(millis / 60_000));
+	if (minutes < 60) return `${minutes} минутын`;
+	const hours = Math.floor(minutes / 60);
+	return hours < 24 ? `${hours} цагийн` : `${Math.floor(hours / 24)} өдрийн`;
+}
+
 function fitTicketLine(
 	line: string,
 	ticket: JiraTicket,
@@ -154,6 +183,9 @@ function fitTicketLine(
 	clock: Clock,
 ): string {
 	if (line.length <= available) return line;
+	// The digest line is the nicety, so it goes before the row is compacted.
+	const row = renderTicketRow(ticket, now, clock);
+	if (row.length <= available) return row;
 	const linkedKey = `[${cleanField(ticket.key, 50)}](${ticket.url})`;
 	const elapsed =
 		clock === 'resolution'
