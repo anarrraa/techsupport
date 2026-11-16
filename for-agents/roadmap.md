@@ -779,6 +779,18 @@ Scope and reports: `plan/phase-5-hosting-auth/`. Requirements:
 - [ ] 5.5 Deploy with the user's project, tenant and superadmin email; staff log in; a
       scheduled run's snapshot appears. Waits on the user.
 
+## Ticket digest line — decided 2026-11-16
+
+PR #4 (`feat/ticket-digest`) proposed a model-written "where it stopped" line.
+User chose the deterministic version: the model half sent summaries and client
+comments to Gemini, which `AGENTS.md` forbids.
+
+- [x] `↳` line under each reminder ticket from public comment authorship and
+      time (no body, no model); dropped first when a message is tight. One
+      recipient's failed delivery no longer fails the run; all failing still
+      does. Dead `src/escalation/ticket-digest.ts` removed.
+      Report: `plan/phase-1-mvp-acceptance/reports/2026-11-16-digest-line.md`.
+
 ## Post-MVP direction
 
 The Tech Success dashboard, Microsoft Entra group authorization, durable

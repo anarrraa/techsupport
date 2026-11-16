@@ -11,9 +11,8 @@ flowchart TD
   B --> C{windowDecision: inside REMINDER_WINDOWS? or dry-run}
   C -- no --> Z[return counts, deliver nothing]
   C -- yes --> D[prepareBotDelivery: escalation candidates L2-L5]
-  D --> E[buildDigests: one digest per request, union of channel + DM tickets]
-  E --> F[channel post via webhook, if TEAMS_WEBHOOK_URL]
-  E --> G[runBotDelivery: plan DMs, send, record state]
+  D --> F[channel post via webhook, if TEAMS_WEBHOOK_URL]
+  D --> G[runBotDelivery: plan DMs, send, record state]
 ```
 
 | Step | Where |
@@ -23,9 +22,8 @@ flowchart TD
 | Delivery-window clock check | `src/shared/delivery-windows.ts`, called in the workflow |
 | Empty scan fails (non-dry-run) | the workflow |
 | Escalation candidates | `src/escalation/escalation.ts`, called in the workflow |
-| Digests (owner deterministic, prose optional model) | `src/escalation/ticket-digest.ts` — not wired into the workflow (dead module) |
 | Optional model intro (aggregate counts only) | `src/reminder/reminder-intro.ts` |
-| Channel message build / post | `src/reminder/reminder-message.ts`, `src/shared/teams-webhook.ts` |
+| Channel message build / post (incl. the `↳` digest line) | `src/reminder/reminder-message.ts`, `src/shared/teams-webhook.ts` |
 | DM planning (recipients, allowlist, chunks) | `src/escalation/direct-messages.ts` |
 | DM send (token, Graph install, Bot Connector) | `src/shared/teams-bot.ts` |
 | Run journal (counts-only CI log) | `src/reminder/run-journal.ts` |
@@ -40,7 +38,6 @@ flowchart TD
 | `src/reminder/sla.ts` | pure selection; `overdueMinutes` vs `elapsedSinceRaisedMinutes` |
 | `src/escalation/escalation*.ts` | policy (pure), directory loader, state file |
 | `src/escalation/direct-messages.ts` | pure per-recipient plan |
-| `src/escalation/ticket-digest.ts` | `DigestTicketView` (identity-free), owner resolution, model prompt, fallback |
 | `src/agents/*.ts` | thin Flue `defineAgent` bindings; prompt text lives in the feature folder |
 | `frontend/src/features/<name>/` | one folder per screen: monthly-report, support-report, reports-archive, chat, teams |
 | `frontend/src/shared/` | code used by 2+ features: `utils/` (api-client, report-requests, format, colors), `i18n.tsx`, `components/` (layout, common, ExportActions); `components/ui/` + `lib/utils.ts` stay (shadcn aliases). Backend types: `import type` via `@backend/*` (`frontend/tsconfig.json` paths → `../src/*`) |

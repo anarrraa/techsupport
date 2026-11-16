@@ -352,9 +352,16 @@ async function runBotDelivery(
 		journal.directMessages({ ...observed, delivered, dryRun: false, failures });
 	}
 
+	// One unreachable recipient must not fail the run: the others keep their
+	// reminder, and the failed legs stay unrecorded so the next run retries them.
+	// Every leg failing is a configuration problem (app not in the catalog,
+	// writes blocked, wrong tenant), and exiting 0 on "delivered 0" would hide it.
 	const failed = Object.values(failures).reduce((total, count) => total + count, 0);
-	if (failed > 0) {
-		throw new Error(`${failed} of ${plan.messages.length} direct-message recipient(s) failed`, {
+	if (failed > 0 && delivered === 0) {
+		const reasons = Object.entries(failures)
+			.map(([reason, count]) => `${reason}:${count}`)
+			.join(' ');
+		throw new Error(`All ${failed} direct-message recipient(s) failed (${reasons})`, {
 			cause: firstFailure,
 		});
 	}

@@ -298,16 +298,17 @@ test('a failed leg leaves the level unrecorded so the missed contact is reached 
 	// leg marked the level notified for someone who never received it.
 	const tickets = [ticket({ resolutionSla: resolutionCycle({ elapsedMinutes: 8 * 60 }) })];
 	const savedOut: { value: EscalationState | null } = { value: null };
-	await assert.rejects(
-		run({
-			config: config({ bot: true }),
-			tickets,
-			savedOut,
-			failSend: (message) =>
-				message.entraObjectId === LEAD ? new TeamsDeliveryError('other', 'refused') : null,
-		}),
-		/direct-message recipient\(s\) failed/,
-	);
+	const result = await run({
+		config: config({ bot: true }),
+		tickets,
+		savedOut,
+		failSend: (message) =>
+			message.entraObjectId === LEAD ? new TeamsDeliveryError('other', 'refused') : null,
+	});
+	// The developer is still reminded: one person's failure costs nobody else
+	// their reminder, so the run does not fail.
+	assert.ok(result.sent.some((message) => message.entraObjectId === DEV));
+	assert.match(result.logs.join('\n'), /1 recipient\(s\) failed/);
 	// The state was still written — that is deliberate, so partial progress
 	// survives — but this level is absent from it.
 	assert.deepEqual(savedOut.value, {}, 'a failed leg must leave the level unrecorded');
@@ -319,17 +320,30 @@ test('records the level when every leg delivered', async () => {
 	assert.deepEqual(result.saved, { 'SYNTHETIC-1': 2 });
 });
 
-test('fails the run visibly when a recipient cannot be reached, without naming them', async () => {
-	const logs: string[] = [];
+test('a partially failing recipient is counted and never named', async () => {
+	const result = await run({
+		config: config({ bot: true }),
+		tickets: [ticket({ resolutionSla: resolutionCycle({ elapsedMinutes: 8 * 60 }) })],
+		failSend: (message) =>
+			message.entraObjectId === LEAD
+				? new TeamsDeliveryError('not-installed', 'bot is not installed')
+				: null,
+	});
+	assert.equal(result.output.directMessageCount, 1);
+	assert.match(result.logs.join('\n'), /1 recipient\(s\) failed/);
+	const observable = JSON.stringify({ logs: result.logs, attributes: result.attributes });
+	for (const secret of [LEAD, 'bot is not installed']) {
+		assert.ok(!observable.includes(secret), `a failure must not name its recipient: ${secret}`);
+	}
+});
+
+test('fails the run when every recipient fails, which a configuration problem causes', async () => {
 	await assert.rejects(
 		run({
 			config: config({ bot: true }),
-			failSend: () => new TeamsDeliveryError('not-installed', 'bot is not installed'),
-			post: async (message) => {
-				logs.push(message);
-			},
+			failSend: () => new TeamsDeliveryError('not-in-catalog', 'app is not in the catalog'),
 		}),
-		/1 of 1 direct-message recipient\(s\) failed/,
+		/All \d+ direct-message recipient\(s\) failed \(not-in-catalog:\d+\)/,
 	);
 });
 
